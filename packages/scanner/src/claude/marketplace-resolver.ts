@@ -143,6 +143,37 @@ async function readGitHubRemote(repoDir: string): Promise<string | undefined> {
   }
 }
 
+/** Read marketplace.json and return the set of declared plugin names. */
+export async function loadMarketplacePluginNames(
+  marketplaceDir: string,
+): Promise<Set<string>> {
+  const names = new Set<string>();
+  for (const rel of [
+    path.join(".claude-plugin", "marketplace.json"),
+    "marketplace.json",
+  ]) {
+    const p = path.join(marketplaceDir, rel);
+    if (!(await pathExists(p))) continue;
+    try {
+      const raw = JSON.parse(await fs.readFile(p, "utf8")) as {
+        plugins?: Array<{ name?: string; id?: string } | string>;
+      };
+      for (const entry of raw.plugins ?? []) {
+        if (typeof entry === "string") {
+          names.add(entry);
+        } else if (entry && typeof entry === "object") {
+          const n = entry.name ?? entry.id;
+          if (n) names.add(String(n));
+        }
+      }
+      if (names.size) return names;
+    } catch {
+      /* try next path */
+    }
+  }
+  return names;
+}
+
 async function loadKnownMarketplaces(
   home: string,
 ): Promise<
@@ -290,6 +321,8 @@ export async function resolveClaudePluginInventory(
   }
 
   // 4) Also scan marketplace dirs for remotes not in known (fill gaps)
+  //    and load marketplace.json plugin membership lists
+  const marketplaceMembers = new Map<string, Set<string>>();
   const marketplacesDir = path.join(claudePluginsDir(home), "marketplaces");
   if (await pathExists(marketplacesDir)) {
     try {
@@ -299,23 +332,59 @@ export async function resolveClaudePluginInventory(
         const st = await fs.stat(mPath).catch(() => null);
         if (!st?.isDirectory()) continue;
         const repo = await readGitHubRemote(mPath);
-        if (!repo) continue;
-        for (const item of byId.values()) {
-          if (item.marketplaceName === name && !item.marketplaceRepository) {
-            item.marketplaceRepository = repo;
-            item.installPath = item.installPath ?? mPath;
-            item.confidence = Math.max(item.confidence, 0.92);
-            item.evidence.push({ from: "marketplace-git-remote", detail: repo });
+        if (repo) {
+          for (const item of byId.values()) {
+            if (item.marketplaceName === name && !item.marketplaceRepository) {
+              item.marketplaceRepository = repo;
+              item.installPath = item.installPath ?? mPath;
+              item.confidence = Math.max(item.confidence, 0.92);
+              item.evidence.push({ from: "marketplace-git-remote", detail: repo });
+            }
           }
         }
+        // marketplace.json membership
+        const members = await loadMarketplacePluginNames(mPath);
+        if (members.size) marketplaceMembers.set(name, members);
       }
     } catch {
       /* ignore */
     }
   }
 
-  // Finalize resolution status
+  // Also check known install locations for manifests
+  for (const [name, m] of known) {
+    if (marketplaceMembers.has(name)) continue;
+    if (m.installLocation) {
+      const members = await loadMarketplacePluginNames(m.installLocation);
+      if (members.size) marketplaceMembers.set(name, members);
+    }
+  }
+
+  // Finalize resolution status + membership validation
   for (const item of byId.values()) {
+    if (item.marketplaceName && marketplaceMembers.has(item.marketplaceName)) {
+      const members = marketplaceMembers.get(item.marketplaceName)!;
+      if (!members.has(item.pluginName)) {
+        item.confidence = Math.min(item.confidence, 0.4);
+        item.evidence.push({
+          from: "marketplace-manifest",
+          detail: `plugin "${item.pluginName}" not listed in marketplace.json`,
+        });
+        // Downgrade: marketplace known but plugin not a member
+        if (item.resolutionStatus !== "unresolved") {
+          item.resolutionStatus = "partially-resolved";
+        }
+        // Clear repository so capture blocks rather than inventing a recipe
+        // only when membership is definitive (manifest was readable)
+        item.marketplaceRepository = undefined;
+        continue;
+      }
+      item.evidence.push({
+        from: "marketplace-manifest",
+        detail: `member of ${item.marketplaceName}`,
+      });
+      item.confidence = Math.max(item.confidence, 0.97);
+    }
     if (item.marketplaceRepository && item.marketplaceName) {
       item.resolutionStatus = "resolved";
       item.confidence = Math.max(item.confidence, 0.95);

@@ -19,7 +19,11 @@ import { resolveClaudePluginInventory } from "./claude/marketplace-resolver.js";
 import { isSystemSkillDirectory } from "./system-skills.js";
 export { parseClaudePluginKey, formatClaudePluginKey, normalizeGitRepositoryUrl } from "./claude/plugin-key.js";
 export { isSystemSkillDirectory, isNeverCapturableResource } from "./system-skills.js";
-export { resolveClaudePluginInventory, parseInstalledPlugins } from "./claude/marketplace-resolver.js";
+export {
+  resolveClaudePluginInventory,
+  parseInstalledPlugins,
+  loadMarketplacePluginNames,
+} from "./claude/marketplace-resolver.js";
 
 export type InventoryClassification =
   | "managed"

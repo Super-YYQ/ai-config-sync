@@ -590,6 +590,41 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
   }
 
   // Codex hooks.json — official event-map shape
+  // Prefer absolute CLI path on Windows for commandWindows
+  let cliAbsoluteCommand: string | undefined;
+  try {
+    // Resolve from programRoot bundled bin when available
+    if (programRoot) {
+      const cjs = path.join(
+        programRoot,
+        "integrations",
+        "claude-plugin",
+        "bin",
+        "ai-config-sync.cjs",
+      );
+      if (await pathExists(cjs)) {
+        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
+      }
+      const distCjs = path.join(programRoot, "dist", "ai-config-sync.cjs");
+      if (!cliAbsoluteCommand && (await pathExists(distCjs))) {
+        cliAbsoluteCommand = `"${process.execPath}" "${distCjs}"`;
+      }
+    }
+    if (!cliAbsoluteCommand) {
+      // try argv[1] (current running CLI)
+      const argv1 = process.argv[1];
+      if (argv1 && (await pathExists(argv1))) {
+        if (argv1.endsWith(".cjs") || argv1.endsWith(".js")) {
+          cliAbsoluteCommand = `"${process.execPath}" "${path.resolve(argv1)}"`;
+        } else {
+          cliAbsoluteCommand = `"${path.resolve(argv1)}"`;
+        }
+      }
+    }
+  } catch {
+    /* optional */
+  }
+
   const hooksPath = codexHooksManifestPath(home);
   let base: unknown = {};
   if (await pathExists(hooksPath)) {
@@ -602,11 +637,17 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
       actions.push(`BACKUP broken hooks.json → ${hooksPath}.bak-*`);
     }
   }
-  const { next, changed } = mergeManagedCodexSessionStart(base);
+  const { next, changed } = mergeManagedCodexSessionStart(base, {
+    cliAbsoluteCommand,
+  });
   if (changed || !hasManagedCodexSessionStart(base)) {
     await ensureDir(path.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
-    actions.push("MERGE Codex hooks.json SessionStart (event-map format)");
+    actions.push(
+      cliAbsoluteCommand
+        ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)"
+        : "MERGE Codex hooks.json SessionStart (event-map format)",
+    );
   }
 
   // Ensure features.hooks = true

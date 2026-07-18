@@ -23,6 +23,16 @@ import {
   type TargetRecipe,
   type TargetTool,
 } from "@ai-config-sync/core";
+import { queryClaudePluginStatus } from "./claude-plugin-status.js";
+
+export {
+  parseClaudePluginListJson,
+  findPluginStatus,
+  queryClaudePluginStatus,
+  pluginIdsEqual,
+  type ClaudePluginListEntry,
+  type ClaudePluginStatus,
+} from "./claude-plugin-status.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -549,22 +559,10 @@ export const claudeMarketplaceDriver: Driver = {
     }
 
     // Probe existing install so rollback won't uninstall pre-existing plugins
-    let previouslyInstalled = false;
-    let previouslyEnabled = false;
-    try {
-      const listOut = await execFileAsync("claude", ["plugin", "list"], {
-        windowsHide: true,
-        maxBuffer: 5 * 1024 * 1024,
-        encoding: "utf8",
-      });
-      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-      if (text.includes(pluginId) || text.includes(plugin)) {
-        previouslyInstalled = true;
-        if (/enabled|✔/i.test(text)) previouslyEnabled = true;
-      }
-    } catch {
-      /* claude missing or list failed */
-    }
+    // Prefer `claude plugin list --json` and full plugin@marketplace id match
+    const status = await queryClaudePluginStatus(pluginId, plugin);
+    let previouslyInstalled = status.installed;
+    let previouslyEnabled = status.enabled;
 
     const receipt: ApplyReceipt = {
       driver: "claude-marketplace",
@@ -719,28 +717,21 @@ export const claudeMarketplaceDriver: Driver = {
     const marketplace = recipe.marketplace;
     const pluginId =
       marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
-    try {
-      const listOut = await execFileAsync("claude", ["plugin", "list"], {
-        windowsHide: true,
-        maxBuffer: 5 * 1024 * 1024,
-        encoding: "utf8",
-      });
-      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-      const present = text.includes(pluginId) || text.includes(plugin);
-      return {
-        ok: present,
-        message: present
-          ? `plugin present: ${pluginId}`
-          : `plugin missing: ${pluginId}`,
-        pathsTouched: [],
-      };
-    } catch (e) {
+    const status = await queryClaudePluginStatus(pluginId, plugin);
+    if (status.source === "unavailable") {
       return {
         ok: false,
-        message: `verify failed: ${(e as Error).message}`,
+        message: `verify failed: claude plugin list unavailable`,
         pathsTouched: [],
       };
     }
+    return {
+      ok: status.installed,
+      message: status.installed
+        ? `plugin present: ${pluginId}${status.enabled ? " (enabled)" : " (disabled)"} [${status.source}]`
+        : `plugin missing: ${pluginId}`,
+      pathsTouched: [],
+    };
   },
 };
 

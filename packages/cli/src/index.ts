@@ -305,7 +305,14 @@ program
   .option("--json", "JSON output of proposals")
   .option("--commit", "Git commit after writing (secret-scanned)")
   .option("--push", "Push after commit")
-  .option("--ai", "Enable analyze-only AI/heuristic recipe assistant for non-standard sources")
+  .option(
+      "--analyze",
+      "Enable heuristic recipe analysis for non-standard sources (no LLM required)",
+    )
+  .option(
+      "--ai",
+      "Alias of --analyze; real LLM only when localConfig.ai has a provider configured",
+    )
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
     const ctx = await loadCtx(home);
@@ -319,6 +326,7 @@ program
       targets: localConfig.targets,
     });
     const aiEnabled =
+      !!opts.analyze ||
       !!opts.ai ||
       (localConfig.ai?.enabled && localConfig.ai.mode === "analyze-only");
     const proposals = await buildCaptureProposals(
@@ -367,7 +375,9 @@ program
     }
     if (!opts.yes) {
       console.log("\nRe-run with --yes to write resources.yaml and recipes.");
-      console.log("Use --ai to enable heuristic/AI analyze-only for unknown layouts.");
+      console.log(
+        "Use --analyze for heuristic analysis of unknown layouts (no LLM). --ai is an alias.",
+      );
       console.log("Note: --yes only writes READY proposals (blocked/system excluded).");
       return;
     }

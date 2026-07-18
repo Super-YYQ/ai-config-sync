@@ -55,14 +55,18 @@ function shouldSkipFile(name: string): boolean {
 
 /**
  * Copy skill source into configRepo/sources/skills/<id>
+ * When stagingRoot is provided, write under stagingRoot instead of configRepoPath
+ * (used for transactional capture).
  */
 export async function vendorSkillDirectory(
   sourceDir: string,
   configRepoPath: string,
   resourceId: string,
+  options: { stagingRoot?: string } = {},
 ): Promise<VendorResult> {
   const destRel = path.posix.join("sources", "skills", resourceId);
-  const destAbs = path.join(configRepoPath, "sources", "skills", resourceId);
+  const baseRoot = options.stagingRoot ?? configRepoPath;
+  const destAbs = path.join(baseRoot, "sources", "skills", resourceId);
 
   if (!(await pathExists(sourceDir))) {
     return {

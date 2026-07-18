@@ -976,7 +976,7 @@ var require_command = __commonJS({
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
     var path20 = require("node:path");
-    var fs9 = require("node:fs");
+    var fs10 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1909,10 +1909,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
           const localBin = path20.resolve(baseDir, baseName);
-          if (fs9.existsSync(localBin)) return localBin;
+          if (fs10.existsSync(localBin)) return localBin;
           if (sourceExt.includes(path20.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs9.existsSync(`${localBin}${ext}`)
+            (ext) => fs10.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1924,7 +1924,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs9.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs10.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
@@ -14424,14 +14424,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs9 = this.flowScalar(this.type);
+              const fs10 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs9, sep: [] });
+                map.items.push({ start, key: fs10, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs9);
+                this.stack.push(fs10);
               } else {
-                Object.assign(it, { key: fs9, sep: [] });
+                Object.assign(it, { key: fs10, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -14559,13 +14559,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs9 = this.flowScalar(this.type);
+              const fs10 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs9, sep: [] });
+                fc.items.push({ start: [], key: fs10, sep: [] });
               else if (it.sep)
-                this.stack.push(fs9);
+                this.stack.push(fs10);
               else
-                Object.assign(it, { key: fs9, sep: [] });
+                Object.assign(it, { key: fs10, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -15623,6 +15623,11 @@ var init_config_io = __esm({
 function isPlainObject2(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
+function isManagedHookCommand(cmd) {
+  if (typeof cmd !== "string")
+    return false;
+  return cmd.includes("ai-config-sync") && cmd.includes("scan");
+}
 function hasManagedCodexSessionStart(doc) {
   if (!isPlainObject2(doc))
     return false;
@@ -15634,7 +15639,7 @@ function hasManagedCodexSessionStart(doc) {
         if (!isPlainObject2(block) || !Array.isArray(block.hooks))
           continue;
         for (const h of block.hooks) {
-          if (isPlainObject2(h) && typeof h.command === "string" && h.command.includes("ai-config-sync") && h.command.includes("scan")) {
+          if (isPlainObject2(h) && (isManagedHookCommand(h.command) || isManagedHookCommand(h.commandWindows) || h.id === MANAGED_ID)) {
             return true;
           }
         }
@@ -15642,23 +15647,58 @@ function hasManagedCodexSessionStart(doc) {
     }
   }
   if (Array.isArray(hooks)) {
-    return hooks.some((h) => isPlainObject2(h) && (h.id === MANAGED_ID || typeof h.command === "string" && h.command.includes("ai-config-sync")));
+    return hooks.some((h) => isPlainObject2(h) && (h.id === MANAGED_ID || isManagedHookCommand(h.command) || isManagedHookCommand(h.commandWindows)));
   }
   return false;
 }
-function mergeManagedCodexSessionStart(doc) {
-  if (hasManagedCodexSessionStart(doc)) {
-    return {
-      next: isPlainObject2(doc) ? { ...doc } : { hooks: {} },
-      changed: false
-    };
-  }
+function buildManagedCommand(options) {
   const managedCmd = {
     type: "command",
     command: MANAGED_COMMAND,
     timeout: 20,
     id: MANAGED_ID
   };
+  if (options?.cliAbsoluteCommand) {
+    managedCmd.commandWindows = options.cliAbsoluteCommand.includes("scan") ? options.cliAbsoluteCommand : `${options.cliAbsoluteCommand} scan --light --write-pending`;
+  }
+  return managedCmd;
+}
+function mergeManagedCodexSessionStart(doc, options) {
+  if (hasManagedCodexSessionStart(doc)) {
+    if (options?.cliAbsoluteCommand && isPlainObject2(doc) && isPlainObject2(doc.hooks)) {
+      const hooks = { ...doc.hooks };
+      const session2 = Array.isArray(hooks.SessionStart) ? [...hooks.SessionStart] : [];
+      let refreshed = false;
+      const nextSession = session2.map((block) => {
+        if (!isPlainObject2(block) || !Array.isArray(block.hooks))
+          return block;
+        const nextHooks = block.hooks.map((h) => {
+          if (isPlainObject2(h) && (h.id === MANAGED_ID || isManagedHookCommand(h.command))) {
+            if (!h.commandWindows) {
+              refreshed = true;
+              return {
+                ...h,
+                commandWindows: options.cliAbsoluteCommand.includes("scan") ? options.cliAbsoluteCommand : `${options.cliAbsoluteCommand} scan --light --write-pending`
+              };
+            }
+          }
+          return h;
+        });
+        return { ...block, hooks: nextHooks };
+      });
+      if (refreshed) {
+        return {
+          next: { ...doc, hooks: { ...hooks, SessionStart: nextSession } },
+          changed: true
+        };
+      }
+    }
+    return {
+      next: isPlainObject2(doc) ? { ...doc } : { hooks: {} },
+      changed: false
+    };
+  }
+  const managedCmd = buildManagedCommand(options);
   let next;
   if (isPlainObject2(doc)) {
     next = { ...doc };
@@ -15994,6 +16034,33 @@ async function readGitHubRemote(repoDir) {
     return void 0;
   }
 }
+async function loadMarketplacePluginNames(marketplaceDir) {
+  const names = /* @__PURE__ */ new Set();
+  for (const rel of [
+    import_node_path5.default.join(".claude-plugin", "marketplace.json"),
+    "marketplace.json"
+  ]) {
+    const p = import_node_path5.default.join(marketplaceDir, rel);
+    if (!await pathExists(p))
+      continue;
+    try {
+      const raw = JSON.parse(await import_promises3.default.readFile(p, "utf8"));
+      for (const entry of raw.plugins ?? []) {
+        if (typeof entry === "string") {
+          names.add(entry);
+        } else if (entry && typeof entry === "object") {
+          const n = entry.name ?? entry.id;
+          if (n)
+            names.add(String(n));
+        }
+      }
+      if (names.size)
+        return names;
+    } catch {
+    }
+  }
+  return names;
+}
 async function loadKnownMarketplaces(home) {
   const map = /* @__PURE__ */ new Map();
   const knownPath = import_node_path5.default.join(claudePluginsDir(home), "known_marketplaces.json");
@@ -16102,6 +16169,7 @@ async function resolveClaudePluginInventory(home) {
       detail: item.marketplaceName
     });
   }
+  const marketplaceMembers = /* @__PURE__ */ new Map();
   const marketplacesDir = import_node_path5.default.join(claudePluginsDir(home), "marketplaces");
   if (await pathExists(marketplacesDir)) {
     try {
@@ -16112,21 +16180,53 @@ async function resolveClaudePluginInventory(home) {
         if (!st?.isDirectory())
           continue;
         const repo = await readGitHubRemote(mPath);
-        if (!repo)
-          continue;
-        for (const item of byId.values()) {
-          if (item.marketplaceName === name && !item.marketplaceRepository) {
-            item.marketplaceRepository = repo;
-            item.installPath = item.installPath ?? mPath;
-            item.confidence = Math.max(item.confidence, 0.92);
-            item.evidence.push({ from: "marketplace-git-remote", detail: repo });
+        if (repo) {
+          for (const item of byId.values()) {
+            if (item.marketplaceName === name && !item.marketplaceRepository) {
+              item.marketplaceRepository = repo;
+              item.installPath = item.installPath ?? mPath;
+              item.confidence = Math.max(item.confidence, 0.92);
+              item.evidence.push({ from: "marketplace-git-remote", detail: repo });
+            }
           }
         }
+        const members = await loadMarketplacePluginNames(mPath);
+        if (members.size)
+          marketplaceMembers.set(name, members);
       }
     } catch {
     }
   }
+  for (const [name, m] of known) {
+    if (marketplaceMembers.has(name))
+      continue;
+    if (m.installLocation) {
+      const members = await loadMarketplacePluginNames(m.installLocation);
+      if (members.size)
+        marketplaceMembers.set(name, members);
+    }
+  }
   for (const item of byId.values()) {
+    if (item.marketplaceName && marketplaceMembers.has(item.marketplaceName)) {
+      const members = marketplaceMembers.get(item.marketplaceName);
+      if (!members.has(item.pluginName)) {
+        item.confidence = Math.min(item.confidence, 0.4);
+        item.evidence.push({
+          from: "marketplace-manifest",
+          detail: `plugin "${item.pluginName}" not listed in marketplace.json`
+        });
+        if (item.resolutionStatus !== "unresolved") {
+          item.resolutionStatus = "partially-resolved";
+        }
+        item.marketplaceRepository = void 0;
+        continue;
+      }
+      item.evidence.push({
+        from: "marketplace-manifest",
+        detail: `member of ${item.marketplaceName}`
+      });
+      item.confidence = Math.max(item.confidence, 0.97);
+    }
     if (item.marketplaceRepository && item.marketplaceName) {
       item.resolutionStatus = "resolved";
       item.confidence = Math.max(item.confidence, 0.95);
@@ -17282,11 +17382,142 @@ var import_node_path13 = __toESM(require("node:path"), 1);
 init_dist();
 
 // drivers/dist/index.js
-var import_node_child_process3 = require("node:child_process");
-var import_node_util3 = require("node:util");
+var import_node_child_process4 = require("node:child_process");
+var import_node_util4 = require("node:util");
 var import_node_path11 = __toESM(require("node:path"), 1);
 init_dist();
+
+// drivers/dist/claude-plugin-status.js
+var import_node_child_process3 = require("node:child_process");
+var import_node_util3 = require("node:util");
 var execFileAsync3 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
+function isPlainObject4(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function pluginIdsEqual(a, b) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+function parseClaudePluginListJson(raw) {
+  const out = [];
+  const push = (item) => {
+    if (!isPlainObject4(item))
+      return;
+    const id = String(item.id ?? item.name ?? "");
+    if (!id)
+      return;
+    out.push({
+      id,
+      version: typeof item.version === "string" ? item.version : void 0,
+      scope: typeof item.scope === "string" ? item.scope : void 0,
+      enabled: typeof item.enabled === "boolean" ? item.enabled : typeof item.status === "string" ? /enabled/i.test(item.status) : void 0,
+      installPath: typeof item.installPath === "string" ? item.installPath : typeof item.path === "string" ? item.path : void 0
+    });
+  };
+  if (Array.isArray(raw)) {
+    for (const item of raw)
+      push(item);
+    return out;
+  }
+  if (isPlainObject4(raw)) {
+    if (Array.isArray(raw.plugins)) {
+      for (const item of raw.plugins)
+        push(item);
+      return out;
+    }
+    if (Array.isArray(raw.installed)) {
+      for (const item of raw.installed)
+        push(item);
+      return out;
+    }
+  }
+  return out;
+}
+function findPluginStatus(entries, pluginId, pluginName) {
+  const exact = entries.find((e) => pluginIdsEqual(e.id, pluginId));
+  if (exact) {
+    return {
+      installed: true,
+      enabled: exact.enabled === true,
+      entry: exact,
+      source: "json"
+    };
+  }
+  const bareName = !pluginId.includes("@") ? pluginId : pluginName && pluginName !== pluginId ? pluginName : void 0;
+  if (bareName) {
+    const byNameOnly = entries.find((e) => e.id.toLowerCase().startsWith(bareName.toLowerCase() + "@"));
+    if (byNameOnly) {
+      return {
+        installed: true,
+        enabled: byNameOnly.enabled === true,
+        entry: byNameOnly,
+        source: "json"
+      };
+    }
+  }
+  return { installed: false, enabled: false, source: "json" };
+}
+async function queryClaudePluginStatus(pluginId, pluginName) {
+  try {
+    const listOut = await execFileAsync3(process.platform === "win32" ? "claude.cmd" : "claude", ["plugin", "list", "--json"], {
+      windowsHide: true,
+      maxBuffer: 5 * 1024 * 1024,
+      encoding: "utf8"
+    });
+    const text = `${listOut.stdout ?? ""}`.trim();
+    if (text) {
+      try {
+        const parsed = JSON.parse(text);
+        const entries = parseClaudePluginListJson(parsed);
+        return findPluginStatus(entries, pluginId, pluginName);
+      } catch {
+      }
+    }
+  } catch {
+  }
+  try {
+    const listOut = await execFileAsync3("claude", ["plugin", "list", "--json"], {
+      windowsHide: true,
+      maxBuffer: 5 * 1024 * 1024,
+      encoding: "utf8",
+      shell: process.platform === "win32"
+    });
+    const text = `${listOut.stdout ?? ""}`.trim();
+    const parsed = JSON.parse(text);
+    const entries = parseClaudePluginListJson(parsed);
+    return findPluginStatus(entries, pluginId, pluginName);
+  } catch {
+  }
+  try {
+    const listOut = await execFileAsync3("claude", ["plugin", "list"], {
+      windowsHide: true,
+      maxBuffer: 5 * 1024 * 1024,
+      encoding: "utf8",
+      shell: process.platform === "win32"
+    });
+    const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+    const lines = text.split(/\r?\n/);
+    const idLower = pluginId.toLowerCase();
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (lower.includes(idLower)) {
+        const re = new RegExp(`(^|[^A-Za-z0-9_@.-])${pluginId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9_@.-]|$)`, "i");
+        if (re.test(line)) {
+          return {
+            installed: true,
+            enabled: /enabled|✔|✓/i.test(line),
+            source: "text-fallback"
+          };
+        }
+      }
+    }
+    return { installed: false, enabled: false, source: "text-fallback" };
+  } catch {
+    return { installed: false, enabled: false, source: "unavailable" };
+  }
+}
+
+// drivers/dist/index.js
+var execFileAsync4 = (0, import_node_util4.promisify)(import_node_child_process4.execFile);
 function destSkillDir(target, resourceId, home) {
   return target === "claude" ? import_node_path11.default.join(claudeSkillsDir(home), resourceId) : import_node_path11.default.join(codexSkillsDir(home), resourceId);
 }
@@ -17565,7 +17796,7 @@ async function applyOperation(op, ctx, recipe) {
       }
       try {
         const [bin, ...args] = cmd;
-        await execFileAsync3(bin, args, {
+        await execFileAsync4(bin, args, {
           cwd: ctx.sourceRoot ?? ctx.home,
           windowsHide: true,
           maxBuffer: 5 * 1024 * 1024
@@ -17661,22 +17892,9 @@ var claudeMarketplaceDriver = {
         pathsTouched: []
       };
     }
-    let previouslyInstalled = false;
-    let previouslyEnabled = false;
-    try {
-      const listOut = await execFileAsync3("claude", ["plugin", "list"], {
-        windowsHide: true,
-        maxBuffer: 5 * 1024 * 1024,
-        encoding: "utf8"
-      });
-      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-      if (text.includes(pluginId) || text.includes(plugin)) {
-        previouslyInstalled = true;
-        if (/enabled|✔/i.test(text))
-          previouslyEnabled = true;
-      }
-    } catch {
-    }
+    const status = await queryClaudePluginStatus(pluginId, plugin);
+    let previouslyInstalled = status.installed;
+    let previouslyEnabled = status.enabled;
     const receipt = {
       driver: "claude-marketplace",
       resourceId: ctx.resourceId,
@@ -17729,7 +17947,7 @@ var claudeMarketplaceDriver = {
     const messages = [];
     for (const { cmd, kind } of commands) {
       try {
-        await execFileAsync3(cmd[0], cmd.slice(1), {
+        await execFileAsync4(cmd[0], cmd.slice(1), {
           windowsHide: true,
           maxBuffer: 5 * 1024 * 1024
         });
@@ -17787,7 +18005,7 @@ var claudeMarketplaceDriver = {
     const messages = [];
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
-        await execFileAsync3("claude", ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await execFileAsync4("claude", ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`disable failed: ${e.message}`);
@@ -17795,7 +18013,7 @@ var claudeMarketplaceDriver = {
     }
     if (receipt.pluginInstalled && !receipt.previouslyInstalled && receipt.pluginId) {
       try {
-        await execFileAsync3("claude", ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await execFileAsync4("claude", ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`uninstall failed: ${e.message}`);
@@ -17810,26 +18028,19 @@ var claudeMarketplaceDriver = {
     const plugin = recipe.plugin ?? ctx.resourceId;
     const marketplace = recipe.marketplace;
     const pluginId = marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
-    try {
-      const listOut = await execFileAsync3("claude", ["plugin", "list"], {
-        windowsHide: true,
-        maxBuffer: 5 * 1024 * 1024,
-        encoding: "utf8"
-      });
-      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-      const present = text.includes(pluginId) || text.includes(plugin);
-      return {
-        ok: present,
-        message: present ? `plugin present: ${pluginId}` : `plugin missing: ${pluginId}`,
-        pathsTouched: []
-      };
-    } catch (e) {
+    const status = await queryClaudePluginStatus(pluginId, plugin);
+    if (status.source === "unavailable") {
       return {
         ok: false,
-        message: `verify failed: ${e.message}`,
+        message: `verify failed: claude plugin list unavailable`,
         pathsTouched: []
       };
     }
+    return {
+      ok: status.installed,
+      message: status.installed ? `plugin present: ${pluginId}${status.enabled ? " (enabled)" : " (disabled)"} [${status.source}]` : `plugin missing: ${pluginId}`,
+      pathsTouched: []
+    };
   }
 };
 var npxSkillsDriver = {
@@ -17865,7 +18076,7 @@ var npxSkillsDriver = {
       };
     }
     try {
-      await execFileAsync3(cmd[0], cmd.slice(1), {
+      await execFileAsync4(cmd[0], cmd.slice(1), {
         windowsHide: true,
         maxBuffer: 10 * 1024 * 1024
       });
@@ -18548,6 +18759,7 @@ async function buildDriftReport(ctx) {
 
 // packages/recipe-engine/dist/capture.js
 var import_node_path16 = __toESM(require("node:path"), 1);
+var import_promises8 = __toESM(require("node:fs/promises"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -18663,9 +18875,10 @@ var SKIP_FILE_GLOBS = [
 function shouldSkipFile(name) {
   return SKIP_FILE_GLOBS.some((re) => re.test(name));
 }
-async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
+async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, options = {}) {
   const destRel = import_node_path15.default.posix.join("sources", "skills", resourceId);
-  const destAbs = import_node_path15.default.join(configRepoPath, "sources", "skills", resourceId);
+  const baseRoot = options.stagingRoot ?? configRepoPath;
+  const destAbs = import_node_path15.default.join(baseRoot, "sources", "skills", resourceId);
   if (!await pathExists(sourceDir)) {
     return {
       ok: false,
@@ -19124,84 +19337,153 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
       usedAi: prev.usedAi || item.usedAi
     });
   }
-  for (const item of batchById.values()) {
-    if (item.status === "blocked" || item.status === "system-excluded") {
-      continue;
-    }
-    const validation = validateCaptureProposal(item);
-    if (!validation.ok) {
-      continue;
-    }
-    if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path16.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
-      const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id);
-      if (!v.ok) {
-        throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
+  const stagingRoot = import_node_path16.default.join(configRepoPath, `.ai-config-sync-staging-${Date.now()}`);
+  const backupRoot = import_node_path16.default.join(configRepoPath, `.ai-config-sync-backup-${Date.now()}`);
+  const stagedRecipeRels = [];
+  const stagedVendorRels = [];
+  try {
+    await import_promises8.default.mkdir(import_node_path16.default.join(stagingRoot, "recipes"), { recursive: true });
+    for (const item of batchById.values()) {
+      if (item.status === "blocked" || item.status === "system-excluded") {
+        continue;
       }
-      item.suggestedResource = {
-        ...item.suggestedResource,
-        source: {
-          provider: "vendored",
-          path: v.destRel
-        },
-        versionPolicy: "vendored"
-      };
-      if (item.suggestedRecipe) {
-        item.suggestedRecipe = {
-          ...item.suggestedRecipe,
-          source: item.suggestedResource.source,
-          versionPolicy: "vendored",
-          targets: Object.fromEntries(Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
-            t,
-            tr ? {
-              ...tr,
-              sourcePaths: { skill: "." },
-              requiredPaths: ["SKILL.md"],
-              driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill"
-            } : tr
-          ]))
+      const validation = validateCaptureProposal(item);
+      if (!validation.ok) {
+        continue;
+      }
+      if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path16.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
+        const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id, { stagingRoot });
+        if (!v.ok) {
+          throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
+        }
+        stagedVendorRels.push(v.destRel);
+        item.suggestedResource = {
+          ...item.suggestedResource,
+          source: {
+            provider: "vendored",
+            path: v.destRel
+          },
+          versionPolicy: "vendored"
         };
-      }
-    }
-    const prev = byId.get(item.suggestedResource.id);
-    if (prev) {
-      byId.set(item.suggestedResource.id, {
-        ...prev,
-        ...item.suggestedResource,
-        targets: {
-          ...prev.targets,
-          ...item.suggestedResource.targets
-        }
-      });
-    } else {
-      byId.set(item.suggestedResource.id, item.suggestedResource);
-    }
-    if (item.suggestedRecipe) {
-      const recipeFile = import_node_path16.default.join(configRepoPath, "recipes", `${item.suggestedResource.id}.yaml`);
-      let baseTargets = item.suggestedRecipe.targets;
-      if (await pathExists(recipeFile)) {
-        try {
-          const existingRecipe = await loadRecipe(recipeFile);
-          baseTargets = {
-            ...existingRecipe.targets,
-            ...item.suggestedRecipe.targets
+        if (item.suggestedRecipe) {
+          item.suggestedRecipe = {
+            ...item.suggestedRecipe,
+            source: item.suggestedResource.source,
+            versionPolicy: "vendored",
+            targets: Object.fromEntries(Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
+              t,
+              tr ? {
+                ...tr,
+                sourcePaths: { skill: "." },
+                requiredPaths: ["SKILL.md"],
+                driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill"
+              } : tr
+            ]))
           };
-        } catch {
         }
       }
-      const recipe = {
-        ...item.suggestedRecipe,
-        targets: baseTargets,
-        confirmedAt: now,
-        confirmedBy
-      };
-      await saveRecipe(recipeFile, recipe);
-      recipePaths.push(recipeFile);
+      const prev = byId.get(item.suggestedResource.id);
+      if (prev) {
+        byId.set(item.suggestedResource.id, {
+          ...prev,
+          ...item.suggestedResource,
+          targets: {
+            ...prev.targets,
+            ...item.suggestedResource.targets
+          }
+        });
+      } else {
+        byId.set(item.suggestedResource.id, item.suggestedResource);
+      }
+      if (item.suggestedRecipe) {
+        const recipeRel = import_node_path16.default.posix.join("recipes", `${item.suggestedResource.id}.yaml`);
+        const recipeFileLive = import_node_path16.default.join(configRepoPath, recipeRel);
+        const recipeFileStage = import_node_path16.default.join(stagingRoot, recipeRel);
+        let baseTargets = item.suggestedRecipe.targets;
+        if (await pathExists(recipeFileLive)) {
+          try {
+            const existingRecipe = await loadRecipe(recipeFileLive);
+            baseTargets = {
+              ...existingRecipe.targets,
+              ...item.suggestedRecipe.targets
+            };
+          } catch {
+          }
+        }
+        const recipe = {
+          ...item.suggestedRecipe,
+          targets: baseTargets,
+          confirmedAt: now,
+          confirmedBy
+        };
+        RecipeSchema.parse(recipe);
+        await saveRecipe(recipeFileStage, recipe);
+        stagedRecipeRels.push(recipeRel);
+        recipePaths.push(recipeFileLive);
+      }
     }
+    const stagedResources = import_node_path16.default.join(stagingRoot, "resources.yaml");
+    await saveResources(stagedResources, {
+      schemaVersion: 1,
+      resources: [...byId.values()]
+    });
+    await loadResources(stagedResources);
+    const toBackup = ["resources.yaml", ...stagedRecipeRels, ...stagedVendorRels];
+    await import_promises8.default.mkdir(backupRoot, { recursive: true });
+    for (const rel of toBackup) {
+      const live = import_node_path16.default.join(configRepoPath, rel);
+      if (await pathExists(live)) {
+        const bak = import_node_path16.default.join(backupRoot, rel);
+        await import_promises8.default.mkdir(import_node_path16.default.dirname(bak), { recursive: true });
+        await import_promises8.default.cp(live, bak, { recursive: true });
+      }
+    }
+    for (const rel of stagedVendorRels) {
+      const from = import_node_path16.default.join(stagingRoot, rel);
+      const to = import_node_path16.default.join(configRepoPath, rel);
+      if (await pathExists(to)) {
+        await import_promises8.default.rm(to, { recursive: true, force: true });
+      }
+      await import_promises8.default.mkdir(import_node_path16.default.dirname(to), { recursive: true });
+      await import_promises8.default.rename(from, to).catch(async () => {
+        await import_promises8.default.cp(from, to, { recursive: true });
+        await import_promises8.default.rm(from, { recursive: true, force: true });
+      });
+    }
+    for (const rel of stagedRecipeRels) {
+      const from = import_node_path16.default.join(stagingRoot, rel);
+      const to = import_node_path16.default.join(configRepoPath, rel);
+      await import_promises8.default.mkdir(import_node_path16.default.dirname(to), { recursive: true });
+      await import_promises8.default.rename(from, to).catch(async () => {
+        await import_promises8.default.copyFile(from, to);
+        await import_promises8.default.rm(from, { force: true });
+      });
+    }
+    {
+      const from = stagedResources;
+      const to = resourcesPath;
+      await import_promises8.default.rename(from, to).catch(async () => {
+        await import_promises8.default.copyFile(from, to);
+        await import_promises8.default.rm(from, { force: true });
+      });
+    }
+    await import_promises8.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
+    });
+    await import_promises8.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+    });
+  } catch (e) {
+    try {
+      if (await pathExists(backupRoot)) {
+        const entries = await import_promises8.default.readdir(backupRoot, { withFileTypes: true });
+        await import_promises8.default.cp(backupRoot, configRepoPath, { recursive: true, force: true });
+        void entries;
+      }
+    } catch {
+    }
+    await import_promises8.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+    });
+    throw e;
   }
-  await saveResources(resourcesPath, {
-    schemaVersion: 1,
-    resources: [...byId.values()]
-  });
   return { resourcesPath, recipePaths };
 }
 
@@ -19233,10 +19515,10 @@ async function runDoctor(options) {
   }
   for (const bin of ["git", "node"]) {
     try {
-      const { execFile: execFile4 } = await import("node:child_process");
-      const { promisify: promisify4 } = await import("node:util");
-      const execFileAsync4 = promisify4(execFile4);
-      await execFileAsync4(bin, ["--version"], { windowsHide: true });
+      const { execFile: execFile5 } = await import("node:child_process");
+      const { promisify: promisify5 } = await import("node:util");
+      const execFileAsync5 = promisify5(execFile5);
+      await execFileAsync5(bin, ["--version"], { windowsHide: true });
       findings.push({
         severity: "ok",
         code: "dep-present",
@@ -19251,10 +19533,10 @@ async function runDoctor(options) {
     }
   }
   try {
-    const { execFile: execFile4 } = await import("node:child_process");
-    const { promisify: promisify4 } = await import("node:util");
-    const execFileAsync4 = promisify4(execFile4);
-    const out = await execFileAsync4("ai-config-sync", ["--version"], {
+    const { execFile: execFile5 } = await import("node:child_process");
+    const { promisify: promisify5 } = await import("node:util");
+    const execFileAsync5 = promisify5(execFile5);
+    const out = await execFileAsync5("ai-config-sync", ["--version"], {
       windowsHide: true,
       encoding: "utf8"
     });
@@ -19453,7 +19735,7 @@ function formatDoctor(report) {
 
 // packages/cli/src/setup.ts
 var import_node_path18 = __toESM(require("node:path"), 1);
-var import_promises8 = __toESM(require("node:fs/promises"), 1);
+var import_promises9 = __toESM(require("node:fs/promises"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
@@ -19601,7 +19883,7 @@ async function detectConfigRepo(options, home) {
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    const files = await import_promises8.default.readdir(dir).catch(() => []);
+    const files = await import_promises9.default.readdir(dir).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: dir, reason: "cwd walk" };
     }
@@ -19616,7 +19898,7 @@ async function detectConfigRepo(options, home) {
   ];
   for (const c of candidates) {
     if (!await pathExists(c)) continue;
-    const files = await import_promises8.default.readdir(c).catch(() => []);
+    const files = await import_promises9.default.readdir(c).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: c, reason: "default directory" };
     }
@@ -19713,12 +19995,12 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     );
     return actions;
   }
-  const { execFile: execFile4 } = await import("node:child_process");
-  const { promisify: promisify4 } = await import("node:util");
-  const execFileAsync4 = promisify4(execFile4);
+  const { execFile: execFile5 } = await import("node:child_process");
+  const { promisify: promisify5 } = await import("node:util");
+  const execFileAsync5 = promisify5(execFile5);
   const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
   const runClaude = async (args, timeout = 12e4) => {
-    await execFileAsync4(claudeBin, args, {
+    await execFileAsync5(claudeBin, args, {
       windowsHide: true,
       timeout,
       maxBuffer: 4 * 1024 * 1024
@@ -19739,7 +20021,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
     if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
       await ensureDir(import_node_path18.default.dirname(skillDest));
-      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
       actions.push("INSTALL Claude user skill: config-sync (fallback, no claude CLI)");
     }
     return actions;
@@ -19838,7 +20120,7 @@ async function installCodexIntegration(home, programRoot) {
   if (!await pathExists(skillMd)) {
     await ensureDir(skillDest);
     if (skillSrc) {
-      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
     } else {
       await writeText(
         skillMd,
@@ -19863,22 +20145,56 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     }
     actions.push(`INSTALL agents skill: config-sync \u2192 ${skillDest}`);
   }
+  let cliAbsoluteCommand;
+  try {
+    if (programRoot) {
+      const cjs = import_node_path18.default.join(
+        programRoot,
+        "integrations",
+        "claude-plugin",
+        "bin",
+        "ai-config-sync.cjs"
+      );
+      if (await pathExists(cjs)) {
+        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
+      }
+      const distCjs = import_node_path18.default.join(programRoot, "dist", "ai-config-sync.cjs");
+      if (!cliAbsoluteCommand && await pathExists(distCjs)) {
+        cliAbsoluteCommand = `"${process.execPath}" "${distCjs}"`;
+      }
+    }
+    if (!cliAbsoluteCommand) {
+      const argv1 = process.argv[1];
+      if (argv1 && await pathExists(argv1)) {
+        if (argv1.endsWith(".cjs") || argv1.endsWith(".js")) {
+          cliAbsoluteCommand = `"${process.execPath}" "${import_node_path18.default.resolve(argv1)}"`;
+        } else {
+          cliAbsoluteCommand = `"${import_node_path18.default.resolve(argv1)}"`;
+        }
+      }
+    }
+  } catch {
+  }
   const hooksPath = codexHooksManifestPath(home);
   let base = {};
   if (await pathExists(hooksPath)) {
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      await import_promises8.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      await import_promises9.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
     }
   }
-  const { next, changed } = mergeManagedCodexSessionStart(base);
+  const { next, changed } = mergeManagedCodexSessionStart(base, {
+    cliAbsoluteCommand
+  });
   if (changed || !hasManagedCodexSessionStart(base)) {
     await ensureDir(import_node_path18.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
-    actions.push("MERGE Codex hooks.json SessionStart (event-map format)");
+    actions.push(
+      cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
+    );
   }
   const cfgPath = codexConfigPath(home);
   let toml = await pathExists(cfgPath) ? await readText(cfgPath) : "";
@@ -20316,7 +20632,13 @@ program2.command("scan").description("Read-only scan of local Claude/Codex resou
     console.log("\u4E0B\u4E00\u6B65\uFF1A\u5173\u8054\u79C1\u6709\u914D\u7F6E\u4ED3\u5E93\u540E\uFF0C\u53EF\u7528 capture \u628A\u672A\u7EB3\u7BA1\u8D44\u6E90\u5199\u5165\u6E05\u5355\u3002");
   }
 });
-program2.command("capture").description("Propose managing local resources into the private config repo").option("--home <path>", "Override home directory").option("--yes", "Confirm and write proposals without prompt").option("--json", "JSON output of proposals").option("--commit", "Git commit after writing (secret-scanned)").option("--push", "Push after commit").option("--ai", "Enable analyze-only AI/heuristic recipe assistant for non-standard sources").action(async (opts) => {
+program2.command("capture").description("Propose managing local resources into the private config repo").option("--home <path>", "Override home directory").option("--yes", "Confirm and write proposals without prompt").option("--json", "JSON output of proposals").option("--commit", "Git commit after writing (secret-scanned)").option("--push", "Push after commit").option(
+  "--analyze",
+  "Enable heuristic recipe analysis for non-standard sources (no LLM required)"
+).option(
+  "--ai",
+  "Alias of --analyze; real LLM only when localConfig.ai has a provider configured"
+).action(async (opts) => {
   const home = homeOpt({ opts: () => opts });
   const ctx = await loadCtx(home);
   if (!requireLinked(ctx, "capture")) return;
@@ -20328,7 +20650,7 @@ program2.command("capture").description("Propose managing local resources into t
     managedIds,
     targets: localConfig.targets
   });
-  const aiEnabled = !!opts.ai || localConfig.ai?.enabled && localConfig.ai.mode === "analyze-only";
+  const aiEnabled = !!opts.analyze || !!opts.ai || localConfig.ai?.enabled && localConfig.ai.mode === "analyze-only";
   const proposals = await buildCaptureProposals(
     inventryDiff(scan, managedIds),
     configRepoPath,
@@ -20365,7 +20687,9 @@ program2.command("capture").description("Propose managing local resources into t
   }
   if (!opts.yes) {
     console.log("\nRe-run with --yes to write resources.yaml and recipes.");
-    console.log("Use --ai to enable heuristic/AI analyze-only for unknown layouts.");
+    console.log(
+      "Use --analyze for heuristic analysis of unknown layouts (no LLM). --ai is an alias."
+    );
     console.log("Note: --yes only writes READY proposals (blocked/system excluded).");
     return;
   }

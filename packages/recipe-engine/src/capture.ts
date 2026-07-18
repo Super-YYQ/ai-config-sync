@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs/promises";
 import {
   RecipeSchema,
   saveRecipe,
@@ -541,6 +542,8 @@ export async function buildCaptureProposals(
 
 /**
  * Persist confirmed capture items into the private config repo.
+ * Transactional: stage under .ai-config-sync-staging/, validate, then
+ * backup existing targets and atomically replace.
  * Merges dual-target recipes instead of overwriting.
  */
 export async function commitCaptureItems(
@@ -591,111 +594,202 @@ export async function commitCaptureItems(
     });
   }
 
-  for (const item of batchById.values()) {
-    if (item.status === "blocked" || item.status === "system-excluded") {
-      continue;
-    }
-    const validation = validateCaptureProposal(item);
-    if (!validation.ok) {
-      continue;
-    }
-    // Auto-vendor local absolute skills so second machine can restore
-    if (
-      item.suggestedResource.source?.provider === "local" &&
-      item.suggestedResource.source.path &&
-      path.isAbsolute(item.suggestedResource.source.path) &&
-      item.scanned.kind === "skill"
-    ) {
-      const v = await vendorSkillDirectory(
-        item.suggestedResource.source.path,
-        configRepoPath,
-        item.suggestedResource.id,
-      );
-      if (!v.ok) {
-        throw new Error(
-          `Cannot capture ${item.suggestedResource.id}: ${v.message}` +
-            (v.blockedSecrets.length
-              ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}`
-              : ""),
+  // Stage all writes under a temp dir, then swap into place
+  const stagingRoot = path.join(
+    configRepoPath,
+    `.ai-config-sync-staging-${Date.now()}`,
+  );
+  const backupRoot = path.join(
+    configRepoPath,
+    `.ai-config-sync-backup-${Date.now()}`,
+  );
+  const stagedRecipeRels: string[] = [];
+  const stagedVendorRels: string[] = [];
+
+  try {
+    await fs.mkdir(path.join(stagingRoot, "recipes"), { recursive: true });
+
+    for (const item of batchById.values()) {
+      if (item.status === "blocked" || item.status === "system-excluded") {
+        continue;
+      }
+      const validation = validateCaptureProposal(item);
+      if (!validation.ok) {
+        continue;
+      }
+      // Auto-vendor local absolute skills into staging
+      if (
+        item.suggestedResource.source?.provider === "local" &&
+        item.suggestedResource.source.path &&
+        path.isAbsolute(item.suggestedResource.source.path) &&
+        item.scanned.kind === "skill"
+      ) {
+        const v = await vendorSkillDirectory(
+          item.suggestedResource.source.path,
+          configRepoPath,
+          item.suggestedResource.id,
+          { stagingRoot },
         );
-      }
-      item.suggestedResource = {
-        ...item.suggestedResource,
-        source: {
-          provider: "vendored",
-          path: v.destRel,
-        },
-        versionPolicy: "vendored",
-      };
-      if (item.suggestedRecipe) {
-        item.suggestedRecipe = {
-          ...item.suggestedRecipe,
-          source: item.suggestedResource.source,
+        if (!v.ok) {
+          throw new Error(
+            `Cannot capture ${item.suggestedResource.id}: ${v.message}` +
+              (v.blockedSecrets.length
+                ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}`
+                : ""),
+          );
+        }
+        stagedVendorRels.push(v.destRel);
+        item.suggestedResource = {
+          ...item.suggestedResource,
+          source: {
+            provider: "vendored",
+            path: v.destRel,
+          },
           versionPolicy: "vendored",
-          targets: Object.fromEntries(
-            Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
-              t,
-              tr
-                ? {
-                    ...tr,
-                    sourcePaths: { skill: "." },
-                    requiredPaths: ["SKILL.md"],
-                    driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill",
-                  }
-                : tr,
-            ]),
-          ) as Recipe["targets"],
         };
-      }
-    }
-
-    const prev = byId.get(item.suggestedResource.id);
-    if (prev) {
-      byId.set(item.suggestedResource.id, {
-        ...prev,
-        ...item.suggestedResource,
-        targets: {
-          ...prev.targets,
-          ...item.suggestedResource.targets,
-        },
-      });
-    } else {
-      byId.set(item.suggestedResource.id, item.suggestedResource);
-    }
-
-    if (item.suggestedRecipe) {
-      const recipeFile = path.join(
-        configRepoPath,
-        "recipes",
-        `${item.suggestedResource.id}.yaml`,
-      );
-      let baseTargets = item.suggestedRecipe.targets;
-      if (await pathExists(recipeFile)) {
-        try {
-          const existingRecipe = await loadRecipe(recipeFile);
-          baseTargets = {
-            ...existingRecipe.targets,
-            ...item.suggestedRecipe.targets,
+        if (item.suggestedRecipe) {
+          item.suggestedRecipe = {
+            ...item.suggestedRecipe,
+            source: item.suggestedResource.source,
+            versionPolicy: "vendored",
+            targets: Object.fromEntries(
+              Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
+                t,
+                tr
+                  ? {
+                      ...tr,
+                      sourcePaths: { skill: "." },
+                      requiredPaths: ["SKILL.md"],
+                      driver:
+                        tr.driver === "claude-marketplace"
+                          ? tr.driver
+                          : "generic-skill",
+                    }
+                  : tr,
+              ]),
+            ) as Recipe["targets"],
           };
-        } catch {
-          /* ignore */
         }
       }
-      const recipe: Recipe = {
-        ...item.suggestedRecipe,
-        targets: baseTargets,
-        confirmedAt: now,
-        confirmedBy,
-      };
-      await saveRecipe(recipeFile, recipe);
-      recipePaths.push(recipeFile);
-    }
-  }
 
-  await saveResources(resourcesPath, {
-    schemaVersion: 1,
-    resources: [...byId.values()],
-  });
+      const prev = byId.get(item.suggestedResource.id);
+      if (prev) {
+        byId.set(item.suggestedResource.id, {
+          ...prev,
+          ...item.suggestedResource,
+          targets: {
+            ...prev.targets,
+            ...item.suggestedResource.targets,
+          },
+        });
+      } else {
+        byId.set(item.suggestedResource.id, item.suggestedResource);
+      }
+
+      if (item.suggestedRecipe) {
+        const recipeRel = path.posix.join(
+          "recipes",
+          `${item.suggestedResource.id}.yaml`,
+        );
+        const recipeFileLive = path.join(configRepoPath, recipeRel);
+        const recipeFileStage = path.join(stagingRoot, recipeRel);
+        let baseTargets = item.suggestedRecipe.targets;
+        if (await pathExists(recipeFileLive)) {
+          try {
+            const existingRecipe = await loadRecipe(recipeFileLive);
+            baseTargets = {
+              ...existingRecipe.targets,
+              ...item.suggestedRecipe.targets,
+            };
+          } catch {
+            /* ignore */
+          }
+        }
+        const recipe: Recipe = {
+          ...item.suggestedRecipe,
+          targets: baseTargets,
+          confirmedAt: now,
+          confirmedBy,
+        };
+        // Validate schema before any live write
+        RecipeSchema.parse(recipe);
+        await saveRecipe(recipeFileStage, recipe);
+        stagedRecipeRels.push(recipeRel);
+        recipePaths.push(recipeFileLive);
+      }
+    }
+
+    // Stage resources.yaml
+    const stagedResources = path.join(stagingRoot, "resources.yaml");
+    await saveResources(stagedResources, {
+      schemaVersion: 1,
+      resources: [...byId.values()],
+    });
+    // Re-load staged resources to ensure file is valid
+    await loadResources(stagedResources);
+
+    // Backup live targets that will be replaced
+    const toBackup: string[] = ["resources.yaml", ...stagedRecipeRels, ...stagedVendorRels];
+    await fs.mkdir(backupRoot, { recursive: true });
+    for (const rel of toBackup) {
+      const live = path.join(configRepoPath, rel);
+      if (await pathExists(live)) {
+        const bak = path.join(backupRoot, rel);
+        await fs.mkdir(path.dirname(bak), { recursive: true });
+        await fs.cp(live, bak, { recursive: true });
+      }
+    }
+
+    // Atomic-ish replace: move staged files into place
+    for (const rel of stagedVendorRels) {
+      const from = path.join(stagingRoot, rel);
+      const to = path.join(configRepoPath, rel);
+      if (await pathExists(to)) {
+        await fs.rm(to, { recursive: true, force: true });
+      }
+      await fs.mkdir(path.dirname(to), { recursive: true });
+      await fs.rename(from, to).catch(async () => {
+        await fs.cp(from, to, { recursive: true });
+        await fs.rm(from, { recursive: true, force: true });
+      });
+    }
+    for (const rel of stagedRecipeRels) {
+      const from = path.join(stagingRoot, rel);
+      const to = path.join(configRepoPath, rel);
+      await fs.mkdir(path.dirname(to), { recursive: true });
+      await fs.rename(from, to).catch(async () => {
+        await fs.copyFile(from, to);
+        await fs.rm(from, { force: true });
+      });
+    }
+    {
+      const from = stagedResources;
+      const to = resourcesPath;
+      await fs.rename(from, to).catch(async () => {
+        await fs.copyFile(from, to);
+        await fs.rm(from, { force: true });
+      });
+    }
+
+    // Success — drop backup and staging
+    await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+  } catch (e) {
+    // Restore from backup if present
+    try {
+      if (await pathExists(backupRoot)) {
+        const entries = await fs.readdir(backupRoot, { withFileTypes: true });
+        // restore top-level + nested via recursive copy
+        await fs.cp(backupRoot, configRepoPath, { recursive: true, force: true });
+        void entries;
+      }
+    } catch {
+      /* best effort */
+    }
+    await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+    // keep backup on failure for manual recovery
+    throw e;
+  }
 
   return { resourcesPath, recipePaths };
 }

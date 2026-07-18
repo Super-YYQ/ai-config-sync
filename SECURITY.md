@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x   | Yes (Alpha) |
+| 0.4.x   | Yes (current — Alpha / Beta compatibility) |
+| 0.3.x   | Best effort |
 | < 0.3   | Best effort |
 
 ## Reporting a vulnerability

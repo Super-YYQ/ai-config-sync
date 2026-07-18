@@ -41,27 +41,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Block obvious secrets in repo
         run: |
-          # Match real secret *values*, not detector source patterns like
-          # `re: /\bsk-ant-[A-Za-z0-9...]` or fixture strings in unit tests.
-          # Exclude: docs, detector source, bundled CLI (mirrors detector), tests.
+          # Match live secret *values* (assignment/usage), not detector regex source.
+          # Scan the whole tree, then allowlist known detector/test patterns only.
           set -euo pipefail
           hits="$(
             git grep -I -n -E \
-              'sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|BEGIN (RSA |OPENSSH )?PRIVATE KEY' \
+              '(^|[^A-Za-z0-9_/-])(sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----)' \
               -- \
               ':!*.md' \
               ':!CHANGELOG.md' \
-              ':!docs/**' \
-              ':!packages/core/src/secrets.ts' \
-              ':!integrations/claude-plugin/bin/**' \
-              ':!dist/**' \
-              ':!tests/**' \
+              ':!package-lock.json' \
             || true
           )"
-          # Drop pure regex / pattern-definition lines (no live token assignment)
+          # Allowlist: detector definitions, unit-test fixtures, bundled mirror of detector
           filtered="$(
             printf '%s\n' "$hits" | grep -v -E \
-              're:\s*/|\\\\bsk-ant-|\\\\bghp_|scanTextForSecrets|name:\s*"(anthropic|github|openai)' \
+              'packages/core/src/secrets\.ts:|integrations/claude-plugin/bin/|dist/ai-config-sync\.cjs:|tests/unit/.*\.test\.ts:|re:\s*/|\\\\bsk-ant-|\\\\bghp_|scanTextForSecrets|abcdefghijklmnopqrstuvwxyz|name:\s*"(anthropic|github|openai)|validate-plugin\.mjs:' \
             || true
           )"
           if [ -n "$(echo "$filtered" | sed '/^\s*$/d')" ]; then
@@ -69,4 +64,4 @@ jobs:
             echo "$filtered"
             exit 1
           fi
-          echo "OK"
+          echo "OK (allowlisted detector/test fixtures only)"

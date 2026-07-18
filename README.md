@@ -2,9 +2,10 @@
 
 在 **Claude Code / Codex** 中管理 Skill、Plugin，并同步到私有 Git 仓库。
 
-> **状态：v0.4.0 Alpha Hardening**  
+> **状态：v0.4.0 Alpha — Beta Compatibility 进行中**  
 > Claude Plugin 已内置 CLI（无需单独 `npm i -g` 也可在插件 PATH 中调用）。  
 > npm 包使用打包后的单文件 `dist/ai-config-sync.cjs`。  
+> CI：跨平台 Build/Test + 隔离 tarball Smoke + Plugin Validate；**尚未**覆盖真实 Claude/Codex E2E。  
 > 请先在隔离 HOME / 测试环境验证，再用于公司真机。
 
 ---
@@ -46,10 +47,16 @@ ai-config-sync setup --config-path ~/ai-config/my-ai-config --profile home
 
 ### Codex
 
-1. 安装 CLI（插件 PATH、或 `npm i -g`、或源码 build）  
+> Codex Hook 支持为**实验性**：不同 CLI / App / IDE 版本行为可能不同。  
+> 已验证路径：本机 `ai-config-sync` CLI + `~/.codex/hooks.json` event-map + `features.hooks=true`。
+
+1. 安装 CLI（任选其一，**不要**假定 Claude Plugin bin 会自动进入 Codex PATH）：  
+   - `npm i -g ai-config-sync`（发布后）  
+   - 或 `npx ai-config-sync ...`  
+   - 或源码 `npm run build` 后把 `dist/` 加入 PATH  
 2. `ai-config-sync setup --config-path ...`  
    - 写入 `~/.agents/skills/config-sync`  
-   - 写入 Codex **event-map** `hooks.json` + `features.hooks = true`  
+   - 写入 Codex **event-map** `hooks.json`（含 Windows `commandWindows` 绝对路径）+ `features.hooks = true`  
 3. 对话说：「扫描技能」「备份配置」「恢复环境」
 
 ### npm CLI
@@ -99,10 +106,11 @@ npx ai-config-sync --help
 
 ## Known Limitations
 
-- Alpha：跨平台矩阵未完整 CI  
-- Codex Hook 可能需用户首次信任  
+- 阶段仍为 Alpha→Beta：真实 Claude/Codex 端到端未进 CI  
+- Codex Hook 可能需用户首次信任（实验性）  
 - 外部 `claude plugin` 安装的补偿卸载仍有限  
-- 非标准仓库自动配方不能保证 100%  
+- 非标准仓库：用 `capture --analyze` 启发式分析；`--ai` 仅为别名，真实 LLM 需配置 provider  
+- Capture 提案状态：`READY` / `BLOCKED` / `NEEDS-REVIEW`；`--yes` 只写入 READY  
 
 ---
 

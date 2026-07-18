@@ -2,11 +2,16 @@
  * Merge Codex hooks.json in the official event-map shape:
  * { hooks: { SessionStart: [ { hooks: [ { type, command, timeout } ] } ] } }
  * Also supports legacy array form and migrates managed entry.
+ *
+ * Windows: include commandWindows when an absolute CLI path is known so
+ * environments without PATH still invoke the correct binary.
  */
 
 export interface CodexHookCommand {
   type: "command";
   command: string;
+  /** Windows-specific command (absolute path preferred). */
+  commandWindows?: string;
   timeout?: number;
   id?: string;
 }
@@ -14,8 +19,18 @@ export interface CodexHookCommand {
 const MANAGED_ID = "ai-config-sync-session-start";
 const MANAGED_COMMAND = "ai-config-sync scan --light --write-pending";
 
+export interface MergeCodexHookOptions {
+  /** Absolute path to ai-config-sync CLI (or node + cjs). Used for commandWindows. */
+  cliAbsoluteCommand?: string;
+}
+
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isManagedHookCommand(cmd: unknown): boolean {
+  if (typeof cmd !== "string") return false;
+  return cmd.includes("ai-config-sync") && cmd.includes("scan");
 }
 
 export function hasManagedCodexSessionStart(doc: unknown): boolean {
@@ -30,9 +45,9 @@ export function hasManagedCodexSessionStart(doc: unknown): boolean {
         for (const h of block.hooks) {
           if (
             isPlainObject(h) &&
-            typeof h.command === "string" &&
-            h.command.includes("ai-config-sync") &&
-            h.command.includes("scan")
+            (isManagedHookCommand(h.command) ||
+              isManagedHookCommand(h.commandWindows) ||
+              h.id === MANAGED_ID)
           ) {
             return true;
           }
@@ -46,33 +61,84 @@ export function hasManagedCodexSessionStart(doc: unknown): boolean {
       (h) =>
         isPlainObject(h) &&
         (h.id === MANAGED_ID ||
-          (typeof h.command === "string" &&
-            h.command.includes("ai-config-sync"))),
+          isManagedHookCommand(h.command) ||
+          isManagedHookCommand(h.commandWindows)),
     );
   }
   return false;
 }
 
-/**
- * Ensure managed SessionStart command exists without dropping other hooks.
- */
-export function mergeManagedCodexSessionStart(doc: unknown): {
-  next: Record<string, unknown>;
-  changed: boolean;
-} {
-  if (hasManagedCodexSessionStart(doc)) {
-    return {
-      next: isPlainObject(doc) ? { ...doc } : { hooks: {} },
-      changed: false,
-    };
-  }
-
+function buildManagedCommand(
+  options?: MergeCodexHookOptions,
+): CodexHookCommand {
   const managedCmd: CodexHookCommand = {
     type: "command",
     command: MANAGED_COMMAND,
     timeout: 20,
     id: MANAGED_ID,
   };
+  if (options?.cliAbsoluteCommand) {
+    // Prefer absolute path on Windows; keep portable command for other platforms
+    managedCmd.commandWindows = options.cliAbsoluteCommand.includes("scan")
+      ? options.cliAbsoluteCommand
+      : `${options.cliAbsoluteCommand} scan --light --write-pending`;
+  }
+  return managedCmd;
+}
+
+/**
+ * Ensure managed SessionStart command exists without dropping other hooks.
+ */
+export function mergeManagedCodexSessionStart(
+  doc: unknown,
+  options?: MergeCodexHookOptions,
+): {
+  next: Record<string, unknown>;
+  changed: boolean;
+} {
+  if (hasManagedCodexSessionStart(doc)) {
+    // Optionally refresh commandWindows if absolute path provided and missing
+    if (options?.cliAbsoluteCommand && isPlainObject(doc) && isPlainObject(doc.hooks)) {
+      const hooks = { ...(doc.hooks as Record<string, unknown>) };
+      const session = Array.isArray(hooks.SessionStart)
+        ? [...(hooks.SessionStart as unknown[])]
+        : [];
+      let refreshed = false;
+      const nextSession = session.map((block) => {
+        if (!isPlainObject(block) || !Array.isArray(block.hooks)) return block;
+        const nextHooks = (block.hooks as unknown[]).map((h) => {
+          if (
+            isPlainObject(h) &&
+            (h.id === MANAGED_ID || isManagedHookCommand(h.command))
+          ) {
+            if (!h.commandWindows) {
+              refreshed = true;
+              return {
+                ...h,
+                commandWindows: options.cliAbsoluteCommand!.includes("scan")
+                  ? options.cliAbsoluteCommand
+                  : `${options.cliAbsoluteCommand} scan --light --write-pending`,
+              };
+            }
+          }
+          return h;
+        });
+        return { ...block, hooks: nextHooks };
+      });
+      if (refreshed) {
+        return {
+          next: { ...doc, hooks: { ...hooks, SessionStart: nextSession } },
+          changed: true,
+        };
+      }
+    }
+    return {
+      next: isPlainObject(doc) ? { ...doc } : { hooks: {} },
+      changed: false,
+    };
+  }
+
+  const managedCmd = buildManagedCommand(options);
 
   // Start from existing
   let next: Record<string, unknown>;
