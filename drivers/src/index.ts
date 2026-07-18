@@ -501,9 +501,9 @@ export const claudeMarketplaceDriver: Driver = {
     return items;
   },
   async apply(recipe, ctx) {
-    // Prefer official CLI when available; record plan ops as external when not.
     const plugin = recipe.plugin ?? ctx.resourceId;
     const marketplace = recipe.marketplace;
+    const scope = recipe.scope ?? "user";
     const pathsTouched: string[] = [];
 
     if (ctx.dryRun) {
@@ -515,9 +515,9 @@ export const claudeMarketplaceDriver: Driver = {
       };
     }
 
-    // Try `claude plugin` CLI — may not exist on all installs
     const commands: string[][] = [];
     if (recipe.marketplaceRepository) {
+      // github style: owner/repo
       commands.push([
         "claude",
         "plugin",
@@ -532,33 +532,59 @@ export const claudeMarketplaceDriver: Driver = {
         "plugin",
         "install",
         `${plugin}@${marketplace}`,
+        "--scope",
+        scope,
       ]);
-      commands.push(["claude", "plugin", "enable", `${plugin}@${marketplace}`]);
+      commands.push([
+        "claude",
+        "plugin",
+        "enable",
+        `${plugin}@${marketplace}`,
+      ]);
     } else if (plugin) {
-      commands.push(["claude", "plugin", "install", plugin]);
+      commands.push([
+        "claude",
+        "plugin",
+        "install",
+        plugin,
+        "--scope",
+        scope,
+      ]);
     }
 
-    let anyOk = false;
     const messages: string[] = [];
     for (const cmd of commands) {
       try {
+        const { execFile } = await import("node:child_process");
+        const { promisify } = await import("node:util");
+        const execFileAsync = promisify(execFile);
         await execFileAsync(cmd[0]!, cmd.slice(1), {
           windowsHide: true,
           maxBuffer: 5 * 1024 * 1024,
         });
-        anyOk = true;
         messages.push(`ok: ${cmd.join(" ")}`);
       } catch (e) {
-        messages.push(`fail: ${cmd.join(" ")} (${(e as Error).message})`);
+        const err = (e as Error).message;
+        // treat already installed/enabled as ok
+        if (/already installed|already enabled|already exists/i.test(err)) {
+          messages.push(`ok(exists): ${cmd.join(" ")}`);
+          continue;
+        }
+        messages.push(`fail: ${cmd.join(" ")} (${err})`);
+        // ALL steps must succeed — fail the whole install
+        return {
+          ok: false,
+          message: `Claude plugin install incomplete: ${messages.join("; ")}`,
+          pathsTouched,
+        };
       }
     }
 
-    if (!anyOk) {
-      // Fallback: write a pending marker into state path notes — caller treats as MANUAL
+    if (commands.length === 0) {
       return {
         ok: true,
         externalManual: true,
-        message: `Claude plugin CLI unavailable or failed; install manually: ${plugin}. ${messages.join("; ")}`,
+        message: `No install commands for plugin ${plugin}`,
         pathsTouched,
       };
     }
@@ -587,11 +613,17 @@ export const npxSkillsDriver: Driver = {
     ];
   },
   async apply(recipe, ctx) {
+    // Prefer full github repository source when available via recipe fields
+    const pkgFromSource =
+      (recipe as TargetRecipe & { packageName?: string }).packageName;
     const pkg =
-      (recipe as TargetRecipe & { package?: string }).sourcePaths?.skill ??
+      pkgFromSource ||
+      recipe.marketplaceRepository ||
+      recipe.sourcePaths?.skill ||
       ctx.resourceId;
     const cmd = [
       "npx",
+      "--yes",
       "skills",
       "add",
       pkg,

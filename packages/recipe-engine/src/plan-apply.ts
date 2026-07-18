@@ -22,9 +22,12 @@ import {
 } from "@ai-config-sync/core";
 import { getDriver, recipePathsValid } from "@ai-config-sync/drivers";
 import {
-  createBackup,
+  beginTransaction,
+  confirmCreatedPaths,
   markInstalled,
   appendLog,
+  rollbackBackup,
+  type BackupRecord,
 } from "@ai-config-sync/state-manager";
 import { resolveCachedSource } from "@ai-config-sync/git-sync";
 import { loadRecipeRegistry } from "./analyzer.js";
@@ -404,6 +407,8 @@ export interface ApplyResult {
   manual: string[];
   backupId?: string;
   noChanges: boolean;
+  /** True if a failure triggered automatic rollback of this apply. */
+  autoRolledBack?: boolean;
 }
 
 export async function applyPlan(
@@ -446,15 +451,16 @@ export async function applyPlan(
         .filter(Boolean),
     ),
   ];
+  let tx: BackupRecord | undefined;
   let backupId: string | undefined;
   if (!ctx.dryRun && paths.length > 0) {
-    const backup = await createBackup(
+    tx = await beginTransaction(
       paths,
       `apply ${activePlan.id}`,
       ctx.home,
       activePlan.actions,
     );
-    backupId = backup.id;
+    backupId = tx.id;
   }
 
   const resourcesFile = await loadResources(
@@ -467,6 +473,7 @@ export async function applyPlan(
   const applied: string[] = [];
   const failed: Array<{ actionId: string; error: string }> = [];
   const manual: string[] = [];
+  let hardFailure = false;
 
   // Group actions by resource+target and apply once per group via driver
   const groups = new Map<string, PlanAction[]>();
@@ -497,7 +504,8 @@ export async function applyPlan(
     const resource = resourcesFile.resources.find((r) => r.id === resourceId);
     if (!resource) {
       failed.push({ actionId: group[0]!.id, error: `resource not found: ${resourceId}` });
-      continue;
+      hardFailure = true;
+      break;
     }
 
     const recipe = await resolveRecipe(
@@ -532,7 +540,6 @@ export async function applyPlan(
           ctx.home,
         );
       } else if (!result.ok) {
-        // Missing source / stale recipe → manual, not hard failure
         if (
           /sourceRoot|source not|recipe-stale|Source skill path missing|requiredPath missing/i.test(
             result.message,
@@ -553,6 +560,8 @@ export async function applyPlan(
             { status: "failed", notes: result.message },
             ctx.home,
           );
+          hardFailure = true;
+          break;
         }
       } else {
         for (const a of group) {
@@ -570,6 +579,9 @@ export async function applyPlan(
           }
         } catch {
           /* ignore */
+        }
+        if (tx && result.pathsTouched.length) {
+          await confirmCreatedPaths(tx, result.pathsTouched, ctx.home);
         }
         await markInstalled(
           resourceId,
@@ -592,17 +604,37 @@ export async function applyPlan(
         actionId: group[0]!.id,
         error: (e as Error).message,
       });
+      hardFailure = true;
+      break;
+    }
+  }
+
+  let autoRolledBack = false;
+  if (hardFailure && tx && !ctx.dryRun) {
+    try {
+      await rollbackBackup(tx.id, ctx.home);
+      autoRolledBack = true;
+      await appendLog(
+        `auto-rollback ${tx.id} after apply failure`,
+        ctx.home,
+      );
+    } catch (e) {
+      failed.push({
+        actionId: "rollback",
+        error: `auto-rollback failed: ${(e as Error).message}`,
+      });
     }
   }
 
   return {
     plan: activePlan,
-    applied,
+    applied: autoRolledBack ? [] : applied,
     failed,
     manual,
     backupId,
     noChanges:
       applied.length === 0 && failed.length === 0 && manual.length === 0,
+    autoRolledBack,
   };
 }
 

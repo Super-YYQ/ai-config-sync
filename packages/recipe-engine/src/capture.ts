@@ -161,23 +161,46 @@ export async function buildCaptureProposals(
       };
     }
 
-    // If we only analyzed installed dir for one target, still record that target
-    for (const t of targetsPresent) {
-      if (!targetRecipes[t] && candidates.length === 0 && !usedRemoteSource) {
-        // fallback generic skill for installed dir
-        targetRecipes[t] = {
-          driver: "generic-skill",
-          scope: "user",
-          sourcePaths: { skill: "." },
-          operations: [{ type: "copy-skill", from: "." }],
-          requiredPaths: ["SKILL.md"],
-          requirements: [],
-          verification: [],
-          risk: "low",
-          evidence: [{ path: primary.path, section: "installed-dir" }],
-          requiresApproval: true,
-        };
-      }
+    // If plugin from marketplace, force claude-marketplace driver candidate
+    const isMarketplacePlugin = group.some(
+      (g) =>
+        g.kind === "plugin" ||
+        String(g.id).startsWith("marketplace:") ||
+        g.metadata?.installVia === "claude-marketplace",
+    );
+    if (isMarketplacePlugin && sourceCandidate && !targetRecipes.claude) {
+      const mktName =
+        sourceCandidate.includes("/")
+          ? sourceCandidate.split("/").pop()!
+          : sourceCandidate;
+      const pluginName = id.replace(/^marketplace:/, "");
+      targetRecipes.claude = {
+        driver: "claude-marketplace",
+        scope: "user",
+        marketplaceRepository: sourceCandidate.includes("/")
+          ? sourceCandidate
+          : undefined,
+        marketplace: mktName,
+        plugin: pluginName,
+        operations: [
+          { type: "register-marketplace" },
+          { type: "install-plugin" },
+          { type: "enable-plugin" },
+        ],
+        requiredPaths: [],
+        requirements: [],
+        verification: [],
+        risk: "medium",
+        evidence: [
+          {
+            path: primary.path,
+            section: "marketplace-install",
+          },
+        ],
+        requiresApproval: true,
+        confidence: primary.confidence,
+      };
+      needsAi = false;
     }
 
     const suggestedResource: Resource = {

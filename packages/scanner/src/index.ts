@@ -241,15 +241,38 @@ async function scanClaudePlugins(
       if (isSelfManagedResourceId(name) || isSelfManagedResourceId(`marketplace:${name}`)) {
         continue;
       }
+      const mPath = path.join(marketplaces, name);
+      // Infer github source from marketplace .git remote when possible
+      let sourceCandidate: string | undefined = name;
+      let confidence = 0.7;
+      try {
+        const gitCfg = path.join(mPath, ".git", "config");
+        if (await pathExists(gitCfg)) {
+          const text = await fs.readFile(gitCfg, "utf8");
+          const m = text.match(
+            /url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/,
+          );
+          if (m) {
+            sourceCandidate = m[1]!.replace(/\.git$/, "");
+            confidence = 0.95;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
       out.push({
         id: `marketplace:${name}`,
         kind: "plugin",
         target: "claude",
-        path: path.join(marketplaces, name),
-        sourceCandidate: name,
-        confidence: 0.7,
+        path: mPath,
+        sourceCandidate,
+        confidence,
         classification: "system-cache",
-        metadata: { role: "marketplace-cache" },
+        metadata: {
+          role: "marketplace-cache",
+          // Skills installed via this marketplace are restored by claude-marketplace driver
+          installVia: "claude-marketplace",
+        },
       });
     }
   }

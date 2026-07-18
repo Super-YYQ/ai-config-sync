@@ -50,7 +50,7 @@ program
   .description(
     "AI Agent config sync — private config repo + Claude Code / Codex integrations",
   )
-  .version("0.2.1");
+  .version("0.2.2");
 
 function homeOpt(cmd: { opts: () => { home?: string } }): string {
   return expandHome(cmd.opts().home ?? os.homedir());
@@ -454,7 +454,10 @@ async function runApplyLike(
     console.log(`${label}: No changes`);
     return;
   }
-  if (result.backupId) console.log(`Backup: ${result.backupId}`);
+  if (result.autoRolledBack) {
+    console.log(`AUTO-ROLLBACK: ${result.backupId} (apply failed; changes undone)`);
+  }
+  if (result.backupId && !result.autoRolledBack) console.log(`Backup: ${result.backupId}`);
   for (const a of result.applied) console.log(`APPLIED: ${a}`);
   for (const m of result.manual) console.log(`MANUAL: ${m}`);
   for (const f of result.failed) {

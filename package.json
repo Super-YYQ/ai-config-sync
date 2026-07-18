@@ -1,27 +1,45 @@
 {
   "name": "ai-config-sync",
-  "version": "0.2.1",
-  "private": true,
-  "description": "AI Agent configuration sync system — private config repo + Claude Code / Codex integrations",
-  "workspaces": [
-    "packages/*",
-    "drivers"
+  "version": "0.2.2",
+  "description": "AI Agent configuration sync — Claude Code / Codex skills & plugins via private config repo",
+  "type": "module",
+  "bin": {
+    "ai-config-sync": "packages/cli/dist/index.js",
+    "agent-sync": "packages/cli/dist/index.js"
+  },
+  "files": [
+    "packages/cli/dist",
+    "packages/core/dist",
+    "packages/scanner/dist",
+    "packages/state-manager/dist",
+    "packages/git-sync/dist",
+    "packages/recipe-engine/dist",
+    "drivers/dist",
+    "integrations",
+    "examples/private-config-template",
+    "README.md",
+    "docs/USER_GUIDE.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "npm run build -w @ai-config-sync/core && npm run build -w @ai-config-sync/scanner && npm run build -w @ai-config-sync/state-manager && npm run build -w @ai-config-sync/git-sync && npm run build -w @ai-config-sync/drivers && npm run build -w @ai-config-sync/recipe-engine && npm run build -w @ai-config-sync/cli",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
     "cli": "node packages/cli/dist/index.js",
     "dev:cli": "tsx packages/cli/src/index.ts",
-    "demo:offline-pwf": "tsx scripts/demo-offline-pwf.ts"
+    "demo:offline-pwf": "tsx scripts/demo-offline-pwf.ts",
+    "pack:check": "npm pack --dry-run"
   },
-  "bin": {
-    "ai-config-sync": "packages/cli/dist/index.js",
-    "agent-sync": "packages/cli/dist/index.js"
-  },
-  "engines": {
-    "node": ">=18"
+  "workspaces": [
+    "packages/*",
+    "drivers"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0",
+    "yaml": "^2.6.1",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -29,6 +47,24 @@
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Super-YYQ/ai-config-sync.git"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "skills",
+    "plugins",
+    "config-sync",
+    "dotfiles"
+  ],
   "license": "MIT",
-  "author": "Super-YYQ"
+  "author": "Super-YYQ",
+  "publishConfig": {
+    "access": "public"
+  }
 }

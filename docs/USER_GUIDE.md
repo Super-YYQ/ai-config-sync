@@ -1,75 +1,75 @@
-# 使用说明（给日常用户）
+# 使用说明
 
-你平时**不用记终端命令**。在 Claude Code 里用斜杠或说话即可。
+你平时**不用记一长串命令**。Claude 用斜杠，Codex 用 Skill 对话。
 
 ---
 
-## 1. 装插件（一次）
+## 1. 安装
 
-和别的在线插件一样：
+**Claude 插件（在线，和其它插件一样）：**
 
 ```text
 /plugin marketplace add Super-YYQ/ai-config-sync
 /plugin install ai-config-sync@ai-config-sync
 ```
 
-**新开一个会话**，再输入 `/` 搜索 `ai-config-sync`。
+**CLI（两工具共用）：**
+
+```bash
+npx ai-config-sync@latest --help
+# 或 npm i -g ai-config-sync
+```
+
+**Codex：** 跑一次 setup 后会自动装 Skill + SessionStart Hook。
 
 ---
 
-## 2. 私有配置仓库什么时候配？
+## 2. 私有配置仓库何时配？
 
-| 你想做的事 | 要不要私有仓 |
-|------------|--------------|
-| 只扫描本机有什么 | 不要 |
+| 你想做的事 | 要不要 |
+|------------|--------|
+| 只扫描 | 不要 |
 | 备份 / 跨电脑恢复 | **要** |
 
-第一次备份前，在对话里说：
-
-> 「帮我初始化配置同步」  
-> 「创建私有配置仓库到 ~/ai-config/my-ai-config」
-
-或：
-
-> 「关联私有仓库 git@github.com:我的账号/my-ai-config.git」
+对话：「初始化配置同步」即可。
 
 ---
 
-## 3. 没有私有仓时扫描会怎样？
+## 3. Claude vs Codex 怎么用？
 
-- **可以扫**，只读本机  
-- **不会**写入 Git，也不会报崩  
-- 会提示：要备份的话先初始化  
-
-`capture` / `restore` 会明确告诉你「还没关联私有仓」，并给出下一步说法。
-
----
-
-## 4. 日常三句话
-
-| 你说 | 效果 |
-|------|------|
-| 扫描配置 / `/ai-config-sync:scan` | 看本机 Skill/Plugin |
-| 同步配置 / `/ai-config-sync:capture` | 备份到私有仓 |
-| 恢复环境 / `/ai-config-sync:restore` | 从私有仓装回来 |
-
-体检：`/ai-config-sync:doctor`  
-状态：`/ai-config-sync:status`
+| | Claude Code | Codex |
+|--|-------------|--------|
+| 入口 | Plugin 斜杠命令 | Skill + Hook |
+| 扫描 | `/ai-config-sync:scan` 或说话 | 说「扫描技能」 |
+| 备份 | `/ai-config-sync:capture` | 说「备份配置」 |
+| 恢复 | `/ai-config-sync:restore` | 说「恢复环境」 |
+| 启动提示 | SessionStart Hook | SessionStart Hook |
+| 配置数据 | **同一私有 Git 仓库** | **同一私有 Git 仓库** |
 
 ---
 
-## 5. 两个仓库别混
+## 4. Marketplace 装的 Skill 怎么同步？
 
-- **ai-config-sync**：程序（插件），可公开  
-- **my-ai-config**（名字自定）：你的清单，**建议 private**
+不是拷贝 plugin cache。
 
-密钥、登录态、聊天记录**不会**进私有仓。
+- 扫描识别 marketplace 目录与 git remote  
+- Capture 记成 **`claude-marketplace` 配方**（仓库 + plugin 名）  
+- 新电脑 Restore：官方 `claude plugin marketplace add / install / enable`  
+
+自己的 `ai-config-sync` 插件不会进备份列表。
 
 ---
 
-## 6. 斜杠没有命令时
+## 5. 没有私有仓时扫描？
 
-1. 新开会话  
-2. `claude plugin list` 看是否 **enabled**  
-3. `claude plugin enable ai-config-sync@ai-config-sync`  
-4. 仍没有：直接说「扫描配置」（走 Skill，不依赖斜杠菜单）
+可以，只读；提示先初始化再 capture。
+
+---
+
+## 6. 回滚
+
+Apply 失败会**自动 rollback**。也可：
+
+```bash
+ai-config-sync rollback --last
+```

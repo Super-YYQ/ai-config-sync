@@ -2,50 +2,68 @@
 
 在 **Claude Code / Codex 对话里** 管理 Skill、Plugin，并同步到你的私有 Git 仓库。
 
-> 日常用法：说话或敲斜杠命令。  
-> 终端命令是给高级用户和排错用的，不是主路径。
+> 日常：说话或斜杠命令。终端命令用于安装与排错。
 
 ---
 
 ## 这是什么？
 
-你换电脑、重装环境时，往往要重新找「我装过哪些 Skill / Plugin」。
+换电脑时不用再回忆「装过哪些 Skill / Plugin」。
 
-本工具做三件事：
-
-1. **扫描**本机已经装了什么  
-2. **备份**到你的私有配置仓库（只存清单和安装方式，不存密钥）  
+1. **扫描**本机  
+2. **备份**到私有配置仓库（清单 + 安装方式，不含密钥）  
 3. **恢复**到另一台电脑  
 
 ```
-Claude / Codex 对话
-       │  斜杠命令 或 自然语言
-       ▼
-  ai-config-sync 插件 / Skill
-       │
-       ├─ 读本机 ~/.claude、~/.codex
-       └─ 读写「私有配置仓库」（你自己的 Git 仓）
+Claude Code 对话          Codex 对话
+   斜杠 / 自然语言          Skill / 自然语言
+         \                   /
+          \                 /
+           ▼               ▼
+            ai-config-sync CLI
+           /               \
+   ~/.claude                ~/.codex
+           \               /
+         私有配置仓库（Git，建议 private）
 ```
 
-有两个仓库，不要混：
-
-| 仓库 | 是什么 | 是否私有 |
-|------|--------|----------|
-| **程序仓库** `ai-config-sync` | 插件 + CLI 本身 | 可公开 |
-| **私有配置仓库** `my-ai-config`（名字自定） | 你的清单：装了啥、怎么装 | **建议 private** |
+| 仓库 | 作用 | 可见性 |
+|------|------|--------|
+| **程序** `ai-config-sync` | 插件 + CLI | 可公开 |
+| **私有配置**（如 `my-ai-config`） | 你的清单 | **建议 private** |
 
 ---
 
-## 安装插件（和别的在线插件一样）
+## 安装
 
-在 Claude Code 里用官方方式装（推荐）：
+### A. 一条命令（发布后）
+
+```bash
+npx ai-config-sync@latest --help
+# 或全局
+npm install -g ai-config-sync
+ai-config-sync --version
+```
+
+> 当前 monorepo 已支持 `npm pack` / 发布到 npm。若尚未 publish，用 B。
+
+### B. 从源码
+
+```bash
+git clone https://github.com/Super-YYQ/ai-config-sync.git
+cd ai-config-sync
+npm install && npm run build
+npm link -w @ai-config-sync/cli
+```
+
+### C. Claude Code 在线插件（与其它插件相同）
 
 ```text
 /plugin marketplace add Super-YYQ/ai-config-sync
 /plugin install ai-config-sync@ai-config-sync
 ```
 
-或终端：
+或：
 
 ```bash
 claude plugin marketplace add Super-YYQ/ai-config-sync
@@ -53,107 +71,109 @@ claude plugin install ai-config-sync@ai-config-sync
 claude plugin enable ai-config-sync@ai-config-sync
 ```
 
-然后 **新开一个 Claude Code 会话**。
+**新开 Claude 会话** 后，`/` 搜索 `ai-config-sync`。
 
-在 `/` 菜单里应能看到类似：
+### D. Codex 怎么用？
 
-- `/ai-config-sync:scan`
-- `/ai-config-sync:status`
-- `/ai-config-sync:capture`
-- `/ai-config-sync:restore`
-- `/ai-config-sync:doctor`
+Codex **没有**和 Claude 完全一样的「斜杠命令市场」，入口是 **用户级 Skill + Hook**：
 
-也可以直接说：「扫描配置」「同步配置」「恢复环境」。
+1. 安装 CLI 后执行一次 setup（会写入 Codex 入口）：
+   ```bash
+   ai-config-sync setup --config-path ~/ai-config/my-ai-config --profile home
+   ```
+2. setup 会安装：
+   - `~/.codex/skills/config-sync/SKILL.md`（对话里说「同步配置」「扫描技能」）
+   - `~/.codex/hooks.json` 里的 SessionStart 轻量扫描
+3. 在 Codex 里直接说：
+   - 「扫描本机 skill」
+   - 「备份配置到私有仓库」
+   - 「按 home profile 恢复环境」
+4. 或让 Codex 执行 shell：
+   ```bash
+   ai-config-sync scan
+   ai-config-sync capture
+   ai-config-sync restore --yes --allow-risk medium
+   ```
 
-> 仍需本机有 Node.js，以便插件调用 `ai-config-sync` CLI。  
-> 若命令找不到，见文末「排错」。
+Claude 用 Plugin 斜杠；Codex 用 Skill + CLI——**同一套私有配置仓库**。
 
 ---
 
-## 私有配置仓库什么时候配置？
+## Marketplace 装的 Skill 怎么同步？
 
-**第一次要把「扫描结果备份起来」之前。**
+Claude 里通过 **Marketplace / Plugin** 装的能力，**不是**简单复制 `~/.claude/skills` 目录。
 
-时间线：
+正确模型：
 
-| 时机 | 要不要私有仓 | 说明 |
-|------|--------------|------|
-| 刚装好插件 | 可以没有 | 能先 `scan` 看本机 |
-| 第一次 **capture（备份）** | **必须有** | 要写入 resources.yaml |
-| **restore（恢复）** 到新电脑 | **必须有** | 从仓库读清单 |
+| 本机形态 | 同步时记什么 | 另一台电脑怎么恢复 |
+|----------|--------------|--------------------|
+| Marketplace 缓存 + 已启用 Plugin | `driver: claude-marketplace` + marketplace 仓库 + plugin 名 | `claude plugin marketplace add` → `install` → `enable` |
+| 独立 Skill 目录（复制/vendored） | `driver: generic-skill` + 源路径/仓库 | 复制到 `~/.claude/skills/<id>` |
+| Codex 专用目录 + hooks | `driver: repository-layout` | 复制 skill + 合并 hooks.json + config.toml |
 
-关联方式（在对话里说即可）：
+流程：
 
-- 「帮我初始化配置同步」  
-- 「用模板创建私有配置仓库到某个路径」  
-- 「关联我的私有仓库 git@github.com:我/xxx.git」
+1. 扫描会识别 `~/.claude/plugins/marketplaces/<name>`（读 git remote 推断 GitHub 源）  
+2. Capture 对这类资源生成 **claude-marketplace** 配方（不是把 cache 当源码拷进私有仓）  
+3. Restore 在新电脑上走官方 Plugin CLI 重装  
 
-对应底层（一般不用你手敲）：
+自身插件 `ai-config-sync` / `config-sync` **不会**被同步（已排除）。
+
+---
+
+## 私有配置仓库何时配置？
+
+| 操作 | 要不要私有仓 |
+|------|----------------|
+| 只扫描 | 不要 |
+| 备份 capture | **要** |
+| 恢复 restore | **要** |
+
+对话：「帮我初始化配置同步」或：
 
 ```bash
-# 本机目录（可用内置模板自动生成结构）
 ai-config-sync setup --config-path ~/ai-config/my-ai-config --profile home
-
-# 或已有远程私有仓
+# 或
 ai-config-sync setup --repo git@github.com:你/my-ai-config.git --profile home
 ```
 
-关联结果写在本机：`~/.ai-config-sync/config.yaml`（不会进 Git）。
+---
+
+## 没有私有仓时扫描？
+
+**可以**，只读本机，提示尚未关联；不会写 Git。  
+`capture` / `restore` 会说明需先 setup。
 
 ---
 
-## 还没有私有配置仓库时，扫描会怎样？
+## 日常（对话优先）
 
-**可以扫，只读，不写仓库。**
+### Claude Code
 
-- `scan`：列出本机 Skill/Plugin，并提示「尚未关联私有配置仓库」  
-- `status` / `capture` / `restore` / `plan`：会用人话提示你先初始化  
-- 不会静默失败，也不会偷偷创建远程仓库  
+| 你做 | 效果 |
+|------|------|
+| `/ai-config-sync:scan` 或「扫描配置」 | 看本机 |
+| `/ai-config-sync:capture` 或「同步到仓库」 | 备份 |
+| `/ai-config-sync:restore` 或「恢复环境」 | 恢复 |
+| `/ai-config-sync:doctor` | 体检 |
 
-典型输出大意：
+### Codex
 
-```text
-提示：尚未关联私有配置仓库。本次只是只读扫描本机，不会写入任何仓库。
-若要把结果备份起来，请先 setup（对话里说「初始化配置同步」）。
-```
-
----
-
-## 日常怎么用（主路径：对话）
-
-### ① 看看本机有什么
-
-对话：
-
-- `/ai-config-sync:scan`  
-- 或：「帮我扫描本机 AI 技能」
-
-### ② 备份到私有仓（需已 setup）
-
-- `/ai-config-sync:capture`  
-- 或：「把新装的 skill 同步到配置仓库」
-
-先看提案，再确认写入。
-
-### ③ 新电脑恢复
-
-1. 装插件（同上）  
-2. 关联你的私有仓：`setup --repo ...`  
-3. `/ai-config-sync:restore` 或说「按私有配置恢复环境」  
-4. `/ai-config-sync:doctor` 检查  
-
-### ④ 打开 Claude 时提示有未纳管资源
-
-说明本机多了还没备份的东西 → 跑 capture。
+| 你做 | 效果 |
+|------|------|
+| 说「扫描技能」 | 走 config-sync Skill → CLI scan |
+| 说「备份配置」 | capture |
+| 说「恢复 home 配置」 | restore |
+| SessionStart | 轻量扫描，提示未纳管资源 |
 
 ---
 
-## 不会同步什么（刻意的）
+## 安全与回滚
 
-- 登录态 / OAuth  
-- 聊天记录、Session  
-- API Key 明文（只用 `secretRef`）  
-- 把整个 plugin cache 当同步源  
+- Apply 前写入事务备份（`~/.ai-config-sync/backups/`）  
+- **硬失败会自动 rollback**（删除新建路径 + 还原修改前快照）  
+- 也可：`ai-config-sync rollback --last`  
+- 不迁移 OAuth / 聊天记录 / 明文密钥  
 
 ---
 
@@ -161,46 +181,23 @@ ai-config-sync setup --repo git@github.com:你/my-ai-config.git --profile home
 
 | 现象 | 处理 |
 |------|------|
-| `/` 里没有 ai-config-sync 命令 | 新开会话；`claude plugin list` 看是否 enabled |
-| 插件 disabled | `claude plugin enable ai-config-sync@ai-config-sync` |
-| 说「扫描」但助手找不到 CLI | 安装 Node 后：`npm install -g` 或从本仓库 `npm link -w @ai-config-sync/cli` |
-| capture 提示未关联仓库 | 先 setup 私有配置仓库 |
-| 命令丢了 | `/ai-config-sync:repair` 或对话说「修复 config-sync」 |
+| Claude `/` 无命令 | 新会话；`claude plugin enable ai-config-sync@ai-config-sync` |
+| Codex 无反应 | `ai-config-sync repair`；确认 `~/.codex/skills/config-sync` |
+| CLI 找不到 | `npm i -g ai-config-sync` 或源码 `npm link` |
+| capture 说未关联 | 先 setup 私有仓 |
 
 ---
 
-## 给开发者
-
-构建、包结构、Driver 扩展：见 [docs/development.md](docs/development.md)  
-设计原文：`docs/AI_Agent_Config_Sync_Design_Development_v1.0.docx`  
-模板：`examples/private-config-template/`  
+## 开发
 
 ```bash
 npm install && npm run build && npm test
-npm run demo:offline-pwf   # 离线恢复演示
+npm run demo:offline-pwf
+npm run pack:check   # 检查可发布文件列表
 ```
 
-版本 0.2.1 · MIT
+- 设计文档：`docs/AI_Agent_Config_Sync_Design_Development_v1.0.docx`  
+- 用户说明：`docs/USER_GUIDE.md`  
+- 模板：`examples/private-config-template/`  
 
----
-
-## 实现成熟度（对照审查）
-
-静态审查（ChatGPT 对修改前版本）指出的问题，当前状态：
-
-| 项 | 状态 |
-|----|------|
-| 两仓库架构 / Schema / Skill 隔离 | 已有 |
-| Setup 先读本机配置再 Clone（P0-1） | **已修** |
-| Profile `resource.profiles` 隔离（P0-6） | **已修** |
-| Capture 双工具 Recipe 不互相覆盖（P0-3） | **已修** |
-| Capture 优先分析原始 GitHub 源（P0-2） | **已修（骨架）** |
-| 排除自身 plugin/skill 不同步 | **已修** |
-| run-cli 收紧白名单（P0-8） | **已修** |
-| Claude 在线 Marketplace 安装（P0-4） | **已修** |
-| Codex SessionStart Hook 安装 | **已修** |
-| 精确事务回滚（P0-7） | 未完成 |
-| 一条 `npx` 发布包（P0-9） | 未完成 |
-| 真实 LLM Provider / Lock 闭环 | 部分 |
-
-请仍在测试环境验证；公司真机配置请谨慎。
+版本 **0.2.2** · MIT
