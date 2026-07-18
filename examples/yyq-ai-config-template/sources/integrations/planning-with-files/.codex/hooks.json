@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "id": "planning-with-files-session-start",
+      "event": "SessionStart",
+      "command": "echo [planning-with-files] offline hook ready",
+      "timeout_ms": 5000
+    }
+  ]
+}

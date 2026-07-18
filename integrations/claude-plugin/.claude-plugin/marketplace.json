@@ -1,0 +1,17 @@
+{
+  "name": "ai-config-sync-marketplace",
+  "owner": {
+    "name": "Super-YYQ"
+  },
+  "metadata": {
+    "description": "Marketplace entry for ai-config-sync Claude Code plugin",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ai-config-sync",
+      "source": "./",
+      "description": "Private-repo based AI agent config sync"
+    }
+  ]
+}

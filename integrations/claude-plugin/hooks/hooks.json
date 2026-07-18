@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx ai-config-sync scan --light --write-pending",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

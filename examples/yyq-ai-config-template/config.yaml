@@ -1,0 +1,12 @@
+schemaVersion: 1
+name: yyq-ai-config
+defaultProfile: home
+targets:
+  claude: true
+  codex: true
+security:
+  blockSecretCommit: true
+  maxRiskWithoutConfirm: low
+ai:
+  enabled: false
+  mode: off

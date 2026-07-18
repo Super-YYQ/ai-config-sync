@@ -1,0 +1,14 @@
+profile: company
+extends:
+  - base
+include:
+  resources:
+    - planning-with-files
+exclude:
+  resources:
+    - demo-skill
+security:
+  maxRisk: medium
+  allowAutomaticLatest: false
+  secrets:
+    provider: local-only

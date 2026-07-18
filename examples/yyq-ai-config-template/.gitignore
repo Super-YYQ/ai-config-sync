@@ -1,0 +1,5 @@
+auth.json
+*.env
+*.secret.*
+local.yaml
+.DS_Store

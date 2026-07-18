@@ -1,0 +1,14 @@
+profile: home
+extends:
+  - base
+include:
+  resources:
+    - demo-skill
+    - planning-with-files
+exclude:
+  resources: []
+security:
+  maxRisk: medium
+  allowAutomaticLatest: false
+  secrets:
+    provider: local-only

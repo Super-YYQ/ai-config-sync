@@ -1,0 +1,11 @@
+profile: base
+extends: []
+include:
+  resources: []
+exclude:
+  resources: []
+security:
+  maxRisk: medium
+  allowAutomaticLatest: false
+  secrets:
+    provider: local-only

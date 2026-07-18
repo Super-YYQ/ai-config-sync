@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "id": "ai-config-sync-session-start",
+      "event": "SessionStart",
+      "command": "npx ai-config-sync scan --light --write-pending",
+      "timeout_ms": 20000
+    }
+  ]
+}

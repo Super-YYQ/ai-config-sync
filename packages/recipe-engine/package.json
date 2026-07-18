@@ -1,0 +1,29 @@
+{
+  "name": "@ai-config-sync/recipe-engine",
+  "version": "0.1.0",
+  "description": "Rule analyzer, plan/apply engines, recipe registry",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-config-sync/core": "0.1.0",
+    "@ai-config-sync/drivers": "0.1.0",
+    "@ai-config-sync/git-sync": "0.1.0",
+    "@ai-config-sync/state-manager": "0.1.0",
+    "@ai-config-sync/scanner": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "files": ["dist"],
+  "license": "MIT"
+}

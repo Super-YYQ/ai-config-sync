@@ -1,0 +1,32 @@
+id: demo-skill
+schemaVersion: 1
+source:
+  provider: local
+  path: sources/skills/demo-skill
+targets:
+  claude:
+    driver: generic-skill
+    scope: user
+    sourcePaths:
+      skill: .
+    operations:
+      - type: copy-skill
+    requiredPaths:
+      - SKILL.md
+    risk: low
+    requiresApproval: false
+  codex:
+    driver: generic-skill
+    scope: user
+    sourcePaths:
+      skill: .
+    operations:
+      - type: copy-skill
+    requiredPaths:
+      - SKILL.md
+    risk: low
+    requiresApproval: false
+versionPolicy: latest-confirm
+risk: low
+confirmedAt: "2026-07-18T00:00:00.000Z"
+confirmedBy: template

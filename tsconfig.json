@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/scanner" },
+    { "path": "packages/state-manager" },
+    { "path": "packages/git-sync" },
+    { "path": "packages/recipe-engine" },
+    { "path": "drivers" },
+    { "path": "packages/cli" }
+  ]
+}

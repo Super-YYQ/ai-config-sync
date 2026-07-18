@@ -1,0 +1,8 @@
+{
+  "name": "planning-with-files",
+  "description": "Offline vendor snapshot — Manus-style file planning skill",
+  "version": "0.0.0-offline",
+  "author": {
+    "name": "offline-vendor"
+  }
+}

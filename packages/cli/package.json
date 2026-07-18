@@ -1,0 +1,28 @@
+{
+  "name": "@ai-config-sync/cli",
+  "version": "0.2.0",
+  "description": "CLI for AI Agent config sync (ai-config-sync / agent-sync)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "ai-config-sync": "./dist/index.js",
+    "agent-sync": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-config-sync/core": "0.1.0",
+    "@ai-config-sync/scanner": "0.1.0",
+    "@ai-config-sync/state-manager": "0.1.0",
+    "@ai-config-sync/git-sync": "0.1.0",
+    "@ai-config-sync/recipe-engine": "0.1.0",
+    "@ai-config-sync/drivers": "0.1.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "files": ["dist"],
+  "license": "MIT"
+}

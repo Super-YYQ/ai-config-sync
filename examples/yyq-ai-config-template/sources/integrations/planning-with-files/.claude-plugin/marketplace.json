@@ -1,0 +1,17 @@
+{
+  "name": "planning-with-files",
+  "owner": {
+    "name": "offline-vendor"
+  },
+  "metadata": {
+    "description": "Offline vendor snapshot for ai-config-sync demos",
+    "version": "0.0.0-offline"
+  },
+  "plugins": [
+    {
+      "name": "planning-with-files",
+      "source": "./",
+      "description": "Planning with files (offline fixture)"
+    }
+  ]
+}

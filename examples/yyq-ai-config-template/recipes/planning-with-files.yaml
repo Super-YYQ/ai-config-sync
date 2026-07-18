@@ -1,0 +1,55 @@
+id: planning-with-files
+schemaVersion: 1
+source:
+  provider: vendored
+  repository: OthmanAdi/planning-with-files
+  path: sources/integrations/planning-with-files
+targets:
+  # Offline-first: copy skill from vendored tree (no Claude CLI / network).
+  # Online environments may still install via Marketplace using marketplace.json.
+  claude:
+    driver: generic-skill
+    scope: user
+    sourcePaths:
+      skill: skills/planning-with-files
+    operations:
+      - type: copy-skill
+    requiredPaths:
+      - skills/planning-with-files/SKILL.md
+      - .claude-plugin/marketplace.json
+    risk: low
+    requiresApproval: false
+    evidence:
+      - path: skills/planning-with-files/SKILL.md
+        section: offline-vendor
+      - path: .claude-plugin/marketplace.json
+        section: marketplace-manifest-present
+  codex:
+    driver: repository-layout
+    scope: user
+    sourcePaths:
+      skill: .codex/skills/planning-with-files
+      hookManifest: .codex/hooks.json
+      hookScripts: .codex/hooks
+    operations:
+      - type: copy-skill
+      - type: merge-hook-manifest
+      - type: copy-hook-scripts
+      - type: merge-toml
+        path: features.hooks
+        value: true
+    requiredPaths:
+      - .codex/skills/planning-with-files/SKILL.md
+      - .codex/hooks.json
+    risk: medium
+    requiresApproval: false
+    evidence:
+      - path: .codex/skills/planning-with-files/SKILL.md
+      - path: .codex/hooks.json
+versionPolicy: vendored
+risk: low
+confirmedAt: "2026-07-18T00:00:00.000Z"
+confirmedBy: offline-vendor-demo
+notes: >
+  Vendored dual-tool fixture for offline restore demos.
+  Claude uses generic-skill copy; Codex uses repository-layout (skill + hooks + toml).
