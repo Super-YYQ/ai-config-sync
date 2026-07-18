@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — Beta Compatibility (core)
+
+### Reliability (plan 3.8)
+- Apply **state draft**: commit `state.json` only after full success; include state in transaction backup
+- Claude marketplace **ApplyReceipt** + compensating disable/uninstall (only what this apply added)
+- Driver `verify()` for marketplace plugins
+
+### Capture / sources
+- Auto-**vendor** unknown local skills to `sources/skills/<id>` (secret-scanned)
+- Group capture by **repo + skill name** (multi-skill monorepos)
+- Read `~/.agents` skills-lock for npx-skills provenance
+
+### Doctor / release
+- CLI on PATH check; Codex managed SessionStart schema
+- CI (OS×Node), SECURITY, CONTRIBUTING, ROADMAP, architecture.md, sync-version.mjs
+
+
 ## 0.3.0 — Alpha Hardening
 
 ### Breaking / important
