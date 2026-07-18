@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const keep = process.argv.includes("--keep");
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const template = path.join(root, "examples", "yyq-ai-config-template");
+const template = path.join(root, "examples", "private-config-template");
 const cli = path.join(root, "packages", "cli", "dist", "index.js");
 
 function banner(title: string) {
@@ -50,7 +50,7 @@ async function main() {
   }
 
   const home = await fs.mkdtemp(path.join(os.tmpdir(), "acs-pwf-demo-"));
-  const configRepo = path.join(home, "yyq-ai-config");
+  const configRepo = path.join(home, "my-ai-config");
   await fs.cp(template, configRepo, { recursive: true });
 
   banner("1) setup --profile offline-demo");

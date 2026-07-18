@@ -105,7 +105,7 @@ async function detectConfigRepo(
     };
   }
   if (options.repo && !options.configPath) {
-    const defaultPath = path.join(home, "ai-config", "yyq-ai-config");
+    const defaultPath = path.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
@@ -130,7 +130,7 @@ async function detectConfigRepo(
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
       return {
-        localPath: path.join(home, "ai-config", "yyq-ai-config"),
+        localPath: path.join(home, "ai-config", "my-ai-config"),
         remote: envRepo,
         reason: "AI_CONFIG_SYNC_REPO",
       };
@@ -153,9 +153,9 @@ async function detectConfigRepo(
   }
 
   const candidates = [
-    path.join(home, "ai-config", "yyq-ai-config"),
-    path.join(home, "Git", "yyq-ai-config"),
-    path.join(home, "git", "yyq-ai-config"),
+    path.join(home, "ai-config", "my-ai-config"),
+    path.join(home, "Git", "my-ai-config"),
+    path.join(home, "git", "my-ai-config"),
   ];
   for (const c of candidates) {
     if (!(await pathExists(c))) continue;
@@ -495,7 +495,7 @@ export async function runSetup(
         "No config repository found. Provide --config-path or --repo.",
         "",
         "快速开始：",
-        "  1. 复制 examples/yyq-ai-config-template 为你的私有仓库",
+        "  1. 复制 examples/private-config-template 为你的私有仓库",
         "  2. ai-config-sync setup --config-path <路径> --profile home",
         "  3. 打开 Claude Code，说「扫描配置」或使用 /ai-config-sync:scan",
       ],

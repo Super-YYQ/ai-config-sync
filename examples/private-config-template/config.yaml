@@ -1,5 +1,5 @@
 schemaVersion: 1
-name: yyq-ai-config
+name: my-ai-config
 defaultProfile: home
 targets:
   claude: true

@@ -33,8 +33,9 @@ ai-config-sync --version
 ```bash
 # 2) 准备「私有配置仓库」（存你的清单，不是程序本身）
 # Windows 示例：
-xcopy /E /I examples\yyq-ai-config-template D:\Git\yyq-ai-config
-cd /d D:\Git\yyq-ai-config
+# Windows PowerShell 示例：
+Copy-Item -Recurse examples\private-config-template $HOME\ai-config\my-ai-config
+cd $HOME\ai-config\my-ai-config
 git init
 git add .
 git commit -m "init my ai config"
@@ -42,8 +43,8 @@ git commit -m "init my ai config"
 
 ```bash
 # 3) 关联 + 安装到 Claude / Codex
-cd 路径\到\ai-config-sync
-ai-config-sync setup --config-path D:\Git\yyq-ai-config --profile home
+cd 路径/到/ai-config-sync
+ai-config-sync setup --config-path "$HOME/ai-config/my-ai-config" --profile home
 ```
 
 setup 会做这些事（幂等，可重复跑）：
@@ -127,7 +128,7 @@ ai-config-sync doctor
 git clone https://github.com/Super-YYQ/ai-config-sync.git
 cd ai-config-sync && npm install && npm run build && npm link -w @ai-config-sync/cli
 
-ai-config-sync setup --repo git@github.com:你/yyq-ai-config.git --profile home
+ai-config-sync setup --repo git@github.com:你/my-ai-config.git --profile home
 # Claude 里：
 # /ai-config-sync:restore
 ```
@@ -173,7 +174,7 @@ ai-config-sync repair
 
 ```
 ┌─────────────────────┐     ┌──────────────────────────┐
-│ ai-config-sync      │     │ yyq-ai-config（你的私有仓）│
+│ ai-config-sync      │     │ my-ai-config（你的私有仓）│
 │ 程序：CLI + Plugin  │     │ 清单：装了啥、怎么装      │
 │ 可以公开            │     │ 请保持 private           │
 └─────────┬───────────┘     └────────────┬─────────────┘

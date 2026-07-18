@@ -6,14 +6,14 @@ describe("git remote matching", () => {
   it("normalizes github urls", () => {
     expect(
       remotesMatch(
-        "git@github.com:yyq/yyq-ai-config.git",
-        "https://github.com/yyq/yyq-ai-config",
+        "git@github.com:you/my-ai-config.git",
+        "https://github.com/you/my-ai-config",
       ),
     ).toBe(true);
     expect(
       remotesMatch(
-        "git@github.com:yyq/yyq-ai-config.git",
-        "https://github.com/other/yyq-ai-config",
+        "git@github.com:you/my-ai-config.git",
+        "https://github.com/other/my-ai-config",
       ),
     ).toBe(false);
   });

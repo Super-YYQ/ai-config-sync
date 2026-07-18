@@ -1,17 +1,17 @@
 # Private config template
 
-Copy this directory to start a personal private config repo (e.g. `yyq-ai-config`).
+Copy this directory to start a personal private config repo (e.g. `my-ai-config`).
 
 ```bash
-cp -r examples/yyq-ai-config-template ~/Git/yyq-ai-config
-cd ~/Git/yyq-ai-config
+cp -r examples/private-config-template ~/Git/my-ai-config
+cd ~/Git/my-ai-config
 git init && git add . && git commit -m "init private ai config"
 ```
 
 Then:
 
 ```bash
-npx ai-config-sync setup --config-path ~/Git/yyq-ai-config --profile home
+npx ai-config-sync setup --config-path ~/Git/my-ai-config --profile home
 npx ai-config-sync plan
 npx ai-config-sync apply --yes --allow-risk medium
 npx ai-config-sync doctor

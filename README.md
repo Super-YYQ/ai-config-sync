@@ -33,12 +33,12 @@ npm install && npm run build
 npm link -w @ai-config-sync/cli
 
 # 私有配置仓库（用模板）
-cp -r examples/yyq-ai-config-template ~/Git/yyq-ai-config   # Windows 请用资源管理器复制
-cd ~/Git/yyq-ai-config && git init && git add . && git commit -m "init"
+cp -r examples/private-config-template ~/Git/my-ai-config   # Windows 请用资源管理器复制
+cd ~/Git/my-ai-config && git init && git add . && git commit -m "init"
 
 # 关联 + 装进 Claude/Codex
 cd /path/to/ai-config-sync
-ai-config-sync setup --config-path ~/Git/yyq-ai-config --profile home
+ai-config-sync setup --config-path ~/Git/my-ai-config --profile home
 ```
 
 setup 会：

@@ -18,7 +18,7 @@ import {
 } from "@ai-config-sync/core";
 
 async function copyTemplate(dest: string): Promise<void> {
-  const src = path.resolve(__dirname, "../../examples/yyq-ai-config-template");
+  const src = path.resolve(__dirname, "../../examples/private-config-template");
   await fs.cp(src, dest, { recursive: true });
 }
 
@@ -28,7 +28,7 @@ describe("offline vendored planning-with-files", () => {
 
   beforeEach(async () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "acs-pwf-"));
-    configRepo = path.join(home, "yyq-ai-config");
+    configRepo = path.join(home, "my-ai-config");
     await copyTemplate(configRepo);
   });
 

@@ -1,6 +1,6 @@
 /**
  * Optional helper: initialize a private config repo from the bundled template.
- * Usage: npx tsx scripts/init-config-repo.ts D:/Git/yyq-ai-config
+ * Usage: npx tsx scripts/init-config-repo.ts ~/ai-config/my-ai-config
  */
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -13,7 +13,7 @@ if (!dest) {
 }
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const src = path.join(root, "examples", "yyq-ai-config-template");
+const src = path.join(root, "examples", "private-config-template");
 const absDest = path.resolve(dest);
 
 await fs.cp(src, absDest, { recursive: true, errorOnExist: true, force: false });

@@ -12,7 +12,7 @@ import {
 import { loadLocalConfig, localConfigPath, pathExists } from "@ai-config-sync/core";
 
 async function copyTemplate(dest: string): Promise<void> {
-  const src = path.resolve(__dirname, "../../examples/yyq-ai-config-template");
+  const src = path.resolve(__dirname, "../../examples/private-config-template");
   await fs.cp(src, dest, { recursive: true });
 }
 
@@ -22,7 +22,7 @@ describe("setup + restore integration", () => {
 
   beforeEach(async () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "acs-int-"));
-    configRepo = path.join(home, "yyq-ai-config");
+    configRepo = path.join(home, "my-ai-config");
     await copyTemplate(configRepo);
   });
 
