@@ -214,6 +214,7 @@ program
   .option("--light", "Skip hashing for faster scans")
   .option("--json", "JSON output")
   .option("--write-pending", "Write unmanaged findings to pending events")
+  .option("--include-system", "Show system-cache resources in text output")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
     const ctx = await loadCtx(home);
@@ -268,9 +269,13 @@ program
       console.log("");
     }
     console.log(`Scanned at ${result.scannedAt}`);
-    console.log(`Resources: ${result.resources.length}`);
-    for (const r of result.resources) {
-      if (r.kind === "config") continue;
+    const visible = result.resources.filter(
+      (r) =>
+        r.kind !== "config" &&
+        (opts.includeSystem || r.classification !== "system-cache"),
+    );
+    console.log(`Resources: ${visible.length}`);
+    for (const r of visible) {
       console.log(
         `  [${r.classification}] ${r.target}/${r.kind} ${r.id}${r.sourceCandidate ? ` <- ${r.sourceCandidate}` : ""}`,
       );
@@ -324,28 +329,47 @@ program
       console.log("No unmanaged resources to capture.");
       return;
     }
+    const ready = proposals.filter((p) => p.status === "ready" || (!p.status && p.suggestedRecipe && !p.needsAi));
+    const blocked = proposals.filter((p) => p.status === "blocked");
+    const needsReview = proposals.filter(
+      (p) => p.status === "needs-review" || (!p.status && (p.needsAi || !p.suggestedRecipe)),
+    );
     console.log(`Capture proposals (${proposals.length}):`);
+    console.log(
+      `Ready: ${ready.length}  Blocked: ${blocked.length}  Needs-review: ${needsReview.length}`,
+    );
     for (const p of proposals) {
+      const label = (p.status ?? (p.needsAi ? "needs-review" : p.suggestedRecipe ? "ready" : "needs-review")).toUpperCase();
+      const driver =
+        p.suggestedRecipe?.targets?.claude?.driver ??
+        p.suggestedRecipe?.targets?.codex?.driver ??
+        p.candidate?.driver;
       console.log(
-        `  - ${p.scanned.target}/${p.scanned.kind} ${p.suggestedResource.id}` +
+        `  [${label}] ${p.scanned.target}/${p.scanned.kind} ${p.suggestedResource.id}` +
           (p.scanned.sourceCandidate
             ? ` source=${p.scanned.sourceCandidate}`
             : "") +
+          (driver ? ` driver=${driver}` : "") +
+          (p.blockReason ? ` reason=${p.blockReason}` : "") +
           (p.needsAi ? " [needs AI analysis]" : "") +
-          (p.usedAi ? " [heuristic/ai]" : "") +
-          (p.candidate
-            ? ` driver=${p.candidate.driver} conf=${p.candidate.confidence}`
-            : ""),
+          (p.usedAi ? " [heuristic/ai]" : ""),
       );
     }
     if (!opts.yes) {
       console.log("\nRe-run with --yes to write resources.yaml and recipes.");
       console.log("Use --ai to enable heuristic/AI analyze-only for unknown layouts.");
+      console.log("Note: --yes only writes READY proposals (blocked/system excluded).");
       return;
     }
-    // Auto-confirm rule-based or AI-assisted recipes that produced a candidate
-    const confirmed = proposals.filter((p) => p.suggestedRecipe && (!p.needsAi || p.usedAi));
-    const skipped = proposals.filter((p) => !p.suggestedRecipe || (p.needsAi && !p.usedAi));
+    // Auto-confirm only READY proposals (never blocked / unresolved marketplace)
+    const confirmed = proposals.filter(
+      (p) =>
+        p.suggestedRecipe &&
+        p.status !== "blocked" &&
+        p.status !== "system-excluded" &&
+        (p.status === "ready" || !p.needsAi || p.usedAi),
+    );
+    const skipped = proposals.filter((p) => !confirmed.includes(p));
     if (confirmed.length === 0) {
       console.log(
         "No rule-based recipes ready. Enable AI assistant or author recipes manually.",

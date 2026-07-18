@@ -15,6 +15,11 @@ import {
   shortHash,
   type TargetTool,
 } from "@ai-config-sync/core";
+import { resolveClaudePluginInventory } from "./claude/marketplace-resolver.js";
+import { isSystemSkillDirectory } from "./system-skills.js";
+export { parseClaudePluginKey, formatClaudePluginKey, normalizeGitRepositoryUrl } from "./claude/plugin-key.js";
+export { isSystemSkillDirectory, isNeverCapturableResource } from "./system-skills.js";
+export { resolveClaudePluginInventory, parseInstalledPlugins } from "./claude/marketplace-resolver.js";
 
 export type InventoryClassification =
   | "managed"
@@ -195,6 +200,24 @@ async function scanSkills(
   for (const name of names) {
     if (isSelfManagedResourceId(name)) continue;
     const full = path.join(dir, name);
+
+    // Codex .system and other tool-managed directories — never user-capturable
+    if (isSystemSkillDirectory(target, name)) {
+      out.push({
+        id: name,
+        kind: "skill",
+        target,
+        path: full,
+        confidence: 1,
+        classification: "system-cache",
+        metadata: {
+          managedBy: target,
+          role: "system-skills",
+        },
+      });
+      continue;
+    }
+
     const source = await detectSkillSource(full, home);
     let hash: string | undefined;
     if (!options.light) {
@@ -230,62 +253,73 @@ async function scanClaudePlugins(
 ): Promise<ScannedResource[]> {
   const out: ScannedResource[] = [];
   const pluginsRoot = claudePluginsDir(home);
-  // installed_plugins.json is a common Claude Code layout
-  const installedPath = path.join(pluginsRoot, "installed_plugins.json");
-  if (await pathExists(installedPath)) {
-    try {
-      const data = JSON.parse(await fs.readFile(installedPath, "utf8")) as {
-        plugins?: Array<{
-          name?: string;
-          id?: string;
-          marketplace?: string;
-          version?: string;
-          enabled?: boolean;
-          path?: string;
-        }>;
-      };
-      for (const p of data.plugins ?? []) {
-        const id = p.id ?? p.name ?? "unknown-plugin";
-        if (isSelfManagedResourceId(id)) continue;
-        const managed = options.managedIds?.has(id) ?? false;
-        out.push({
-          id,
-          kind: "plugin",
-          target: "claude",
-          path: p.path ?? installedPath,
-          sourceCandidate: p.marketplace
-            ? `${p.marketplace}/${p.name ?? id}`
-            : p.name,
-          confidence: p.marketplace ? 0.9 : 0.5,
-          classification: managed
-            ? "managed"
-            : p.marketplace
-              ? "source-known"
-              : "source-unknown",
-          metadata: {
-            marketplace: p.marketplace,
-            version: p.version,
-            enabled: p.enabled,
-            from: "installed_plugins.json",
-          },
-        });
-      }
-    } catch {
-      /* ignore */
-    }
+  const settingsPath = claudeSettingsPath(home);
+
+  // Unified inventory: settings + installed_plugins + known_marketplaces + git remotes
+  const { items, warnings } = await resolveClaudePluginInventory(home);
+  for (const w of warnings) {
+    // surfaced via scanLocal warnings by caller if needed — stash on synthetic
+    void w;
   }
 
-  // Also scan marketplaces dir
+  for (const item of items) {
+    if (isSelfManagedResourceId(item.canonicalId)) continue;
+    if (isSelfManagedResourceId(item.pluginName)) continue;
+
+    const managed =
+      (options.managedIds?.has(item.canonicalId) ||
+        options.managedIds?.has(item.pluginName)) ??
+      false;
+
+    const resolved = item.resolutionStatus === "resolved";
+    const partial = item.resolutionStatus === "partially-resolved";
+
+    // Never use settings.json as install source path
+    const pathForResource =
+      item.installPath ??
+      (item.marketplaceName
+        ? path.join(pluginsRoot, "marketplaces", item.marketplaceName)
+        : pluginsRoot);
+
+    out.push({
+      id: item.canonicalId,
+      kind: "plugin",
+      target: "claude",
+      path: pathForResource,
+      sourceCandidate: item.marketplaceRepository,
+      confidence: item.confidence,
+      classification: managed
+        ? "managed"
+        : resolved
+          ? "source-known"
+          : "source-unknown",
+      metadata: {
+        pluginName: item.pluginName,
+        marketplace: item.marketplaceName,
+        marketplaceRepository: item.marketplaceRepository,
+        version: item.version,
+        enabled: item.enabled,
+        installVia: "claude-marketplace",
+        sourceResolutionStatus: item.resolutionStatus,
+        evidence: item.evidence,
+        // explicit: settings is evidence only, never a source path
+        settingsPath: settingsPath,
+      },
+    });
+  }
+
+  // Marketplace cache dirs (for diagnostics) — system-cache, not capture
   const marketplaces = path.join(pluginsRoot, "marketplaces");
   if (await pathExists(marketplaces)) {
     for (const name of await listDirNames(marketplaces)) {
-      if (isSelfManagedResourceId(name) || isSelfManagedResourceId(`marketplace:${name}`)) {
+      if (
+        isSelfManagedResourceId(name) ||
+        isSelfManagedResourceId(`marketplace:${name}`)
+      ) {
         continue;
       }
       const mPath = path.join(marketplaces, name);
-      // Infer github source from marketplace .git remote when possible
-      let sourceCandidate: string | undefined = name;
-      let confidence = 0.7;
+      let sourceCandidate: string | undefined;
       try {
         const gitCfg = path.join(mPath, ".git", "config");
         if (await pathExists(gitCfg)) {
@@ -293,10 +327,7 @@ async function scanClaudePlugins(
           const m = text.match(
             /url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/,
           );
-          if (m) {
-            sourceCandidate = m[1]!.replace(/\.git$/, "");
-            confidence = 0.95;
-          }
+          if (m) sourceCandidate = m[1]!.replace(/\.git$/, "");
         }
       } catch {
         /* ignore */
@@ -307,49 +338,15 @@ async function scanClaudePlugins(
         target: "claude",
         path: mPath,
         sourceCandidate,
-        confidence,
+        confidence: sourceCandidate ? 0.9 : 0.5,
         classification: "system-cache",
         metadata: {
           role: "marketplace-cache",
-          // Skills installed via this marketplace are restored by claude-marketplace driver
+          marketplace: name,
+          marketplaceRepository: sourceCandidate,
           installVia: "claude-marketplace",
         },
       });
-    }
-  }
-
-  // settings.json enabledPlugins
-  const settingsPath = claudeSettingsPath(home);
-  if (await pathExists(settingsPath)) {
-    try {
-      const settings = JSON.parse(await fs.readFile(settingsPath, "utf8")) as {
-        enabledPlugins?: Record<string, boolean>;
-      };
-      if (settings.enabledPlugins) {
-        for (const [key, enabled] of Object.entries(settings.enabledPlugins)) {
-          if (isSelfManagedResourceId(key)) continue;          const existing = out.find((r) => r.id === key || r.id.endsWith(key));
-          if (existing) {
-            existing.metadata = {
-              ...existing.metadata,
-              enabledInSettings: enabled,
-            };
-          } else {
-            out.push({
-              id: key,
-              kind: "plugin",
-              target: "claude",
-              path: settingsPath,
-              confidence: 0.6,
-              classification: options.managedIds?.has(key)
-                ? "managed"
-                : "source-unknown",
-              metadata: { enabledInSettings: enabled, from: "settings.json" },
-            });
-          }
-        }
-      }
-    } catch {
-      /* ignore */
     }
   }
 
@@ -505,6 +502,7 @@ export function inventryDiff(
   return scan.resources.filter((r) => {
     if (r.kind === "config") return false;
     if (r.classification === "system-cache") return false;
+    if (r.target === "codex" && r.id === ".system") return false;
     return !managedIds.has(r.id) && !r.id.startsWith("marketplace:");
   });
 }

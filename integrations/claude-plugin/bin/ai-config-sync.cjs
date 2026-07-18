@@ -975,8 +975,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path19 = require("node:path");
-    var fs8 = require("node:fs");
+    var path20 = require("node:path");
+    var fs9 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1908,11 +1908,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path19.resolve(baseDir, baseName);
-          if (fs8.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path19.extname(baseName))) return void 0;
+          const localBin = path20.resolve(baseDir, baseName);
+          if (fs9.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path20.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs8.existsSync(`${localBin}${ext}`)
+            (ext) => fs9.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1924,21 +1924,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs8.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs9.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path19.resolve(
-            path19.dirname(resolvedScriptPath),
+          executableDir = path20.resolve(
+            path20.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path19.basename(
+            const legacyName = path20.basename(
               this._scriptPath,
-              path19.extname(this._scriptPath)
+              path20.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1949,7 +1949,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path19.extname(executableFile));
+        launchWithNode = sourceExt.includes(path20.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2789,7 +2789,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path19.basename(filename, path19.extname(filename));
+        this._name = path20.basename(filename, path20.extname(filename));
         return this;
       }
       /**
@@ -2803,9 +2803,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path20) {
-        if (path20 === void 0) return this._executableDir;
-        this._executableDir = path20;
+      executableDir(path21) {
+        if (path21 === void 0) return this._executableDir;
+        this._executableDir = path21;
         return this;
       }
       /**
@@ -3447,8 +3447,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path19, errorMaps, issueData } = params;
-      const fullPath = [...path19, ...issueData.path || []];
+      const { data, path: path20, errorMaps, issueData } = params;
+      const fullPath = [...path20, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -3756,11 +3756,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value, path19, key) {
+      constructor(parent, value, path20, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path19;
+        this._path = path20;
         this._key = key;
       }
       get path() {
@@ -7623,17 +7623,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path19) {
-      const ctrl = callVisitor(key, node, visitor, path19);
+    function visit_(key, node, visitor, path20) {
+      const ctrl = callVisitor(key, node, visitor, path20);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path19, ctrl);
-        return visit_(key, ctrl, visitor, path19);
+        replaceNode(key, path20, ctrl);
+        return visit_(key, ctrl, visitor, path20);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path19 = Object.freeze(path19.concat(node));
+          path20 = Object.freeze(path20.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path19);
+            const ci = visit_(i, node.items[i], visitor, path20);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7644,13 +7644,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path19 = Object.freeze(path19.concat(node));
-          const ck = visit_("key", node.key, visitor, path19);
+          path20 = Object.freeze(path20.concat(node));
+          const ck = visit_("key", node.key, visitor, path20);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path19);
+          const cv = visit_("value", node.value, visitor, path20);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7671,17 +7671,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path19) {
-      const ctrl = await callVisitor(key, node, visitor, path19);
+    async function visitAsync_(key, node, visitor, path20) {
+      const ctrl = await callVisitor(key, node, visitor, path20);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path19, ctrl);
-        return visitAsync_(key, ctrl, visitor, path19);
+        replaceNode(key, path20, ctrl);
+        return visitAsync_(key, ctrl, visitor, path20);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path19 = Object.freeze(path19.concat(node));
+          path20 = Object.freeze(path20.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path19);
+            const ci = await visitAsync_(i, node.items[i], visitor, path20);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7692,13 +7692,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path19 = Object.freeze(path19.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path19);
+          path20 = Object.freeze(path20.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path20);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path19);
+          const cv = await visitAsync_("value", node.value, visitor, path20);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7725,23 +7725,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path19) {
+    function callVisitor(key, node, visitor, path20) {
       if (typeof visitor === "function")
-        return visitor(key, node, path19);
+        return visitor(key, node, path20);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path19);
+        return visitor.Map?.(key, node, path20);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path19);
+        return visitor.Seq?.(key, node, path20);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path19);
+        return visitor.Pair?.(key, node, path20);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path19);
+        return visitor.Scalar?.(key, node, path20);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path19);
+        return visitor.Alias?.(key, node, path20);
       return void 0;
     }
-    function replaceNode(key, path19, node) {
-      const parent = path19[path19.length - 1];
+    function replaceNode(key, path20, node) {
+      const parent = path20[path20.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -8351,10 +8351,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path19, value) {
+    function collectionFromPath(schema, path20, value) {
       let v = value;
-      for (let i = path19.length - 1; i >= 0; --i) {
-        const k = path19[i];
+      for (let i = path20.length - 1; i >= 0; --i) {
+        const k = path20[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -8373,7 +8373,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path19) => path19 == null || typeof path19 === "object" && !!path19[Symbol.iterator]().next().done;
+    var isEmptyPath = (path20) => path20 == null || typeof path20 === "object" && !!path20[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -8403,11 +8403,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path19, value) {
-        if (isEmptyPath(path19))
+      addIn(path20, value) {
+        if (isEmptyPath(path20))
           this.add(value);
         else {
-          const [key, ...rest] = path19;
+          const [key, ...rest] = path20;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -8421,8 +8421,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path19) {
-        const [key, ...rest] = path19;
+      deleteIn(path20) {
+        const [key, ...rest] = path20;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -8436,8 +8436,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path19, keepScalar) {
-        const [key, ...rest] = path19;
+      getIn(path20, keepScalar) {
+        const [key, ...rest] = path20;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -8455,8 +8455,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path19) {
-        const [key, ...rest] = path19;
+      hasIn(path20) {
+        const [key, ...rest] = path20;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -8466,8 +8466,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path19, value) {
-        const [key, ...rest] = path19;
+      setIn(path20, value) {
+        const [key, ...rest] = path20;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -10982,9 +10982,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path19, value) {
+      addIn(path20, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path19, value);
+          this.contents.addIn(path20, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -11059,14 +11059,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path19) {
-        if (Collection.isEmptyPath(path19)) {
+      deleteIn(path20) {
+        if (Collection.isEmptyPath(path20)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path19) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path20) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -11081,10 +11081,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path19, keepScalar) {
-        if (Collection.isEmptyPath(path19))
+      getIn(path20, keepScalar) {
+        if (Collection.isEmptyPath(path20))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path19, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path20, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -11095,10 +11095,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path19) {
-        if (Collection.isEmptyPath(path19))
+      hasIn(path20) {
+        if (Collection.isEmptyPath(path20))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path19) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path20) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -11115,13 +11115,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path19, value) {
-        if (Collection.isEmptyPath(path19)) {
+      setIn(path20, value) {
+        if (Collection.isEmptyPath(path20)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path19), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path20), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path19, value);
+          this.contents.setIn(path20, value);
         }
       }
       /**
@@ -13081,9 +13081,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path19) => {
+    visit.itemAtPath = (cst, path20) => {
       let item = cst;
-      for (const [field, index] of path19) {
+      for (const [field, index] of path20) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -13092,23 +13092,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path19) => {
-      const parent = visit.itemAtPath(cst, path19.slice(0, -1));
-      const field = path19[path19.length - 1][0];
+    visit.parentCollection = (cst, path20) => {
+      const parent = visit.itemAtPath(cst, path20.slice(0, -1));
+      const field = path20[path20.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path19, item, visitor) {
-      let ctrl = visitor(item, path19);
+    function _visit(path20, item, visitor) {
+      let ctrl = visitor(item, path20);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path19.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path20.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -13119,10 +13119,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path19);
+            ctrl = ctrl(item, path20);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path19) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path20) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -14424,14 +14424,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs8 = this.flowScalar(this.type);
+              const fs9 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs8, sep: [] });
+                map.items.push({ start, key: fs9, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs8);
+                this.stack.push(fs9);
               } else {
-                Object.assign(it, { key: fs8, sep: [] });
+                Object.assign(it, { key: fs9, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -14559,13 +14559,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs8 = this.flowScalar(this.type);
+              const fs9 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs8, sep: [] });
+                fc.items.push({ start: [], key: fs9, sep: [] });
               else if (it.sep)
-                this.stack.push(fs8);
+                this.stack.push(fs9);
               else
-                Object.assign(it, { key: fs8, sep: [] });
+                Object.assign(it, { key: fs9, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -15034,10 +15034,10 @@ function isPlainObject(v) {
 function hasId(v) {
   return isPlainObject(v) && typeof v.id === "string";
 }
-function pathAllowed(path19, owned) {
+function pathAllowed(path20, owned) {
   if (!owned || owned.length === 0)
     return true;
-  return owned.some((o) => path19 === o || path19.startsWith(`${o}.`) || o.startsWith(`${path19}.`));
+  return owned.some((o) => path20 === o || path20.startsWith(`${o}.`) || o.startsWith(`${path20}.`));
 }
 function mergeJson(base, managed, options = {}, currentPath = "") {
   const preferManaged = options.preferManaged ?? true;
@@ -15326,7 +15326,7 @@ function redact(match) {
     return "***";
   return `${match.slice(0, 4)}\u2026${match.slice(-4)} (len=${match.length})`;
 }
-function scanTextForSecrets(text, path19) {
+function scanTextForSecrets(text, path20) {
   const findings = [];
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -15339,7 +15339,7 @@ function scanTextForSecrets(text, path19) {
           rule: rule.name,
           line: i + 1,
           preview: redact(m[0]),
-          path: path19
+          path: path20
         });
       }
     }
@@ -15867,22 +15867,308 @@ var import_node_os3 = __toESM(require("node:os"), 1);
 init_dist();
 
 // packages/scanner/dist/index.js
+var import_promises4 = __toESM(require("node:fs/promises"), 1);
+var import_node_path6 = __toESM(require("node:path"), 1);
+init_dist();
+
+// packages/scanner/dist/claude/marketplace-resolver.js
 var import_promises3 = __toESM(require("node:fs/promises"), 1);
 var import_node_path5 = __toESM(require("node:path"), 1);
 init_dist();
+
+// packages/scanner/dist/claude/plugin-key.js
+function parseClaudePluginKey(value) {
+  const v = value.trim();
+  if (!v || v === "@")
+    return { pluginName: v };
+  if (v.startsWith("@") && !v.slice(1).includes("@")) {
+    return { pluginName: v };
+  }
+  const index = v.lastIndexOf("@");
+  if (index <= 0 || index === v.length - 1) {
+    return { pluginName: v };
+  }
+  return {
+    pluginName: v.slice(0, index),
+    marketplaceName: v.slice(index + 1)
+  };
+}
+function formatClaudePluginKey(pluginName, marketplaceName) {
+  return marketplaceName ? `${pluginName}@${marketplaceName}` : pluginName;
+}
+function normalizeGitRepositoryUrl(url) {
+  const raw = url.trim().replace(/\.git$/i, "");
+  let m = raw.match(/github\.com[:/]([^/\s]+\/[^/\s]+)/i) || raw.match(/ssh:\/\/git@github\.com\/([^/\s]+\/[^/\s]+)/i);
+  if (m) {
+    return {
+      provider: "github",
+      repository: m[1].replace(/\.git$/i, ""),
+      url: raw
+    };
+  }
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(raw)) {
+    return { provider: "github", repository: raw, url: raw };
+  }
+  return { provider: "git", url: raw };
+}
+
+// packages/scanner/dist/claude/marketplace-resolver.js
+function isPlainObject3(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function parseInstalledPlugins(raw) {
+  const items = [];
+  if (raw == null)
+    return { items };
+  const push = (idRaw, extra = {}) => {
+    const parsed = parseClaudePluginKey(idRaw);
+    const id = formatClaudePluginKey(parsed.pluginName, parsed.marketplaceName);
+    items.push({
+      id,
+      pluginName: parsed.pluginName,
+      marketplaceName: parsed.marketplaceName ?? extra.marketplaceName,
+      version: extra.version,
+      enabled: extra.enabled,
+      installPath: extra.installPath
+    });
+  };
+  try {
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        if (!isPlainObject3(entry))
+          continue;
+        const id = String(entry.id ?? entry.name ?? "");
+        if (!id)
+          continue;
+        push(id, {
+          marketplaceName: typeof entry.marketplace === "string" ? entry.marketplace : void 0,
+          version: typeof entry.version === "string" ? entry.version : void 0,
+          enabled: typeof entry.enabled === "boolean" ? entry.enabled : void 0,
+          installPath: typeof entry.path === "string" ? entry.path : typeof entry.installPath === "string" ? entry.installPath : void 0
+        });
+      }
+      return { items };
+    }
+    if (isPlainObject3(raw) && Array.isArray(raw.plugins)) {
+      return parseInstalledPlugins(raw.plugins);
+    }
+    if (isPlainObject3(raw)) {
+      for (const [key, val] of Object.entries(raw)) {
+        if (key === "version" || key === "plugins")
+          continue;
+        if (typeof val === "boolean") {
+          push(key, { enabled: val });
+          continue;
+        }
+        if (isPlainObject3(val)) {
+          push(key, {
+            marketplaceName: typeof val.marketplace === "string" ? val.marketplace : void 0,
+            version: typeof val.version === "string" ? val.version : void 0,
+            enabled: typeof val.enabled === "boolean" ? val.enabled : void 0,
+            installPath: typeof val.installPath === "string" ? val.installPath : typeof val.path === "string" ? val.path : void 0
+          });
+        }
+      }
+      return { items };
+    }
+    return { items, warning: "installed_plugins.json: unrecognized shape" };
+  } catch (e) {
+    return {
+      items: [],
+      warning: `installed_plugins.json parse error: ${e.message}`
+    };
+  }
+}
+async function readGitHubRemote(repoDir) {
+  const gitCfg = import_node_path5.default.join(repoDir, ".git", "config");
+  if (!await pathExists(gitCfg))
+    return void 0;
+  try {
+    const text = await import_promises3.default.readFile(gitCfg, "utf8");
+    const m = text.match(/url\s*=\s*(.+)/i);
+    if (!m?.[1])
+      return void 0;
+    const n = normalizeGitRepositoryUrl(m[1].trim());
+    return n.repository;
+  } catch {
+    return void 0;
+  }
+}
+async function loadKnownMarketplaces(home) {
+  const map = /* @__PURE__ */ new Map();
+  const knownPath = import_node_path5.default.join(claudePluginsDir(home), "known_marketplaces.json");
+  if (!await pathExists(knownPath))
+    return map;
+  try {
+    const raw = JSON.parse(await import_promises3.default.readFile(knownPath, "utf8"));
+    for (const [name, val] of Object.entries(raw)) {
+      if (!isPlainObject3(val))
+        continue;
+      const installLocation = typeof val.installLocation === "string" ? val.installLocation : typeof val.path === "string" ? val.path : void 0;
+      let repository;
+      const source = val.source;
+      if (isPlainObject3(source)) {
+        if (typeof source.repo === "string")
+          repository = source.repo;
+        else if (typeof source.url === "string") {
+          repository = normalizeGitRepositoryUrl(source.url).repository;
+        } else if (typeof source.path === "string" && installLocation) {
+        }
+      }
+      if (!repository && installLocation) {
+        repository = await readGitHubRemote(installLocation);
+      }
+      map.set(name, {
+        installLocation,
+        repository,
+        sourceType: isPlainObject3(source) ? String(source.source ?? source.type ?? "") : void 0
+      });
+    }
+  } catch {
+  }
+  return map;
+}
+async function resolveClaudePluginInventory(home) {
+  const warnings = [];
+  const byId = /* @__PURE__ */ new Map();
+  const ensure = (pluginName, marketplaceName) => {
+    const canonicalId = formatClaudePluginKey(pluginName, marketplaceName);
+    let item = byId.get(canonicalId);
+    if (!item) {
+      item = {
+        canonicalId,
+        pluginName,
+        marketplaceName,
+        evidence: [],
+        confidence: 0.4,
+        resolutionStatus: "unresolved"
+      };
+      byId.set(canonicalId, item);
+    }
+    return item;
+  };
+  const settingsPath = claudeSettingsPath(home);
+  if (await pathExists(settingsPath)) {
+    try {
+      const settings = JSON.parse(await import_promises3.default.readFile(settingsPath, "utf8"));
+      for (const [key, enabled] of Object.entries(settings.enabledPlugins ?? {})) {
+        const parsed = parseClaudePluginKey(key);
+        const item = ensure(parsed.pluginName, parsed.marketplaceName);
+        item.enabled = enabled;
+        item.evidence.push({ from: "settings.json", detail: key });
+      }
+    } catch {
+      warnings.push("settings.json: failed to parse enabledPlugins");
+    }
+  }
+  const installedPath = import_node_path5.default.join(claudePluginsDir(home), "installed_plugins.json");
+  if (await pathExists(installedPath)) {
+    try {
+      const raw = JSON.parse(await import_promises3.default.readFile(installedPath, "utf8"));
+      const { items, warning } = parseInstalledPlugins(raw);
+      if (warning)
+        warnings.push(warning);
+      for (const p of items) {
+        const item = ensure(p.pluginName, p.marketplaceName);
+        if (p.version)
+          item.version = p.version;
+        if (p.installPath)
+          item.installPath = p.installPath;
+        if (typeof p.enabled === "boolean")
+          item.enabled = p.enabled;
+        item.evidence.push({ from: "installed_plugins.json", detail: p.id });
+        item.confidence = Math.max(item.confidence, 0.7);
+      }
+    } catch {
+      warnings.push("installed_plugins.json: unreadable");
+    }
+  }
+  const known = await loadKnownMarketplaces(home);
+  for (const item of byId.values()) {
+    if (!item.marketplaceName)
+      continue;
+    const m = known.get(item.marketplaceName);
+    if (!m)
+      continue;
+    if (m.repository) {
+      item.marketplaceRepository = m.repository;
+      item.confidence = Math.max(item.confidence, 0.95);
+    }
+    if (m.installLocation && !item.installPath) {
+      item.installPath = m.installLocation;
+    }
+    item.evidence.push({
+      from: "known_marketplaces.json",
+      detail: item.marketplaceName
+    });
+  }
+  const marketplacesDir = import_node_path5.default.join(claudePluginsDir(home), "marketplaces");
+  if (await pathExists(marketplacesDir)) {
+    try {
+      const names = await import_promises3.default.readdir(marketplacesDir);
+      for (const name of names) {
+        const mPath = import_node_path5.default.join(marketplacesDir, name);
+        const st = await import_promises3.default.stat(mPath).catch(() => null);
+        if (!st?.isDirectory())
+          continue;
+        const repo = await readGitHubRemote(mPath);
+        if (!repo)
+          continue;
+        for (const item of byId.values()) {
+          if (item.marketplaceName === name && !item.marketplaceRepository) {
+            item.marketplaceRepository = repo;
+            item.installPath = item.installPath ?? mPath;
+            item.confidence = Math.max(item.confidence, 0.92);
+            item.evidence.push({ from: "marketplace-git-remote", detail: repo });
+          }
+        }
+      }
+    } catch {
+    }
+  }
+  for (const item of byId.values()) {
+    if (item.marketplaceRepository && item.marketplaceName) {
+      item.resolutionStatus = "resolved";
+      item.confidence = Math.max(item.confidence, 0.95);
+    } else if (item.marketplaceName) {
+      item.resolutionStatus = "partially-resolved";
+      item.confidence = Math.max(item.confidence, 0.6);
+    } else {
+      item.resolutionStatus = "unresolved";
+    }
+  }
+  return { items: [...byId.values()], warnings };
+}
+
+// packages/scanner/dist/system-skills.js
+var SYSTEM_SKILL_DIRECTORIES = {
+  codex: /* @__PURE__ */ new Set([".system"])
+};
+function isSystemSkillDirectory(target, name) {
+  return SYSTEM_SKILL_DIRECTORIES[target]?.has(name) ?? false;
+}
+function isNeverCapturableResource(resource) {
+  if (resource.classification === "system-cache")
+    return true;
+  if (resource.target === "codex" && resource.id === ".system")
+    return true;
+  return false;
+}
+
+// packages/scanner/dist/index.js
 async function detectSkillSource(skillDir, home) {
   const meta = {};
   for (const lockRel of [
-    import_node_path5.default.join(home, ".agents", ".skill-lock.json"),
-    import_node_path5.default.join(home, ".agents", "skills-lock.json"),
-    import_node_path5.default.join(skillDir, "skills-lock.json"),
-    import_node_path5.default.join(skillDir, "..", "skills-lock.json")
+    import_node_path6.default.join(home, ".agents", ".skill-lock.json"),
+    import_node_path6.default.join(home, ".agents", "skills-lock.json"),
+    import_node_path6.default.join(skillDir, "skills-lock.json"),
+    import_node_path6.default.join(skillDir, "..", "skills-lock.json")
   ]) {
     if (!await pathExists(lockRel))
       continue;
     try {
-      const raw = JSON.parse(await import_promises3.default.readFile(lockRel, "utf8"));
-      const name = import_node_path5.default.basename(skillDir);
+      const raw = JSON.parse(await import_promises4.default.readFile(lockRel, "utf8"));
+      const name = import_node_path6.default.basename(skillDir);
       const skills = raw.skills;
       const entry = skills && skills[name] || raw[name];
       if (entry) {
@@ -15898,10 +16184,10 @@ async function detectSkillSource(skillDir, home) {
     } catch {
     }
   }
-  const skillMd = import_node_path5.default.join(skillDir, "SKILL.md");
+  const skillMd = import_node_path6.default.join(skillDir, "SKILL.md");
   if (await pathExists(skillMd)) {
     try {
-      const text = await import_promises3.default.readFile(skillMd, "utf8");
+      const text = await import_promises4.default.readFile(skillMd, "utf8");
       meta.hasSkillMd = true;
       const urlMatch = text.match(/https?:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
       if (urlMatch) {
@@ -15914,10 +16200,10 @@ async function detectSkillSource(skillDir, home) {
     } catch {
     }
   }
-  const pkg = import_node_path5.default.join(skillDir, "package.json");
+  const pkg = import_node_path6.default.join(skillDir, "package.json");
   if (await pathExists(pkg)) {
     try {
-      const raw = JSON.parse(await import_promises3.default.readFile(pkg, "utf8"));
+      const raw = JSON.parse(await import_promises4.default.readFile(pkg, "utf8"));
       meta.packageName = raw.name;
       const url = typeof raw.repository === "string" ? raw.repository : raw.repository?.url;
       if (url) {
@@ -15933,10 +16219,10 @@ async function detectSkillSource(skillDir, home) {
     } catch {
     }
   }
-  const gitConfig = import_node_path5.default.join(skillDir, ".git", "config");
+  const gitConfig = import_node_path6.default.join(skillDir, ".git", "config");
   if (await pathExists(gitConfig)) {
     try {
-      const text = await import_promises3.default.readFile(gitConfig, "utf8");
+      const text = await import_promises4.default.readFile(gitConfig, "utf8");
       const m = text.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
       if (m) {
         return {
@@ -15949,9 +16235,9 @@ async function detectSkillSource(skillDir, home) {
     }
   }
   try {
-    const st = await import_promises3.default.lstat(skillDir);
+    const st = await import_promises4.default.lstat(skillDir);
     if (st.isSymbolicLink()) {
-      const target = await import_promises3.default.readlink(skillDir);
+      const target = await import_promises4.default.readlink(skillDir);
       meta.symlinkTarget = target;
       return {
         candidate: void 0,
@@ -15970,7 +16256,22 @@ async function scanSkills(dir, target, options) {
   for (const name of names) {
     if (isSelfManagedResourceId(name))
       continue;
-    const full = import_node_path5.default.join(dir, name);
+    const full = import_node_path6.default.join(dir, name);
+    if (isSystemSkillDirectory(target, name)) {
+      out.push({
+        id: name,
+        kind: "skill",
+        target,
+        path: full,
+        confidence: 1,
+        classification: "system-cache",
+        metadata: {
+          managedBy: target,
+          role: "system-skills"
+        }
+      });
+      continue;
+    }
     const source = await detectSkillSource(full, home);
     let hash;
     if (!options.light) {
@@ -15997,52 +16298,57 @@ async function scanSkills(dir, target, options) {
 async function scanClaudePlugins(home, options) {
   const out = [];
   const pluginsRoot = claudePluginsDir(home);
-  const installedPath = import_node_path5.default.join(pluginsRoot, "installed_plugins.json");
-  if (await pathExists(installedPath)) {
-    try {
-      const data = JSON.parse(await import_promises3.default.readFile(installedPath, "utf8"));
-      for (const p of data.plugins ?? []) {
-        const id = p.id ?? p.name ?? "unknown-plugin";
-        if (isSelfManagedResourceId(id))
-          continue;
-        const managed = options.managedIds?.has(id) ?? false;
-        out.push({
-          id,
-          kind: "plugin",
-          target: "claude",
-          path: p.path ?? installedPath,
-          sourceCandidate: p.marketplace ? `${p.marketplace}/${p.name ?? id}` : p.name,
-          confidence: p.marketplace ? 0.9 : 0.5,
-          classification: managed ? "managed" : p.marketplace ? "source-known" : "source-unknown",
-          metadata: {
-            marketplace: p.marketplace,
-            version: p.version,
-            enabled: p.enabled,
-            from: "installed_plugins.json"
-          }
-        });
-      }
-    } catch {
-    }
+  const settingsPath = claudeSettingsPath(home);
+  const { items, warnings } = await resolveClaudePluginInventory(home);
+  for (const w of warnings) {
+    void w;
   }
-  const marketplaces = import_node_path5.default.join(pluginsRoot, "marketplaces");
+  for (const item of items) {
+    if (isSelfManagedResourceId(item.canonicalId))
+      continue;
+    if (isSelfManagedResourceId(item.pluginName))
+      continue;
+    const managed = (options.managedIds?.has(item.canonicalId) || options.managedIds?.has(item.pluginName)) ?? false;
+    const resolved = item.resolutionStatus === "resolved";
+    const partial = item.resolutionStatus === "partially-resolved";
+    const pathForResource = item.installPath ?? (item.marketplaceName ? import_node_path6.default.join(pluginsRoot, "marketplaces", item.marketplaceName) : pluginsRoot);
+    out.push({
+      id: item.canonicalId,
+      kind: "plugin",
+      target: "claude",
+      path: pathForResource,
+      sourceCandidate: item.marketplaceRepository,
+      confidence: item.confidence,
+      classification: managed ? "managed" : resolved ? "source-known" : "source-unknown",
+      metadata: {
+        pluginName: item.pluginName,
+        marketplace: item.marketplaceName,
+        marketplaceRepository: item.marketplaceRepository,
+        version: item.version,
+        enabled: item.enabled,
+        installVia: "claude-marketplace",
+        sourceResolutionStatus: item.resolutionStatus,
+        evidence: item.evidence,
+        // explicit: settings is evidence only, never a source path
+        settingsPath
+      }
+    });
+  }
+  const marketplaces = import_node_path6.default.join(pluginsRoot, "marketplaces");
   if (await pathExists(marketplaces)) {
     for (const name of await listDirNames(marketplaces)) {
       if (isSelfManagedResourceId(name) || isSelfManagedResourceId(`marketplace:${name}`)) {
         continue;
       }
-      const mPath = import_node_path5.default.join(marketplaces, name);
-      let sourceCandidate = name;
-      let confidence = 0.7;
+      const mPath = import_node_path6.default.join(marketplaces, name);
+      let sourceCandidate;
       try {
-        const gitCfg = import_node_path5.default.join(mPath, ".git", "config");
+        const gitCfg = import_node_path6.default.join(mPath, ".git", "config");
         if (await pathExists(gitCfg)) {
-          const text = await import_promises3.default.readFile(gitCfg, "utf8");
+          const text = await import_promises4.default.readFile(gitCfg, "utf8");
           const m = text.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
-          if (m) {
+          if (m)
             sourceCandidate = m[1].replace(/\.git$/, "");
-            confidence = 0.95;
-          }
         }
       } catch {
       }
@@ -16052,44 +16358,15 @@ async function scanClaudePlugins(home, options) {
         target: "claude",
         path: mPath,
         sourceCandidate,
-        confidence,
+        confidence: sourceCandidate ? 0.9 : 0.5,
         classification: "system-cache",
         metadata: {
           role: "marketplace-cache",
-          // Skills installed via this marketplace are restored by claude-marketplace driver
+          marketplace: name,
+          marketplaceRepository: sourceCandidate,
           installVia: "claude-marketplace"
         }
       });
-    }
-  }
-  const settingsPath = claudeSettingsPath(home);
-  if (await pathExists(settingsPath)) {
-    try {
-      const settings = JSON.parse(await import_promises3.default.readFile(settingsPath, "utf8"));
-      if (settings.enabledPlugins) {
-        for (const [key, enabled] of Object.entries(settings.enabledPlugins)) {
-          if (isSelfManagedResourceId(key))
-            continue;
-          const existing = out.find((r) => r.id === key || r.id.endsWith(key));
-          if (existing) {
-            existing.metadata = {
-              ...existing.metadata,
-              enabledInSettings: enabled
-            };
-          } else {
-            out.push({
-              id: key,
-              kind: "plugin",
-              target: "claude",
-              path: settingsPath,
-              confidence: 0.6,
-              classification: options.managedIds?.has(key) ? "managed" : "source-unknown",
-              metadata: { enabledInSettings: enabled, from: "settings.json" }
-            });
-          }
-        }
-      }
-    } catch {
     }
   }
   return out;
@@ -16099,7 +16376,7 @@ async function scanCodexHooks(home, options) {
   const manifestPath = codexHooksManifestPath(home);
   if (await pathExists(manifestPath)) {
     try {
-      const raw = JSON.parse(await import_promises3.default.readFile(manifestPath, "utf8"));
+      const raw = JSON.parse(await import_promises4.default.readFile(manifestPath, "utf8"));
       const entries = Array.isArray(raw.hooks) ? raw.hooks : Array.isArray(raw) ? raw : [];
       if (entries.length > 0) {
         for (const entry of entries) {
@@ -16145,7 +16422,7 @@ async function scanCodexHooks(home, options) {
       id: `hook-script:${name}`,
       kind: "hook",
       target: "codex",
-      path: import_node_path5.default.join(hooksDir, name),
+      path: import_node_path6.default.join(hooksDir, name),
       confidence: 0.5,
       classification: options.managedIds?.has(name) ? "managed" : "unmanaged"
     });
@@ -16221,13 +16498,15 @@ function inventryDiff(scan, managedIds) {
       return false;
     if (r.classification === "system-cache")
       return false;
+    if (r.target === "codex" && r.id === ".system")
+      return false;
     return !managedIds.has(r.id) && !r.id.startsWith("marketplace:");
   });
 }
 
 // packages/state-manager/dist/index.js
-var import_promises4 = __toESM(require("node:fs/promises"), 1);
-var import_node_path6 = __toESM(require("node:path"), 1);
+var import_promises5 = __toESM(require("node:fs/promises"), 1);
+var import_node_path7 = __toESM(require("node:path"), 1);
 init_dist();
 async function ensureStateDirs(home) {
   const root = defaultStateRoot(home);
@@ -16239,11 +16518,11 @@ async function ensureStateDirs(home) {
 }
 async function getState(home) {
   await ensureStateDirs(home);
-  return loadState(import_node_path6.default.join(defaultStateRoot(home), "state.json"));
+  return loadState(import_node_path7.default.join(defaultStateRoot(home), "state.json"));
 }
 async function putState(state, home) {
   await ensureStateDirs(home);
-  await saveState(import_node_path6.default.join(defaultStateRoot(home), "state.json"), state);
+  await saveState(import_node_path7.default.join(defaultStateRoot(home), "state.json"), state);
 }
 async function loadPending(home) {
   const p = pendingEventsPath(home);
@@ -16278,7 +16557,7 @@ async function appendPendingEvents(events, home) {
 async function beginTransaction(plannedPaths, reason, home, operations) {
   await ensureStateDirs(home);
   const id = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-  const dir = import_node_path6.default.join(backupsDir(home), id);
+  const dir = import_node_path7.default.join(backupsDir(home), id);
   await ensureDir(dir);
   const record = {
     id,
@@ -16290,9 +16569,9 @@ async function beginTransaction(plannedPaths, reason, home, operations) {
   };
   const seen = /* @__PURE__ */ new Set();
   for (const original of plannedPaths) {
-    if (!original || !import_node_path6.default.isAbsolute(original))
+    if (!original || !import_node_path7.default.isAbsolute(original))
       continue;
-    if (original.includes(`${import_node_path6.default.sep}node_modules${import_node_path6.default.sep}`))
+    if (original.includes(`${import_node_path7.default.sep}node_modules${import_node_path7.default.sep}`))
       continue;
     const key = original;
     if (seen.has(key))
@@ -16310,7 +16589,7 @@ async function beginTransaction(plannedPaths, reason, home, operations) {
     }
     let st;
     try {
-      st = await import_promises4.default.lstat(original);
+      st = await import_promises5.default.lstat(original);
     } catch {
       continue;
     }
@@ -16323,21 +16602,21 @@ async function beginTransaction(plannedPaths, reason, home, operations) {
       });
       continue;
     }
-    const base = import_node_path6.default.basename(original) || "root";
+    const base = import_node_path7.default.basename(original) || "root";
     const safeBase = base.replace(/^\.+/, "dot") || "root";
-    let finalDest = import_node_path6.default.join(dir, safeBase);
+    let finalDest = import_node_path7.default.join(dir, safeBase);
     let i = 1;
     while (await pathExists(finalDest)) {
-      finalDest = import_node_path6.default.join(dir, `${safeBase}.${i}`);
+      finalDest = import_node_path7.default.join(dir, `${safeBase}.${i}`);
       i++;
     }
-    await import_promises4.default.cp(original, finalDest, {
+    await import_promises5.default.cp(original, finalDest, {
       recursive: true,
       dereference: true,
       errorOnExist: false,
       force: true
     });
-    const backupRel = import_node_path6.default.relative(dir, finalDest);
+    const backupRel = import_node_path7.default.relative(dir, finalDest);
     record.files.push({
       original,
       backup: finalDest,
@@ -16371,7 +16650,7 @@ async function recordPathOp(tx, op, home) {
 }
 async function confirmCreatedPaths(tx, paths, home) {
   for (const p of paths) {
-    if (!p || !import_node_path6.default.isAbsolute(p))
+    if (!p || !import_node_path7.default.isAbsolute(p))
       continue;
     const existedBefore = tx.pathOps.some((o) => o.path === p && o.existedBefore);
     if (!existedBefore) {
@@ -16380,18 +16659,18 @@ async function confirmCreatedPaths(tx, paths, home) {
   }
 }
 async function persistTransaction(record, home) {
-  const dir = import_node_path6.default.join(backupsDir(home), record.id);
+  const dir = import_node_path7.default.join(backupsDir(home), record.id);
   await ensureDir(dir);
-  await writeJsonFile(import_node_path6.default.join(dir, "operations.json"), record);
+  await writeJsonFile(import_node_path7.default.join(dir, "operations.json"), record);
 }
 async function listBackups(home) {
   const root = backupsDir(home);
   if (!await pathExists(root))
     return [];
-  const names = await import_promises4.default.readdir(root);
+  const names = await import_promises5.default.readdir(root);
   const out = [];
   for (const name of names) {
-    const op = import_node_path6.default.join(root, name, "operations.json");
+    const op = import_node_path7.default.join(root, name, "operations.json");
     if (await pathExists(op)) {
       const rec = await readJsonFile(op);
       if (!rec.pathOps)
@@ -16403,7 +16682,7 @@ async function listBackups(home) {
               kind: "replace",
               path: f.original,
               existedBefore: f.existedBefore ?? true,
-              backupRel: import_node_path6.default.relative(import_node_path6.default.join(backupsDir(home), rec.id), f.backup)
+              backupRel: import_node_path7.default.relative(import_node_path7.default.join(backupsDir(home), rec.id), f.backup)
             });
           }
         }
@@ -16420,33 +16699,33 @@ async function rollbackBackup(id, home) {
   const record = id === "last" ? backups[0] : backups.find((b) => b.id === id);
   if (!record)
     throw new Error(`Backup not found: ${id}`);
-  const txDir = import_node_path6.default.join(backupsDir(home), record.id);
+  const txDir = import_node_path7.default.join(backupsDir(home), record.id);
   const ops = [...record.pathOps ?? []].reverse();
   for (const op of ops) {
     if (!op.existedBefore) {
       if (await pathExists(op.path)) {
-        await import_promises4.default.rm(op.path, { recursive: true, force: true });
+        await import_promises5.default.rm(op.path, { recursive: true, force: true });
       }
       continue;
     }
     if (op.backupRel) {
-      const backupPath = import_node_path6.default.join(txDir, op.backupRel);
+      const backupPath = import_node_path7.default.join(txDir, op.backupRel);
       if (await pathExists(backupPath)) {
         if (await pathExists(op.path)) {
-          await import_promises4.default.rm(op.path, { recursive: true, force: true });
+          await import_promises5.default.rm(op.path, { recursive: true, force: true });
         }
-        await ensureDir(import_node_path6.default.dirname(op.path));
-        await import_promises4.default.cp(backupPath, op.path, { recursive: true, force: true });
+        await ensureDir(import_node_path7.default.dirname(op.path));
+        await import_promises5.default.cp(backupPath, op.path, { recursive: true, force: true });
         continue;
       }
     }
     const file = record.files?.find((f) => f.original === op.path);
     if (file && await pathExists(file.backup)) {
       if (await pathExists(op.path)) {
-        await import_promises4.default.rm(op.path, { recursive: true, force: true });
+        await import_promises5.default.rm(op.path, { recursive: true, force: true });
       }
-      await ensureDir(import_node_path6.default.dirname(op.path));
-      await import_promises4.default.cp(file.backup, op.path, { recursive: true, force: true });
+      await ensureDir(import_node_path7.default.dirname(op.path));
+      await import_promises5.default.cp(file.backup, op.path, { recursive: true, force: true });
     }
   }
   for (const file of record.files ?? []) {
@@ -16455,10 +16734,10 @@ async function rollbackBackup(id, home) {
     if (!await pathExists(file.backup))
       continue;
     if (await pathExists(file.original)) {
-      await import_promises4.default.rm(file.original, { recursive: true, force: true });
+      await import_promises5.default.rm(file.original, { recursive: true, force: true });
     }
-    await ensureDir(import_node_path6.default.dirname(file.original));
-    await import_promises4.default.cp(file.backup, file.original, { recursive: true, force: true });
+    await ensureDir(import_node_path7.default.dirname(file.original));
+    await import_promises5.default.cp(file.backup, file.original, { recursive: true, force: true });
   }
   record.rolledBack = true;
   record.rolledBackAt = (/* @__PURE__ */ new Date()).toISOString();
@@ -16468,10 +16747,10 @@ async function rollbackBackup(id, home) {
 }
 async function appendLog(line, home) {
   await ensureStateDirs(home);
-  const file = import_node_path6.default.join(logsDir(home), "operations.log");
+  const file = import_node_path7.default.join(logsDir(home), "operations.log");
   const entry = `[${(/* @__PURE__ */ new Date()).toISOString()}] ${line}
 `;
-  await import_promises4.default.appendFile(file, entry, "utf8");
+  await import_promises5.default.appendFile(file, entry, "utf8");
 }
 function hasLocalConfig(home) {
   return pathExists(localConfigPath(home));
@@ -16480,13 +16759,13 @@ function hasLocalConfig(home) {
 // packages/git-sync/dist/index.js
 var import_node_child_process2 = require("node:child_process");
 var import_node_util2 = require("node:util");
-var import_node_path8 = __toESM(require("node:path"), 1);
+var import_node_path9 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/git-sync/dist/source-cache.js
 var import_node_child_process = require("node:child_process");
 var import_node_util = require("node:util");
-var import_node_path7 = __toESM(require("node:path"), 1);
+var import_node_path8 = __toESM(require("node:path"), 1);
 init_dist();
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
 function remotesMatch(a, b) {
@@ -16531,7 +16810,7 @@ function cacheKey(source) {
 async function resolveCachedSource(source, options) {
   if (!source)
     return void 0;
-  if (source.path && import_node_path7.default.isAbsolute(source.path) && await pathExists(source.path)) {
+  if (source.path && import_node_path8.default.isAbsolute(source.path) && await pathExists(source.path)) {
     return { root: source.path, fromCache: false };
   }
   const remote = source.url ?? (source.repository ? githubHttpsUrl(source.repository) : void 0);
@@ -16540,8 +16819,8 @@ async function resolveCachedSource(source, options) {
   if (!remote)
     return void 0;
   const key = cacheKey(source);
-  const root = import_node_path7.default.join(cacheDir(options.home), "sources", key);
-  await ensureDir(import_node_path7.default.dirname(root));
+  const root = import_node_path8.default.join(cacheDir(options.home), "sources", key);
+  await ensureDir(import_node_path8.default.dirname(root));
   if (await pathExists(root)) {
     const inside = await git(root, ["rev-parse", "--is-inside-work-tree"], true);
     if (inside.code === 0 && inside.stdout.trim() === "true") {
@@ -16583,8 +16862,8 @@ async function resolveCachedSource(source, options) {
   if (!ref)
     args.push("--depth", "1");
   args.push(remote, root);
-  await ensureDir(import_node_path7.default.dirname(root));
-  await git(import_node_path7.default.dirname(root), args);
+  await ensureDir(import_node_path8.default.dirname(root));
+  await git(import_node_path8.default.dirname(root), args);
   if (ref)
     await git(root, ["checkout", ref], true);
   const head = await git(root, ["rev-parse", "HEAD"], true);
@@ -16596,11 +16875,11 @@ async function resolveCachedSource(source, options) {
   };
 }
 async function listCachedSources(home) {
-  const root = import_node_path7.default.join(cacheDir(home), "sources");
+  const root = import_node_path8.default.join(cacheDir(home), "sources");
   if (!await pathExists(root))
     return [];
   const { readdir } = await import("node:fs/promises");
-  return (await readdir(root)).map((n) => import_node_path7.default.join(root, n));
+  return (await readdir(root)).map((n) => import_node_path8.default.join(root, n));
 }
 
 // packages/git-sync/dist/index.js
@@ -16707,8 +16986,8 @@ async function cloneRepo(remote, localPath) {
   if (await pathExists(localPath)) {
     throw new GitError(`Target directory already exists: ${localPath}. Refusing to clone over it.`);
   }
-  await ensureDir(import_node_path8.default.dirname(localPath));
-  await runGit(import_node_path8.default.dirname(localPath), ["clone", remote, localPath]);
+  await ensureDir(import_node_path9.default.dirname(localPath));
+  await runGit(import_node_path9.default.dirname(localPath), ["clone", remote, localPath]);
 }
 async function pullRepo(dir) {
   const safety = await inspectGitSafety(dir);
@@ -16756,7 +17035,7 @@ async function scanWorkingTreeSecrets(dir) {
     if (filePath.endsWith(".png") || filePath.endsWith(".jpg") || filePath.endsWith(".zip") || filePath.endsWith(".woff")) {
       continue;
     }
-    const full = import_node_path8.default.join(dir, filePath);
+    const full = import_node_path9.default.join(dir, filePath);
     if (!await pathExists(full))
       continue;
     try {
@@ -16776,8 +17055,8 @@ function remotesMatch2(a, b) {
 }
 
 // packages/recipe-engine/dist/analyzer.js
-var import_promises5 = __toESM(require("node:fs/promises"), 1);
-var import_node_path9 = __toESM(require("node:path"), 1);
+var import_promises6 = __toESM(require("node:fs/promises"), 1);
+var import_node_path10 = __toESM(require("node:path"), 1);
 init_dist();
 async function analyzeSourceTree(sourceRoot, targets = ["claude", "codex"]) {
   const notes = [];
@@ -16794,12 +17073,12 @@ async function analyzeSourceTree(sourceRoot, targets = ["claude", "codex"]) {
         let pluginName;
         try {
           if (marketplace) {
-            const raw = JSON.parse(await readText(import_node_path9.default.join(sourceRoot, marketplace)));
+            const raw = JSON.parse(await readText(import_node_path10.default.join(sourceRoot, marketplace)));
             marketplaceName = raw.name;
             pluginName = raw.plugins?.[0]?.name;
           }
           if (pluginJson) {
-            const raw = JSON.parse(await readText(import_node_path9.default.join(sourceRoot, pluginJson)));
+            const raw = JSON.parse(await readText(import_node_path10.default.join(sourceRoot, pluginJson)));
             pluginName = pluginName ?? raw.name;
           }
         } catch {
@@ -16831,7 +17110,7 @@ async function analyzeSourceTree(sourceRoot, targets = ["claude", "codex"]) {
       }
       const claudeSkill = tree.find((f) => f.startsWith("skills/") && f.endsWith("SKILL.md") || f.startsWith(".claude/skills/") && f.endsWith("SKILL.md"));
       if (claudeSkill && !standardMatch) {
-        const skillDir = import_node_path9.default.posix.dirname(claudeSkill);
+        const skillDir = import_node_path10.default.posix.dirname(claudeSkill);
         standardMatch = {
           kind: "generic-skill",
           confidence: 0.85,
@@ -16855,7 +17134,7 @@ async function analyzeSourceTree(sourceRoot, targets = ["claude", "codex"]) {
       const hookManifest = tree.find((f) => f === ".codex/hooks.json" || f.endsWith("/hooks.json"));
       const hasCodexDir = tree.some((f) => f.startsWith(".codex/"));
       if (hasCodexDir || codexSkill || hookManifest) {
-        const skillDir = codexSkill ? import_node_path9.default.posix.dirname(codexSkill) : void 0;
+        const skillDir = codexSkill ? import_node_path10.default.posix.dirname(codexSkill) : void 0;
         standardMatch = {
           kind: "codex-layout",
           confidence: 0.9,
@@ -16925,11 +17204,11 @@ async function loadRecipeRegistry(recipesDir) {
   const map = /* @__PURE__ */ new Map();
   if (!await pathExists(recipesDir))
     return map;
-  const entries = await import_promises5.default.readdir(recipesDir);
+  const entries = await import_promises6.default.readdir(recipesDir);
   for (const name of entries) {
     if (!name.endsWith(".yaml") && !name.endsWith(".yml"))
       continue;
-    const full = import_node_path9.default.join(recipesDir, name);
+    const full = import_node_path10.default.join(recipesDir, name);
     try {
       const recipe = await loadRecipe(full);
       map.set(recipe.id, recipe);
@@ -16941,17 +17220,17 @@ async function loadRecipeRegistry(recipesDir) {
 }
 
 // packages/recipe-engine/dist/plan-apply.js
-var import_node_path12 = __toESM(require("node:path"), 1);
+var import_node_path13 = __toESM(require("node:path"), 1);
 init_dist();
 
 // drivers/dist/index.js
 var import_node_child_process3 = require("node:child_process");
 var import_node_util3 = require("node:util");
-var import_node_path10 = __toESM(require("node:path"), 1);
+var import_node_path11 = __toESM(require("node:path"), 1);
 init_dist();
 var execFileAsync3 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 function destSkillDir(target, resourceId, home) {
-  return target === "claude" ? import_node_path10.default.join(claudeSkillsDir(home), resourceId) : import_node_path10.default.join(codexSkillsDir(home), resourceId);
+  return target === "claude" ? import_node_path11.default.join(claudeSkillsDir(home), resourceId) : import_node_path11.default.join(codexSkillsDir(home), resourceId);
 }
 async function pathReady(p) {
   return pathExists(p);
@@ -16960,7 +17239,7 @@ var genericSkillDriver = {
   name: "generic-skill",
   async plan(recipe, ctx) {
     const fromRel = recipe.sourcePaths?.skill;
-    const from = fromRel ? import_node_path10.default.isAbsolute(fromRel) ? fromRel : ctx.sourceRoot ? import_node_path10.default.join(ctx.sourceRoot, fromRel) : void 0 : ctx.sourceRoot;
+    const from = fromRel ? import_node_path11.default.isAbsolute(fromRel) ? fromRel : ctx.sourceRoot ? import_node_path11.default.join(ctx.sourceRoot, fromRel) : void 0 : ctx.sourceRoot;
     const to = destSkillDir(ctx.target, ctx.resourceId, ctx.home);
     return [
       {
@@ -16972,7 +17251,7 @@ var genericSkillDriver = {
   },
   async apply(recipe, ctx) {
     const fromRel = recipe.sourcePaths?.skill;
-    const from = fromRel ? import_node_path10.default.isAbsolute(fromRel) ? fromRel : import_node_path10.default.join(ctx.sourceRoot ?? "", fromRel) : ctx.sourceRoot;
+    const from = fromRel ? import_node_path11.default.isAbsolute(fromRel) ? fromRel : import_node_path11.default.join(ctx.sourceRoot ?? "", fromRel) : ctx.sourceRoot;
     if (!from || !await pathReady(from)) {
       return {
         ok: false,
@@ -16981,7 +17260,7 @@ var genericSkillDriver = {
       };
     }
     for (const req of recipe.requiredPaths) {
-      const p = import_node_path10.default.isAbsolute(req) ? req : import_node_path10.default.join(ctx.sourceRoot ?? from, req);
+      const p = import_node_path11.default.isAbsolute(req) ? req : import_node_path11.default.join(ctx.sourceRoot ?? from, req);
       if (!await pathReady(p)) {
         return {
           ok: false,
@@ -16999,7 +17278,7 @@ var genericSkillDriver = {
         pathsTouched: [to]
       };
     }
-    await ensureDir(import_node_path10.default.dirname(to));
+    await ensureDir(import_node_path11.default.dirname(to));
     await copyDirectory(from, to, { overwrite: true });
     return {
       ok: true,
@@ -17009,7 +17288,7 @@ var genericSkillDriver = {
   },
   async verify(_recipe, ctx) {
     const to = destSkillDir(ctx.target, ctx.resourceId, ctx.home);
-    const skillMd = import_node_path10.default.join(to, "SKILL.md");
+    const skillMd = import_node_path11.default.join(to, "SKILL.md");
     const ok = await pathReady(to) && await pathReady(skillMd);
     return {
       ok,
@@ -17028,7 +17307,7 @@ async function mergeHookManifest(destManifest, managedEntries) {
     // merge hooks array by id when possible
     preferManaged: true
   });
-  await ensureDir(import_node_path10.default.dirname(destManifest));
+  await ensureDir(import_node_path11.default.dirname(destManifest));
   await writeJsonFile(destManifest, merged);
   return [destManifest];
 }
@@ -17085,7 +17364,7 @@ var repositoryLayoutDriver = {
       };
     }
     for (const req of recipe.requiredPaths) {
-      const p = import_node_path10.default.join(ctx.sourceRoot, req);
+      const p = import_node_path11.default.join(ctx.sourceRoot, req);
       if (!await pathReady(p)) {
         return {
           ok: false,
@@ -17103,22 +17382,22 @@ var repositoryLayoutDriver = {
       };
     }
     if (recipe.sourcePaths?.skill) {
-      const from = import_node_path10.default.join(ctx.sourceRoot, recipe.sourcePaths.skill);
+      const from = import_node_path11.default.join(ctx.sourceRoot, recipe.sourcePaths.skill);
       const to = destSkillDir(ctx.target, ctx.resourceId, ctx.home);
-      await ensureDir(import_node_path10.default.dirname(to));
+      await ensureDir(import_node_path11.default.dirname(to));
       await copyDirectory(from, to, { overwrite: true });
       touched.push(to);
     }
     if (recipe.sourcePaths?.hookScripts) {
-      const from = import_node_path10.default.join(ctx.sourceRoot, recipe.sourcePaths.hookScripts);
-      const to = import_node_path10.default.join(codexHooksDir(ctx.home), ctx.resourceId);
+      const from = import_node_path11.default.join(ctx.sourceRoot, recipe.sourcePaths.hookScripts);
+      const to = import_node_path11.default.join(codexHooksDir(ctx.home), ctx.resourceId);
       if (await pathReady(from)) {
         await copyDirectory(from, to, { overwrite: true });
         touched.push(to);
       }
     }
     if (recipe.sourcePaths?.hookManifest) {
-      const from = import_node_path10.default.join(ctx.sourceRoot, recipe.sourcePaths.hookManifest);
+      const from = import_node_path11.default.join(ctx.sourceRoot, recipe.sourcePaths.hookManifest);
       if (await pathReady(from)) {
         const managed = await readJsonFile(from);
         const dest = codexHooksManifestPath(ctx.home);
@@ -17162,7 +17441,7 @@ async function applyOperation(op, ctx, recipe) {
         }
       ]);
       if (!ctx.dryRun) {
-        await ensureDir(import_node_path10.default.dirname(dest));
+        await ensureDir(import_node_path11.default.dirname(dest));
         await writeText(dest, text);
       }
       return {
@@ -17180,7 +17459,7 @@ async function applyOperation(op, ctx, recipe) {
       const managed = op.value ?? {};
       const merged = mergeJson(base, managed, { preferManaged: true });
       if (!ctx.dryRun) {
-        await ensureDir(import_node_path10.default.dirname(dest));
+        await ensureDir(import_node_path11.default.dirname(dest));
         await writeJsonFile(dest, merged);
       }
       return { ok: true, message: `merge-json ${dest}`, pathsTouched: [dest] };
@@ -17195,13 +17474,13 @@ async function applyOperation(op, ctx, recipe) {
           pathsTouched: []
         };
       }
-      const from = import_node_path10.default.isAbsolute(op.from) ? op.from : import_node_path10.default.join(ctx.sourceRoot ?? "", op.from);
+      const from = import_node_path11.default.isAbsolute(op.from) ? op.from : import_node_path11.default.join(ctx.sourceRoot ?? "", op.from);
       const to = expandHome(op.to, ctx.home);
       if (!await pathReady(from)) {
         return { ok: false, message: `source missing: ${from}`, pathsTouched: [] };
       }
       if (!ctx.dryRun) {
-        await ensureDir(import_node_path10.default.dirname(to));
+        await ensureDir(import_node_path11.default.dirname(to));
         await copyDirectory(from, to, { overwrite: true });
       }
       return { ok: true, message: `${op.type} ${from} -> ${to}`, pathsTouched: [to] };
@@ -17582,7 +17861,7 @@ function getDriver(name) {
 async function recipePathsValid(recipe, sourceRoot) {
   const missing = [];
   for (const req of recipe.requiredPaths) {
-    const p = import_node_path10.default.isAbsolute(req) || !sourceRoot ? expandHome(req) : import_node_path10.default.join(sourceRoot, req);
+    const p = import_node_path11.default.isAbsolute(req) || !sourceRoot ? expandHome(req) : import_node_path11.default.join(sourceRoot, req);
     if (!await pathExists(p))
       missing.push(req);
   }
@@ -17590,10 +17869,10 @@ async function recipePathsValid(recipe, sourceRoot) {
 }
 
 // packages/recipe-engine/dist/drift.js
-var import_node_path11 = __toESM(require("node:path"), 1);
+var import_node_path12 = __toESM(require("node:path"), 1);
 init_dist();
 function installPath(home, target, resourceId) {
-  return target === "claude" ? import_node_path11.default.join(claudeSkillsDir(home), resourceId) : import_node_path11.default.join(codexSkillsDir(home), resourceId);
+  return target === "claude" ? import_node_path12.default.join(claudeSkillsDir(home), resourceId) : import_node_path12.default.join(codexSkillsDir(home), resourceId);
 }
 async function computeResourceDrift(options) {
   const { home, resource, target, sourceRoot } = options;
@@ -17616,7 +17895,7 @@ async function computeResourceDrift(options) {
   }
   if (sourceRoot) {
     try {
-      if (await pathExists(import_node_path11.default.join(sourceRoot, "SKILL.md"))) {
+      if (await pathExists(import_node_path12.default.join(sourceRoot, "SKILL.md"))) {
         desiredHash = shortHash(await hashDirectory(sourceRoot));
       }
     } catch {
@@ -17708,15 +17987,15 @@ async function resolveSourceRoot(ctx, resource) {
   if (ctx.sourceRoots?.[resource.id])
     return ctx.sourceRoots[resource.id];
   if (resource.source?.path) {
-    const p = import_node_path12.default.isAbsolute(resource.source.path) ? resource.source.path : import_node_path12.default.join(ctx.configRepoPath, resource.source.path);
+    const p = import_node_path13.default.isAbsolute(resource.source.path) ? resource.source.path : import_node_path13.default.join(ctx.configRepoPath, resource.source.path);
     if (await pathExists(p))
       return p;
   }
-  const vendored = import_node_path12.default.join(ctx.configRepoPath, "sources", "skills", resource.id);
+  const vendored = import_node_path13.default.join(ctx.configRepoPath, "sources", "skills", resource.id);
   if (await pathExists(vendored))
     return vendored;
   try {
-    const lock = await loadLock(import_node_path12.default.join(ctx.configRepoPath, "lock.yaml"));
+    const lock = await loadLock(import_node_path13.default.join(ctx.configRepoPath, "lock.yaml"));
     const locked = lock.entries.find((e) => e.resourceId === resource.id);
     const cached = await resolveCachedSource(resource.source, {
       home: ctx.home,
@@ -17730,7 +18009,7 @@ async function resolveSourceRoot(ctx, resource) {
   }
 }
 function installedSkillPath(home, target, resourceId) {
-  return target === "claude" ? import_node_path12.default.join(claudeSkillsDir(home), resourceId) : import_node_path12.default.join(codexSkillsDir(home), resourceId);
+  return target === "claude" ? import_node_path13.default.join(claudeSkillsDir(home), resourceId) : import_node_path13.default.join(codexSkillsDir(home), resourceId);
 }
 function riskRank(r) {
   return r === "low" ? 1 : r === "medium" ? 2 : 3;
@@ -17742,7 +18021,7 @@ function riskAllowed(actionRisk, allowRisk, yes) {
   return riskRank(actionRisk) <= riskRank(max);
 }
 async function loadResolvedProfile(configRepoPath, profileName) {
-  const profilePath = import_node_path12.default.join(configRepoPath, "profiles", `${profileName}.yaml`);
+  const profilePath = import_node_path13.default.join(configRepoPath, "profiles", `${profileName}.yaml`);
   if (!await pathExists(profilePath)) {
     return {
       profile: {
@@ -17762,7 +18041,7 @@ async function loadResolvedProfile(configRepoPath, profileName) {
   const profile = await loadProfile(profilePath);
   const parents = [];
   for (const ext of profile.extends) {
-    const p = import_node_path12.default.join(configRepoPath, "profiles", `${ext}.yaml`);
+    const p = import_node_path13.default.join(configRepoPath, "profiles", `${ext}.yaml`);
     if (await pathExists(p))
       parents.push(await loadProfile(p));
   }
@@ -17774,25 +18053,25 @@ async function resolveRecipe(configRepoPath, resource, target, registry) {
     return void 0;
   if (targetCfg.recipeRef) {
     const { file, target: frag } = parseRecipeRef(targetCfg.recipeRef);
-    const full = import_node_path12.default.join(configRepoPath, file);
+    const full = import_node_path13.default.join(configRepoPath, file);
     if (await pathExists(full)) {
       const recipe = await loadRecipe(full);
       return recipe;
     }
-    const base = import_node_path12.default.basename(file, import_node_path12.default.extname(file));
+    const base = import_node_path13.default.basename(file, import_node_path13.default.extname(file));
     return registry.get(base);
   }
   return registry.get(resource.id);
 }
 async function buildPlan(ctx) {
-  const resourcesFile = await loadResources(import_node_path12.default.join(ctx.configRepoPath, "resources.yaml"));
+  const resourcesFile = await loadResources(import_node_path13.default.join(ctx.configRepoPath, "resources.yaml"));
   const { profile, parents } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
   const allIds = resourcesFile.resources.map((r) => r.id);
   const selectedIds = new Set(resolveProfileResources(profile, allIds, parents, resourcesFile.resources.map((r) => ({ id: r.id, profiles: r.profiles }))));
   const resources = resourcesFile.resources.filter((r) => selectedIds.has(r.id));
   const maxRisk = profile.security?.maxRisk ?? "medium";
   const riskRankLocal = (r) => r === "low" ? 1 : r === "medium" ? 2 : 3;
-  const registry = await loadRecipeRegistry(import_node_path12.default.join(ctx.configRepoPath, "recipes"));
+  const registry = await loadRecipeRegistry(import_node_path13.default.join(ctx.configRepoPath, "recipes"));
   const actions = [];
   let actionSeq = 0;
   const enabledTargets = [];
@@ -17990,8 +18269,8 @@ async function applyPlan(ctx, plan) {
     tx = await beginTransaction(paths, `apply ${activePlan.id}`, ctx.home, activePlan.actions);
     backupId = tx.id;
   }
-  const resourcesFile = await loadResources(import_node_path12.default.join(ctx.configRepoPath, "resources.yaml"));
-  const registry = await loadRecipeRegistry(import_node_path12.default.join(ctx.configRepoPath, "recipes"));
+  const resourcesFile = await loadResources(import_node_path13.default.join(ctx.configRepoPath, "resources.yaml"));
+  const registry = await loadRecipeRegistry(import_node_path13.default.join(ctx.configRepoPath, "recipes"));
   const stateDraft = structuredClone(await getState(ctx.home));
   const receipts = [];
   function draftMark(resourceId, target, info) {
@@ -18163,7 +18442,7 @@ async function applyPlan(ctx, plan) {
   };
 }
 async function buildDriftReport(ctx) {
-  const resourcesFile = await loadResources(import_node_path12.default.join(ctx.configRepoPath, "resources.yaml"));
+  const resourcesFile = await loadResources(import_node_path13.default.join(ctx.configRepoPath, "resources.yaml"));
   const { profile, parents } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
   const selected = new Set(resolveProfileResources(profile, resourcesFile.resources.map((r) => r.id), parents));
   const items = [];
@@ -18195,11 +18474,11 @@ async function buildDriftReport(ctx) {
 }
 
 // packages/recipe-engine/dist/capture.js
-var import_node_path15 = __toESM(require("node:path"), 1);
+var import_node_path16 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
-var import_node_path13 = __toESM(require("node:path"), 1);
+var import_node_path14 = __toESM(require("node:path"), 1);
 init_dist();
 var heuristicAiProvider = {
   name: "heuristic",
@@ -18207,7 +18486,7 @@ var heuristicAiProvider = {
     const skillMds = tree.filter((f) => f.endsWith("SKILL.md"));
     const out = [];
     for (const md of skillMds.slice(0, 5)) {
-      const dir = import_node_path13.default.posix.dirname(md);
+      const dir = import_node_path14.default.posix.dirname(md);
       out.push(CandidateRecipeSchema.parse({
         target,
         driver: "generic-skill",
@@ -18244,7 +18523,7 @@ async function analyzeWithOptionalAi(request, options = {}) {
   const docNames = tree.filter((f) => /(^|\/)(readme|install|skill\.md|plugin\.json|marketplace\.json|package\.json|hooks\.json)/i.test(f));
   const documents = [];
   for (const rel of docNames.slice(0, 12)) {
-    const full = import_node_path13.default.join(request.sourceRoot, rel);
+    const full = import_node_path14.default.join(request.sourceRoot, rel);
     if (!await pathExists(full))
       continue;
     try {
@@ -18282,8 +18561,8 @@ async function analyzeWithOptionalAi(request, options = {}) {
 }
 
 // packages/recipe-engine/dist/vendor.js
-var import_promises6 = __toESM(require("node:fs/promises"), 1);
-var import_node_path14 = __toESM(require("node:path"), 1);
+var import_promises7 = __toESM(require("node:fs/promises"), 1);
+var import_node_path15 = __toESM(require("node:path"), 1);
 init_dist();
 var SKIP_DIR_NAMES = /* @__PURE__ */ new Set([
   ".git",
@@ -18312,8 +18591,8 @@ function shouldSkipFile(name) {
   return SKIP_FILE_GLOBS.some((re) => re.test(name));
 }
 async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
-  const destRel = import_node_path14.default.posix.join("sources", "skills", resourceId);
-  const destAbs = import_node_path14.default.join(configRepoPath, "sources", "skills", resourceId);
+  const destRel = import_node_path15.default.posix.join("sources", "skills", resourceId);
+  const destAbs = import_node_path15.default.join(configRepoPath, "sources", "skills", resourceId);
   if (!await pathExists(sourceDir)) {
     return {
       ok: false,
@@ -18330,10 +18609,10 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
   const blockedSecrets = [];
   const toCopy = [];
   for (const full of files) {
-    const base = import_node_path14.default.basename(full);
+    const base = import_node_path15.default.basename(full);
     if (shouldSkipFile(base))
       continue;
-    const rel = import_node_path14.default.relative(sourceDir, full);
+    const rel = import_node_path15.default.relative(sourceDir, full);
     try {
       const text = await readText(full);
       const findings = scanTextForSecrets(text, rel);
@@ -18358,15 +18637,15 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
     };
   }
   if (await pathExists(destAbs)) {
-    await import_promises6.default.rm(destAbs, { recursive: true, force: true });
+    await import_promises7.default.rm(destAbs, { recursive: true, force: true });
   }
   await ensureDir(destAbs);
   let copied = 0;
   for (const full of toCopy) {
-    const rel = import_node_path14.default.relative(sourceDir, full);
-    const out = import_node_path14.default.join(destAbs, rel);
-    await ensureDir(import_node_path14.default.dirname(out));
-    await import_promises6.default.copyFile(full, out);
+    const rel = import_node_path15.default.relative(sourceDir, full);
+    const out = import_node_path15.default.join(destAbs, rel);
+    await ensureDir(import_node_path15.default.dirname(out));
+    await import_promises7.default.copyFile(full, out);
     copied++;
   }
   const hash = shortHash(await hashDirectory(destAbs));
@@ -18382,17 +18661,87 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
 }
 
 // packages/recipe-engine/dist/capture.js
+var FORBIDDEN_LOCAL_SOURCE_BASENAMES = /* @__PURE__ */ new Set([
+  "settings.json",
+  "installed_plugins.json",
+  "known_marketplaces.json",
+  "config.toml",
+  "hooks.json"
+]);
+function isForbiddenLocalSourcePath(p) {
+  if (!p)
+    return false;
+  const base = import_node_path16.default.basename(p).toLowerCase();
+  if (FORBIDDEN_LOCAL_SOURCE_BASENAMES.has(base))
+    return true;
+  const norm = p.replace(/\\/g, "/").toLowerCase();
+  return norm.endsWith("/.claude/settings.json") || norm.includes("/.claude/plugins/installed_plugins.json") || norm.includes("/.claude/plugins/known_marketplaces.json") || norm.endsWith("/.codex/config.toml") || norm.endsWith("/.codex/hooks.json");
+}
+function metaString(meta, key) {
+  const v = meta?.[key];
+  return typeof v === "string" && v.length > 0 ? v : void 0;
+}
+function pluginIdentity(s) {
+  const pluginName = metaString(s.metadata, "pluginName") || (s.id.includes("@") ? s.id.slice(0, s.id.lastIndexOf("@")) : void 0);
+  const marketplace = metaString(s.metadata, "marketplace") || (s.id.includes("@") ? s.id.slice(s.id.lastIndexOf("@") + 1) : void 0);
+  const marketplaceRepository = metaString(s.metadata, "marketplaceRepository") || s.sourceCandidate;
+  return { pluginName, marketplace, marketplaceRepository };
+}
 function logicalId(s) {
   if (s.kind === "skill")
     return s.id;
+  if (s.kind === "plugin") {
+    const { pluginName, marketplace } = pluginIdentity(s);
+    if (pluginName && marketplace)
+      return `${pluginName}@${marketplace}`;
+    if (pluginName)
+      return pluginName;
+    if (s.id.includes("@"))
+      return s.id;
+  }
   if (s.sourceCandidate) {
     const repo = s.sourceCandidate.replace(/\.git$/i, "");
     const short = repo.includes("/") ? repo.split("/").pop() : repo;
     if (s.id.includes("@"))
-      return s.id.split("@")[0] || short || s.id;
+      return s.id;
     return short || s.id;
   }
   return s.id;
+}
+function validateCaptureProposal(item) {
+  if (isNeverCapturableResource(item.scanned)) {
+    return { ok: false, reason: "system-resource-not-capturable" };
+  }
+  if (item.scanned.kind === "plugin") {
+    const { pluginName, marketplace, marketplaceRepository } = pluginIdentity(item.scanned);
+    const src = item.suggestedResource.source;
+    if (src?.provider === "local" && isForbiddenLocalSourcePath(src.path)) {
+      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+    }
+    if (!pluginName) {
+      return { ok: false, reason: "plugin-name-missing" };
+    }
+    const claude = item.suggestedRecipe?.targets?.claude;
+    if (claude?.driver === "claude-marketplace") {
+      if (!marketplace && !marketplaceRepository && !claude.marketplace && !claude.marketplaceRepository) {
+        return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+      }
+    }
+    if (!marketplaceRepository && !marketplace && metaString(item.scanned.metadata, "sourceResolutionStatus") === "unresolved") {
+      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+    }
+    if (!item.scanned.sourceCandidate && !marketplaceRepository && item.scanned.kind === "plugin") {
+      const evidence = item.scanned.metadata?.evidence;
+      const onlySettings = Array.isArray(evidence) && evidence.length > 0 && evidence.every((e) => typeof e === "object" && e !== null && e.from === "settings.json");
+      if (onlySettings || !item.scanned.sourceCandidate) {
+        return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+      }
+    }
+  }
+  if (item.suggestedResource.source?.provider === "local" && isForbiddenLocalSourcePath(item.suggestedResource.source.path)) {
+    return { ok: false, reason: "forbidden-local-source" };
+  }
+  return { ok: true };
 }
 function groupKey(s) {
   const name = logicalId(s);
@@ -18400,11 +18749,13 @@ function groupKey(s) {
   return `${repo}::${name}::${s.kind}`;
 }
 async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
-  const existing = await loadResources(import_node_path15.default.join(configRepoPath, "resources.yaml"));
+  const existing = await loadResources(import_node_path16.default.join(configRepoPath, "resources.yaml"));
   const existingIds = new Set(existing.resources.map((r) => r.id));
   const groups = /* @__PURE__ */ new Map();
   for (const s of scanned) {
     if (s.kind === "config")
+      continue;
+    if (isNeverCapturableResource(s))
       continue;
     if (s.classification === "system-cache")
       continue;
@@ -18426,10 +18777,41 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
   for (const [, group] of groups) {
     const id = logicalId(group[0]);
     const primary = group.find((g) => g.kind === "skill") ?? group.find((g) => g.kind === "plugin") ?? group[0];
-    const sourceCandidate = group.map((g) => g.sourceCandidate).find(Boolean) ?? primary.sourceCandidate;
+    const identity = pluginIdentity(primary);
+    const sourceCandidate = identity.marketplaceRepository || group.map((g) => g.sourceCandidate).find(Boolean) || primary.sourceCandidate;
+    const isPlugin = group.some((g) => g.kind === "plugin");
+    const isMarketplacePlugin = group.some((g) => g.kind === "plugin" || String(g.id).startsWith("marketplace:") || g.metadata?.installVia === "claude-marketplace");
+    if (isPlugin && !sourceCandidate) {
+      const blockedResource = {
+        id,
+        kind: "plugin",
+        source: {
+          provider: "unknown"
+        },
+        targets: {
+          claude: {
+            enabled: true,
+            recipeRef: `recipes/${id}.yaml#claude`
+          }
+        },
+        profiles: ["home"],
+        versionPolicy: "latest-confirm"
+      };
+      items.push({
+        scanned: primary,
+        scannedAll: group,
+        suggestedResource: blockedResource,
+        suggestedRecipe: void 0,
+        needsAi: false,
+        status: "blocked",
+        blockReason: "plugin-marketplace-source-unresolved"
+      });
+      continue;
+    }
     let analyzeRoot = primary.path;
     let usedRemoteSource = false;
-    if (sourceCandidate && options.home && !options.offline) {
+    const skipTreeAnalyze = isMarketplacePlugin && (Boolean(identity.pluginName) || Boolean(identity.marketplace));
+    if (sourceCandidate && options.home && !options.offline && !skipTreeAnalyze) {
       try {
         const cached = await resolveCachedSource({ provider: "github", repository: sourceCandidate }, { home: options.home, offline: false });
         if (cached?.root) {
@@ -18445,30 +18827,32 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     let usedAi = false;
     const targetRecipes = {};
     const candidates = [];
-    try {
-      if (options.aiEnabled) {
-        const aiResult = await analyzeWithOptionalAi({
-          sourceRoot: analyzeRoot,
-          targets: analyzeTargets,
-          homeHint: options.homeHint
-        }, { aiEnabled: true });
-        usedAi = aiResult.usedAi;
-        for (const c of aiResult.candidates) {
-          candidates.push(c);
-        }
-        if (aiResult.candidates.length === 0)
-          needsAi = true;
-      } else {
-        const analysis = await analyzeSourceTree(analyzeRoot, analyzeTargets);
-        for (const a of analysis) {
-          if (a.candidates[0])
-            candidates.push(a.candidates[0]);
-          if (a.needsAi)
+    if (!skipTreeAnalyze) {
+      try {
+        if (options.aiEnabled) {
+          const aiResult = await analyzeWithOptionalAi({
+            sourceRoot: analyzeRoot,
+            targets: analyzeTargets,
+            homeHint: options.homeHint
+          }, { aiEnabled: true });
+          usedAi = aiResult.usedAi;
+          for (const c of aiResult.candidates) {
+            candidates.push(c);
+          }
+          if (aiResult.candidates.length === 0)
             needsAi = true;
+        } else {
+          const analysis = await analyzeSourceTree(analyzeRoot, analyzeTargets);
+          for (const a of analysis) {
+            if (a.candidates[0])
+              candidates.push(a.candidates[0]);
+            if (a.needsAi)
+              needsAi = true;
+          }
         }
+      } catch {
+        needsAi = true;
       }
-    } catch {
-      needsAi = true;
     }
     for (const c of candidates) {
       targetRecipes[c.target] = {
@@ -18485,47 +18869,70 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
         requiresApproval: true
       };
     }
-    const isMarketplacePlugin = group.some((g) => g.kind === "plugin" || String(g.id).startsWith("marketplace:") || g.metadata?.installVia === "claude-marketplace");
-    if (isMarketplacePlugin && sourceCandidate && !targetRecipes.claude) {
-      const mktName = sourceCandidate.includes("/") ? sourceCandidate.split("/").pop() : sourceCandidate;
-      const pluginName = id.replace(/^marketplace:/, "");
+    if (isMarketplacePlugin && sourceCandidate) {
+      const pluginName = identity.pluginName || (id.includes("@") ? id.slice(0, id.lastIndexOf("@")) : id.replace(/^marketplace:/, ""));
+      const mktName = identity.marketplace || (id.includes("@") ? id.slice(id.lastIndexOf("@") + 1) : sourceCandidate.includes("/") ? sourceCandidate.split("/").pop() : sourceCandidate);
+      const marketplaceRepository = sourceCandidate.includes("/") ? sourceCandidate : identity.marketplaceRepository;
+      const existing2 = targetRecipes.claude;
       targetRecipes.claude = {
         driver: "claude-marketplace",
         scope: "user",
-        marketplaceRepository: sourceCandidate.includes("/") ? sourceCandidate : void 0,
+        marketplaceRepository,
         marketplace: mktName,
         plugin: pluginName,
-        operations: [
+        operations: existing2?.operations?.length ? existing2.operations : [
           { type: "register-marketplace" },
           { type: "install-plugin" },
           { type: "enable-plugin" }
         ],
-        requiredPaths: [],
-        requirements: [],
-        verification: [],
+        requiredPaths: existing2?.requiredPaths ?? [],
+        requirements: existing2?.requirements ?? [],
+        verification: existing2?.verification ?? [],
         risk: "medium",
-        evidence: [
+        evidence: existing2?.evidence?.length ? existing2.evidence : [
           {
             path: primary.path,
             section: "marketplace-install"
           }
         ],
         requiresApproval: true,
-        confidence: primary.confidence
+        confidence: Math.max(primary.confidence, existing2?.confidence ?? 0),
+        sourcePaths: existing2?.sourcePaths
       };
       needsAi = false;
+    }
+    let source = sourceCandidate ? {
+      provider: isMarketplacePlugin ? "marketplace" : "github",
+      repository: sourceCandidate,
+      marketplace: identity.marketplace
+    } : {
+      // Will be rewritten to vendored on commit if still local absolute
+      provider: "local",
+      path: primary.path
+    };
+    if (source.provider === "local" && isForbiddenLocalSourcePath(source.path)) {
+      items.push({
+        scanned: primary,
+        scannedAll: group,
+        suggestedResource: {
+          id,
+          kind: isPlugin ? "plugin" : "skill",
+          source: { provider: "unknown" },
+          targets: {},
+          profiles: ["home"],
+          versionPolicy: "latest-confirm"
+        },
+        suggestedRecipe: void 0,
+        needsAi: false,
+        status: "blocked",
+        blockReason: "forbidden-local-source"
+      });
+      continue;
     }
     const suggestedResource = {
       id,
       kind: group.some((g) => g.kind === "plugin") ? group.length > 1 ? "integration" : "plugin" : group.length > 1 ? "integration" : "skill",
-      source: sourceCandidate ? {
-        provider: "github",
-        repository: sourceCandidate
-      } : {
-        // Will be rewritten to vendored on commit if still local absolute
-        provider: "local",
-        path: primary.path
-      },
+      source,
       targets: {
         ...targetRecipes.claude ? {
           claude: {
@@ -18556,7 +18963,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     let suggestedRecipe;
     if (Object.keys(targetRecipes).length > 0) {
       let existingTargets = {};
-      const recipeFile = import_node_path15.default.join(configRepoPath, "recipes", `${id}.yaml`);
+      const recipeFile = import_node_path16.default.join(configRepoPath, "recipes", `${id}.yaml`);
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -18576,20 +18983,35 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
         confirmedAt: void 0
       });
     }
-    items.push({
+    const draft = {
       scanned: primary,
       scannedAll: group,
       candidate: candidates[0],
       suggestedResource,
       suggestedRecipe,
       needsAi: needsAi && !suggestedRecipe,
-      usedAi
-    });
+      usedAi,
+      status: suggestedRecipe && !needsAi ? "ready" : "needs-review"
+    };
+    const validation = validateCaptureProposal(draft);
+    if (!validation.ok) {
+      draft.suggestedRecipe = void 0;
+      draft.needsAi = false;
+      draft.status = "blocked";
+      draft.blockReason = validation.reason;
+      if (draft.suggestedResource.source?.provider === "local") {
+        draft.suggestedResource = {
+          ...draft.suggestedResource,
+          source: { provider: "unknown" }
+        };
+      }
+    }
+    items.push(draft);
   }
   return items;
 }
 async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
-  const resourcesPath = import_node_path15.default.join(configRepoPath, "resources.yaml");
+  const resourcesPath = import_node_path16.default.join(configRepoPath, "resources.yaml");
   const existing = await loadResources(resourcesPath);
   const byId = new Map(existing.resources.map((r) => [r.id, r]));
   const recipePaths = [];
@@ -18630,7 +19052,14 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
     });
   }
   for (const item of batchById.values()) {
-    if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path15.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
+    if (item.status === "blocked" || item.status === "system-excluded") {
+      continue;
+    }
+    const validation = validateCaptureProposal(item);
+    if (!validation.ok) {
+      continue;
+    }
+    if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path16.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
       const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id);
       if (!v.ok) {
         throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
@@ -18674,7 +19103,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
       byId.set(item.suggestedResource.id, item.suggestedResource);
     }
     if (item.suggestedRecipe) {
-      const recipeFile = import_node_path15.default.join(configRepoPath, "recipes", `${item.suggestedResource.id}.yaml`);
+      const recipeFile = import_node_path16.default.join(configRepoPath, "recipes", `${item.suggestedResource.id}.yaml`);
       let baseTargets = item.suggestedRecipe.targets;
       if (await pathExists(recipeFile)) {
         try {
@@ -18704,7 +19133,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
 }
 
 // packages/recipe-engine/dist/doctor.js
-var import_node_path16 = __toESM(require("node:path"), 1);
+var import_node_path17 = __toESM(require("node:path"), 1);
 init_dist();
 async function runDoctor(options) {
   const findings = [];
@@ -18812,7 +19241,7 @@ async function runDoctor(options) {
           });
         }
       }
-      const resourcesPath = import_node_path16.default.join(repo, "resources.yaml");
+      const resourcesPath = import_node_path17.default.join(repo, "resources.yaml");
       if (!await pathExists(resourcesPath)) {
         findings.push({
           severity: "warn",
@@ -18912,7 +19341,7 @@ async function runDoctor(options) {
   }
   if (options.configRepoPath) {
     try {
-      const res = await loadResources(import_node_path16.default.join(options.configRepoPath, "resources.yaml"));
+      const res = await loadResources(import_node_path17.default.join(options.configRepoPath, "resources.yaml"));
       const refs = collectSecretRefs(res);
       if (refs.length > 0) {
         const checks = await checkSecrets(refs, "env");
@@ -18950,37 +19379,37 @@ function formatDoctor(report) {
 }
 
 // packages/cli/src/setup.ts
-var import_node_path17 = __toESM(require("node:path"), 1);
-var import_promises7 = __toESM(require("node:fs/promises"), 1);
+var import_node_path18 = __toESM(require("node:path"), 1);
+var import_promises8 = __toESM(require("node:fs/promises"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
 function packageRootFromHere() {
   try {
-    const here = import_node_path17.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
-    const root = import_node_path17.default.resolve(here, "../../..");
+    const here = import_node_path18.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
+    const root = import_node_path18.default.resolve(here, "../../..");
     return root;
   } catch {
     return void 0;
   }
 }
 async function detectProgramRoot(explicit) {
-  if (explicit && await pathExists(explicit)) return import_node_path17.default.resolve(explicit);
+  if (explicit && await pathExists(explicit)) return import_node_path18.default.resolve(explicit);
   const fromModule = packageRootFromHere();
   if (fromModule && await pathExists(
-    import_node_path17.default.join(fromModule, "integrations", "claude-plugin", ".claude-plugin")
+    import_node_path18.default.join(fromModule, "integrations", "claude-plugin", ".claude-plugin")
   )) {
     return fromModule;
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     if (await pathExists(
-      import_node_path17.default.join(dir, "integrations", "claude-plugin", ".claude-plugin")
+      import_node_path18.default.join(dir, "integrations", "claude-plugin", ".claude-plugin")
     )) {
       return dir;
     }
-    const parent = import_node_path17.default.dirname(dir);
+    const parent = import_node_path18.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -18996,7 +19425,7 @@ async function detectConfigRepo(options, home) {
     }
   }
   if (options.configPath) {
-    const localPath = import_node_path17.default.resolve(expandHome(options.configPath, home));
+    const localPath = import_node_path18.default.resolve(expandHome(options.configPath, home));
     return {
       localPath,
       remote: options.repo ?? existingLink?.configRepository.remote,
@@ -19026,7 +19455,7 @@ async function detectConfigRepo(options, home) {
         blocked: `Already linked to ${existingLink.configRepository.localPath}` + (existingLink.configRepository.remote ? ` (${existingLink.configRepository.remote})` : "") + `. Requested --repo ${options.repo}. Use --reconfigure to switch, or --config-path for a different directory.`
       };
     }
-    const defaultPath = import_node_path17.default.join(home, "ai-config", "my-ai-config");
+    const defaultPath = import_node_path18.default.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
@@ -19046,34 +19475,34 @@ async function detectConfigRepo(options, home) {
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
       return {
-        localPath: import_node_path17.default.join(home, "ai-config", "my-ai-config"),
+        localPath: import_node_path18.default.join(home, "ai-config", "my-ai-config"),
         remote: envRepo,
         reason: "AI_CONFIG_SYNC_REPO"
       };
     }
     return {
-      localPath: import_node_path17.default.resolve(expandHome(envRepo, home)),
+      localPath: import_node_path18.default.resolve(expandHome(envRepo, home)),
       reason: "AI_CONFIG_SYNC_REPO path"
     };
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    const files = await import_promises7.default.readdir(dir).catch(() => []);
+    const files = await import_promises8.default.readdir(dir).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: dir, reason: "cwd walk" };
     }
-    const parent = import_node_path17.default.dirname(dir);
+    const parent = import_node_path18.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   const candidates = [
-    import_node_path17.default.join(home, "ai-config", "my-ai-config"),
-    import_node_path17.default.join(home, "Git", "my-ai-config"),
-    import_node_path17.default.join(home, "git", "my-ai-config")
+    import_node_path18.default.join(home, "ai-config", "my-ai-config"),
+    import_node_path18.default.join(home, "Git", "my-ai-config"),
+    import_node_path18.default.join(home, "git", "my-ai-config")
   ];
   for (const c of candidates) {
     if (!await pathExists(c)) continue;
-    const files = await import_promises7.default.readdir(c).catch(() => []);
+    const files = await import_promises8.default.readdir(c).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: c, reason: "default directory" };
     }
@@ -19083,18 +19512,18 @@ async function detectConfigRepo(options, home) {
 async function ensureMinimalConfigRepo(localPath) {
   const actions = [];
   await ensureDir(localPath);
-  const configYaml = import_node_path17.default.join(localPath, "config.yaml");
+  const configYaml = import_node_path18.default.join(localPath, "config.yaml");
   if (!await pathExists(configYaml)) {
     await writeYamlFile(
       configYaml,
       ConfigRepoSchema.parse({
-        name: import_node_path17.default.basename(localPath),
+        name: import_node_path18.default.basename(localPath),
         defaultProfile: "home"
       })
     );
     actions.push(`CREATE ${configYaml}`);
   }
-  const resources = import_node_path17.default.join(localPath, "resources.yaml");
+  const resources = import_node_path18.default.join(localPath, "resources.yaml");
   if (!await pathExists(resources)) {
     await writeYamlFile(resources, { schemaVersion: 1, resources: [] });
     actions.push(`CREATE ${resources}`);
@@ -19110,13 +19539,13 @@ async function ensureMinimalConfigRepo(localPath) {
     "instructions/claude",
     "instructions/codex"
   ]) {
-    const full = import_node_path17.default.join(localPath, d);
+    const full = import_node_path18.default.join(localPath, d);
     if (!await pathExists(full)) {
       await ensureDir(full);
       actions.push(`CREATE dir ${d}`);
     }
   }
-  const baseProfile = import_node_path17.default.join(localPath, "profiles", "base.yaml");
+  const baseProfile = import_node_path18.default.join(localPath, "profiles", "base.yaml");
   if (!await pathExists(baseProfile)) {
     await writeYamlFile(baseProfile, {
       profile: "base",
@@ -19125,7 +19554,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/base.yaml");
   }
-  const homeProfile = import_node_path17.default.join(localPath, "profiles", "home.yaml");
+  const homeProfile = import_node_path18.default.join(localPath, "profiles", "home.yaml");
   if (!await pathExists(homeProfile)) {
     await writeYamlFile(homeProfile, {
       profile: "home",
@@ -19140,7 +19569,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/home.yaml");
   }
-  const gitignore = import_node_path17.default.join(localPath, ".gitignore");
+  const gitignore = import_node_path18.default.join(localPath, ".gitignore");
   if (!await pathExists(gitignore)) {
     await writeText(
       gitignore,
@@ -19160,19 +19589,19 @@ async function ensureMinimalConfigRepo(localPath) {
 }
 async function installClaudePlugin(home, programRoot) {
   const actions = [];
-  const pluginSrc = import_node_path17.default.join(programRoot, "integrations", "claude-plugin");
-  if (!await pathExists(import_node_path17.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
+  const pluginSrc = import_node_path18.default.join(programRoot, "integrations", "claude-plugin");
+  if (!await pathExists(import_node_path18.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
     return actions;
   }
-  const marketplacesDir = import_node_path17.default.join(home, ".claude", "plugins", "marketplaces");
-  const dest = import_node_path17.default.join(marketplacesDir, "ai-config-sync");
+  const marketplacesDir = import_node_path18.default.join(home, ".claude", "plugins", "marketplaces");
+  const dest = import_node_path18.default.join(marketplacesDir, "ai-config-sync");
   await ensureDir(marketplacesDir);
-  const destPluginJson = import_node_path17.default.join(dest, ".claude-plugin", "plugin.json");
+  const destPluginJson = import_node_path18.default.join(dest, ".claude-plugin", "plugin.json");
   let needCopy = true;
   if (await pathExists(destPluginJson)) {
     try {
       const a = await readJsonFile(
-        import_node_path17.default.join(pluginSrc, ".claude-plugin", "plugin.json")
+        import_node_path18.default.join(pluginSrc, ".claude-plugin", "plugin.json")
       );
       const b = await readJsonFile(destPluginJson);
       if (a.version && a.version === b.version) needCopy = false;
@@ -19181,11 +19610,11 @@ async function installClaudePlugin(home, programRoot) {
     }
   }
   if (needCopy) {
-    await import_promises7.default.rm(dest, { recursive: true, force: true });
-    await import_promises7.default.cp(pluginSrc, dest, { recursive: true });
+    await import_promises8.default.rm(dest, { recursive: true, force: true });
+    await import_promises8.default.cp(pluginSrc, dest, { recursive: true });
     actions.push(`INSTALL Claude marketplace copy \u2192 ${dest}`);
   }
-  const knownPath = import_node_path17.default.join(
+  const knownPath = import_node_path18.default.join(
     home,
     ".claude",
     "plugins",
@@ -19262,7 +19691,7 @@ async function installClaudePlugin(home, programRoot) {
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
     } else {
-      const settingsPath = import_node_path17.default.join(home, ".claude", "settings.json");
+      const settingsPath = import_node_path18.default.join(home, ".claude", "settings.json");
       let settings = {};
       if (await pathExists(settingsPath)) {
         try {
@@ -19292,16 +19721,16 @@ async function installClaudePlugin(home, programRoot) {
     (a) => /plugin enable|already enabled|already installed/i.test(a) || a.includes("claude plugin install")
   );
   if (!pluginEnabled) {
-    const skillSrc = import_node_path17.default.join(pluginSrc, "skills", "config-sync");
-    const skillDest = import_node_path17.default.join(home, ".claude", "skills", "config-sync");
-    const skillMd = import_node_path17.default.join(skillDest, "SKILL.md");
+    const skillSrc = import_node_path18.default.join(pluginSrc, "skills", "config-sync");
+    const skillDest = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
+    const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
     if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-      await ensureDir(import_node_path17.default.dirname(skillDest));
-      await import_promises7.default.cp(skillSrc, skillDest, { recursive: true });
+      await ensureDir(import_node_path18.default.dirname(skillDest));
+      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
       actions.push("INSTALL Claude user skill: config-sync (fallback)");
     }
   } else {
-    const skillMd = import_node_path17.default.join(
+    const skillMd = import_node_path18.default.join(
       home,
       ".claude",
       "skills",
@@ -19310,9 +19739,9 @@ async function installClaudePlugin(home, programRoot) {
     );
     if (await pathExists(skillMd)) {
       try {
-        const text = await import_promises7.default.readFile(skillMd, "utf8");
+        const text = await import_promises8.default.readFile(skillMd, "utf8");
         if (text.includes("ai-config-sync") && text.includes("\u8DE8\u7535\u8111\u540C\u6B65")) {
-          await import_promises7.default.rm(import_node_path17.default.dirname(skillMd), { recursive: true, force: true });
+          await import_promises8.default.rm(import_node_path18.default.dirname(skillMd), { recursive: true, force: true });
           actions.push("REMOVE Claude fallback skill (plugin is active)");
         }
       } catch {
@@ -19326,10 +19755,10 @@ function messagesPushSafe(actions, line) {
 }
 async function installCodexIntegration(home, programRoot) {
   const actions = [];
-  const skillDest = import_node_path17.default.join(agentsSkillsDir(home), "config-sync");
+  const skillDest = import_node_path18.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
-    const p = import_node_path17.default.join(
+    const p = import_node_path18.default.join(
       programRoot,
       "integrations",
       "codex",
@@ -19338,11 +19767,11 @@ async function installCodexIntegration(home, programRoot) {
     );
     if (await pathExists(p)) skillSrc = p;
   }
-  const skillMd = import_node_path17.default.join(skillDest, "SKILL.md");
+  const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
   if (!await pathExists(skillMd)) {
     await ensureDir(skillDest);
     if (skillSrc) {
-      await import_promises7.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
     } else {
       await writeText(
         skillMd,
@@ -19373,14 +19802,14 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      await import_promises7.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      await import_promises8.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
     }
   }
   const { next, changed } = mergeManagedCodexSessionStart(base);
   if (changed || !hasManagedCodexSessionStart(base)) {
-    await ensureDir(import_node_path17.default.dirname(hooksPath));
+    await ensureDir(import_node_path18.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push("MERGE Codex hooks.json SessionStart (event-map format)");
   }
@@ -19390,7 +19819,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     toml = mergeTomlText(toml, [
       { section: "features", key: "hooks", value: true }
     ]);
-    await ensureDir(import_node_path17.default.dirname(cfgPath));
+    await ensureDir(import_node_path18.default.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
   }
@@ -19422,10 +19851,10 @@ async function runSetup(options = {}) {
     };
   }
   if (detected.existingLink && mode !== "reconfigure" && options.configPath) {
-    const existingPath = import_node_path17.default.resolve(
+    const existingPath = import_node_path18.default.resolve(
       detected.existingLink.configRepository.localPath
     );
-    const requested = import_node_path17.default.resolve(expandHome(options.configPath, home));
+    const requested = import_node_path18.default.resolve(expandHome(options.configPath, home));
     if (existingPath !== requested) {
       return {
         status: "planned",
@@ -19524,7 +19953,7 @@ async function runSetup(options = {}) {
   if (await pathExists(cfgPath) && mode !== "reconfigure") {
     try {
       const prev = await loadLocalConfig(cfgPath);
-      const samePath = import_node_path17.default.resolve(prev.configRepository.localPath) === import_node_path17.default.resolve(localPath);
+      const samePath = import_node_path18.default.resolve(prev.configRepository.localPath) === import_node_path18.default.resolve(localPath);
       const sameProfile = prev.profile === profile;
       if (samePath && sameProfile && mode === "default") {
         status = "no-changes";
@@ -19542,7 +19971,7 @@ async function runSetup(options = {}) {
     if (await pathExists(cfgPath) && mode !== "reconfigure") {
       try {
         const prev = await loadLocalConfig(cfgPath);
-        if (import_node_path17.default.resolve(prev.configRepository.localPath) === import_node_path17.default.resolve(localPath) && prev.profile === profile) {
+        if (import_node_path18.default.resolve(prev.configRepository.localPath) === import_node_path18.default.resolve(localPath) && prev.profile === profile) {
           shouldWrite = false;
         }
       } catch {
@@ -19574,8 +20003,8 @@ async function runSetup(options = {}) {
         if (status === "no-changes") status = "repaired";
       }
     } else {
-      const skillDir = import_node_path17.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path17.default.join(skillDir, "SKILL.md");
+      const skillDir = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path18.default.join(skillDir, "SKILL.md");
       if (!await pathExists(skillMd)) {
         await ensureDir(skillDir);
         await writeText(
@@ -19624,7 +20053,7 @@ user-invocable: true
 }
 
 // packages/cli/src/index.ts
-var import_node_path18 = __toESM(require("node:path"), 1);
+var import_node_path19 = __toESM(require("node:path"), 1);
 init_dist();
 var program2 = new Command();
 program2.name("ai-config-sync").description(
@@ -19742,7 +20171,7 @@ program2.command("status").description("Show repository, profile, integrations, 
     }
   }
 });
-program2.command("scan").description("Read-only scan of local Claude/Codex resources").option("--home <path>", "Override home directory").option("--light", "Skip hashing for faster scans").option("--json", "JSON output").option("--write-pending", "Write unmanaged findings to pending events").action(async (opts) => {
+program2.command("scan").description("Read-only scan of local Claude/Codex resources").option("--home <path>", "Override home directory").option("--light", "Skip hashing for faster scans").option("--json", "JSON output").option("--write-pending", "Write unmanaged findings to pending events").option("--include-system", "Show system-cache resources in text output").action(async (opts) => {
   const home = homeOpt({ opts: () => opts });
   const ctx = await loadCtx(home);
   const state = await getState(home);
@@ -19794,9 +20223,11 @@ program2.command("scan").description("Read-only scan of local Claude/Codex resou
     console.log("");
   }
   console.log(`Scanned at ${result.scannedAt}`);
-  console.log(`Resources: ${result.resources.length}`);
-  for (const r of result.resources) {
-    if (r.kind === "config") continue;
+  const visible = result.resources.filter(
+    (r) => r.kind !== "config" && (opts.includeSystem || r.classification !== "system-cache")
+  );
+  console.log(`Resources: ${visible.length}`);
+  for (const r of visible) {
     console.log(
       `  [${r.classification}] ${r.target}/${r.kind} ${r.id}${r.sourceCandidate ? ` <- ${r.sourceCandidate}` : ""}`
     );
@@ -19838,19 +20269,32 @@ program2.command("capture").description("Propose managing local resources into t
     console.log("No unmanaged resources to capture.");
     return;
   }
+  const ready = proposals.filter((p) => p.status === "ready" || !p.status && p.suggestedRecipe && !p.needsAi);
+  const blocked = proposals.filter((p) => p.status === "blocked");
+  const needsReview = proposals.filter(
+    (p) => p.status === "needs-review" || !p.status && (p.needsAi || !p.suggestedRecipe)
+  );
   console.log(`Capture proposals (${proposals.length}):`);
+  console.log(
+    `Ready: ${ready.length}  Blocked: ${blocked.length}  Needs-review: ${needsReview.length}`
+  );
   for (const p of proposals) {
+    const label = (p.status ?? (p.needsAi ? "needs-review" : p.suggestedRecipe ? "ready" : "needs-review")).toUpperCase();
+    const driver = p.suggestedRecipe?.targets?.claude?.driver ?? p.suggestedRecipe?.targets?.codex?.driver ?? p.candidate?.driver;
     console.log(
-      `  - ${p.scanned.target}/${p.scanned.kind} ${p.suggestedResource.id}` + (p.scanned.sourceCandidate ? ` source=${p.scanned.sourceCandidate}` : "") + (p.needsAi ? " [needs AI analysis]" : "") + (p.usedAi ? " [heuristic/ai]" : "") + (p.candidate ? ` driver=${p.candidate.driver} conf=${p.candidate.confidence}` : "")
+      `  [${label}] ${p.scanned.target}/${p.scanned.kind} ${p.suggestedResource.id}` + (p.scanned.sourceCandidate ? ` source=${p.scanned.sourceCandidate}` : "") + (driver ? ` driver=${driver}` : "") + (p.blockReason ? ` reason=${p.blockReason}` : "") + (p.needsAi ? " [needs AI analysis]" : "") + (p.usedAi ? " [heuristic/ai]" : "")
     );
   }
   if (!opts.yes) {
     console.log("\nRe-run with --yes to write resources.yaml and recipes.");
     console.log("Use --ai to enable heuristic/AI analyze-only for unknown layouts.");
+    console.log("Note: --yes only writes READY proposals (blocked/system excluded).");
     return;
   }
-  const confirmed = proposals.filter((p) => p.suggestedRecipe && (!p.needsAi || p.usedAi));
-  const skipped = proposals.filter((p) => !p.suggestedRecipe || p.needsAi && !p.usedAi);
+  const confirmed = proposals.filter(
+    (p) => p.suggestedRecipe && p.status !== "blocked" && p.status !== "system-excluded" && (p.status === "ready" || !p.needsAi || p.usedAi)
+  );
+  const skipped = proposals.filter((p) => !confirmed.includes(p));
   if (confirmed.length === 0) {
     console.log(
       "No rule-based recipes ready. Enable AI assistant or author recipes manually."
@@ -19955,9 +20399,9 @@ program2.command("update").description("Fetch sources per versionPolicy and re-a
   if (!requireLinked(ctx, "update")) return;
   const { localConfig, configRepoPath } = ctx;
   const resources = await loadResources(
-    import_node_path18.default.join(configRepoPath, "resources.yaml")
+    import_node_path19.default.join(configRepoPath, "resources.yaml")
   );
-  const lock = await loadLock(import_node_path18.default.join(configRepoPath, "lock.yaml"));
+  const lock = await loadLock(import_node_path19.default.join(configRepoPath, "lock.yaml"));
   for (const r of resources.resources) {
     const locked = lock.entries.find((e) => e.resourceId === r.id);
     const check = await checkVersionPolicy({
@@ -20081,7 +20525,7 @@ program2.command("secret").description("Check or document secretRef resolution (
     }
     if (ctx.configRepoPath && (action === "scan" || !ref)) {
       const resources = await loadResources(
-        import_node_path18.default.join(ctx.configRepoPath, "resources.yaml")
+        import_node_path19.default.join(ctx.configRepoPath, "resources.yaml")
       );
       const refs = collectSecretRefs(resources);
       if (refs.length === 0) {
