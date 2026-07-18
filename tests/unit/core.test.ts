@@ -176,6 +176,27 @@ describe("resolveProfileResources", () => {
     expect(ids).toContain("both");
     expect(ids).toContain("unrestricted");
   });
+
+  it("does not treat base as wildcard for company", () => {
+    const company: Profile = {
+      profile: "company",
+      extends: [],
+      include: { resources: [] },
+      exclude: { resources: [] },
+      security: {
+        maxRisk: "medium",
+        allowAutomaticLatest: false,
+        secrets: { provider: "local-only" },
+      },
+    };
+    const ids = resolveProfileResources(
+      company,
+      ["demo"],
+      [],
+      [{ id: "demo", profiles: ["base", "home"] }],
+    );
+    expect(ids).not.toContain("demo");
+  });
 });
 
 describe("self-managed exclusion", () => {

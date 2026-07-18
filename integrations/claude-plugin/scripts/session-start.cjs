@@ -1,45 +1,61 @@
 /**
- * Claude Code SessionStart: lightweight scan, never blocks startup long.
- * Prints a short hint when unmanaged skills/plugins are found.
+ * Lightweight SessionStart: use plugin-bundled CLI (on PATH as ai-config-sync)
+ * or fall back to sibling bin/ file. Never call npx.
  */
 const { spawnSync } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
-function run() {
-  const isWin = process.platform === "win32";
-  const cmd = isWin ? "npx.cmd" : "npx";
-  const r = spawnSync(
-    cmd,
-    ["--yes", "ai-config-sync", "scan", "--light", "--json"],
-    {
-      encoding: "utf8",
-      timeout: 15000,
-      windowsHide: true,
-      env: process.env,
-    },
+function resolveCli() {
+  // 1) Plugin PATH / global
+  const which = spawnSync(
+    process.platform === "win32" ? "where" : "which",
+    ["ai-config-sync"],
+    { encoding: "utf8", windowsHide: true, shell: process.platform === "win32" },
   );
-
-  // Fallback: global / PATH binary
-  let stdout = r.stdout || "";
-  if (r.error || r.status !== 0) {
-    const r2 = spawnSync("ai-config-sync", ["scan", "--light", "--json"], {
-      encoding: "utf8",
-      timeout: 15000,
-      windowsHide: true,
-      shell: isWin,
-    });
-    if (r2.status !== 0 || !r2.stdout) return;
-    stdout = r2.stdout;
+  if (which.status === 0 && which.stdout) {
+    const first = which.stdout.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+    if (first) return { cmd: first, argsPrefix: [] };
   }
 
+  // 2) Sibling bundled binary
+  const root =
+    process.env.CLAUDE_PLUGIN_ROOT ||
+    path.resolve(__dirname, "..");
+  const cjs = path.join(root, "bin", "ai-config-sync.cjs");
+  if (fs.existsSync(cjs)) {
+    return { cmd: process.execPath, argsPrefix: [cjs] };
+  }
+  return null;
+}
+
+function run() {
+  const resolved = resolveCli();
+  if (!resolved) return;
+
+  const args = [
+    ...resolved.argsPrefix,
+    "scan",
+    "--light",
+    "--json",
+  ];
+  const r = spawnSync(resolved.cmd, args, {
+    encoding: "utf8",
+    timeout: 15000,
+    windowsHide: true,
+    env: process.env,
+  });
+  if (r.status !== 0 || !r.stdout) return;
+
   try {
-    const data = JSON.parse(stdout);
+    const data = JSON.parse(r.stdout);
     const unmanaged = (data.resources || []).filter(
       (x) =>
         x.classification !== "managed" &&
         x.classification !== "system-cache" &&
         x.kind !== "config" &&
-        !String(x.id || "").startsWith("marketplace:"),
+        !String(x.id || "").toLowerCase().includes("ai-config-sync") &&
+        String(x.id || "") !== "config-sync",
     );
     if (unmanaged.length > 0) {
       const names = unmanaged
@@ -50,16 +66,16 @@ function run() {
         unmanaged.length > 5 ? ` …(+${unmanaged.length - 5})` : "";
       process.stderr.write(
         `[ai-config-sync] 发现 ${unmanaged.length} 个未纳管资源: ${names}${more}\n` +
-          `  在对话中说「同步配置」或运行 /ai-config-sync:capture\n`,
+          `  说「同步配置」或运行 /ai-config-sync:capture\n`,
       );
     }
   } catch {
-    /* ignore parse errors — never break session start */
+    /* ignore */
   }
 }
 
 try {
   run();
 } catch {
-  /* swallow */
+  /* never block session start */
 }

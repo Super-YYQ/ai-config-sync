@@ -1,0 +1,12 @@
+schemaVersion: 1
+name: demo-config
+defaultProfile: offline-demo
+targets:
+  claude: true
+  codex: true
+security:
+  blockSecretCommit: true
+  maxRiskWithoutConfirm: low
+ai:
+  enabled: false
+  mode: off

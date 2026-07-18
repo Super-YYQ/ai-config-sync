@@ -1,7 +1,7 @@
 {
   "name": "ai-config-sync",
-  "version": "0.2.1",
-  "description": "AI Agent 配置同步：scan / capture / restore / doctor。在 Claude Code 对话中用斜杠命令或直接说「扫描配置」「同步配置」。",
+  "version": "0.3.0",
+  "description": "AI Agent 配置同步：scan / capture / restore / doctor。安装本插件即可使用（内置 CLI，无需单独 npm 全局安装）。",
   "author": {
     "name": "Super-YYQ",
     "url": "https://github.com/Super-YYQ/ai-config-sync"

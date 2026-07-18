@@ -2,9 +2,7 @@ profile: home
 extends:
   - base
 include:
-  resources:
-    - demo-skill
-    - planning-with-files
+  resources: []
 exclude:
   resources: []
 security:

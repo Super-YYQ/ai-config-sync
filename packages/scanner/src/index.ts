@@ -7,7 +7,7 @@ import {
   codexConfigPath,
   codexHooksDir,
   codexHooksManifestPath,
-  codexSkillsDir,
+  listCodexSkillRoots,
   hashDirectory,
   isSelfManagedResourceId,
   listDirNames,
@@ -424,11 +424,26 @@ export async function scanLocal(options: ScanOptions = {}): Promise<ScanResult> 
   }
 
   if (targets.codex) {
-    const skillsDir = codexSkillsDir(home);
-    if (await pathExists(skillsDir)) {
-      resources.push(...(await scanSkills(skillsDir, "codex", options)));
-    } else {
-      warnings.push(`Codex skills dir not found: ${skillsDir}`);
+    const seenSkillIds = new Set<string>();
+    for (const root of listCodexSkillRoots(home)) {
+      if (!(await pathExists(root.path))) {
+        if (!root.legacy) {
+          warnings.push(`Codex/agents skills dir not found: ${root.path}`);
+        }
+        continue;
+      }
+      const skills = await scanSkills(root.path, "codex", options);
+      for (const s of skills) {
+        if (seenSkillIds.has(s.id)) continue;
+        seenSkillIds.add(s.id);
+        s.metadata = {
+          ...s.metadata,
+          skillRoot: root.path,
+          legacy: root.legacy,
+          rootLabel: root.label,
+        };
+        resources.push(s);
+      }
     }
     resources.push(...(await scanCodexHooks(home, options)));
   }

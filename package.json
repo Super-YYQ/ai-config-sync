@@ -1,36 +1,35 @@
 {
   "name": "ai-config-sync",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "AI Agent configuration sync — Claude Code / Codex skills & plugins via private config repo",
   "type": "module",
   "bin": {
-    "ai-config-sync": "packages/cli/dist/index.js",
-    "agent-sync": "packages/cli/dist/index.js"
+    "ai-config-sync": "dist/ai-config-sync.cjs",
+    "agent-sync": "dist/ai-config-sync.cjs"
   },
   "files": [
-    "packages/cli/dist",
-    "packages/core/dist",
-    "packages/scanner/dist",
-    "packages/state-manager/dist",
-    "packages/git-sync/dist",
-    "packages/recipe-engine/dist",
-    "drivers/dist",
-    "integrations",
+    "dist",
+    "integrations/claude-plugin",
+    "integrations/codex",
     "examples/private-config-template",
     "README.md",
     "docs/USER_GUIDE.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "npm run build -w @ai-config-sync/core && npm run build -w @ai-config-sync/scanner && npm run build -w @ai-config-sync/state-manager && npm run build -w @ai-config-sync/git-sync && npm run build -w @ai-config-sync/drivers && npm run build -w @ai-config-sync/recipe-engine && npm run build -w @ai-config-sync/cli",
+    "build": "npm run build -w @ai-config-sync/core && npm run build -w @ai-config-sync/scanner && npm run build -w @ai-config-sync/state-manager && npm run build -w @ai-config-sync/git-sync && npm run build -w @ai-config-sync/drivers && npm run build -w @ai-config-sync/recipe-engine && npm run build -w @ai-config-sync/cli && node scripts/build-plugin-cli.mjs",
+    "build:plugin-cli": "node scripts/build-plugin-cli.mjs",
     "prepack": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false",
-    "cli": "node packages/cli/dist/index.js",
+    "cli": "node dist/ai-config-sync.cjs",
     "dev:cli": "tsx packages/cli/src/index.ts",
     "demo:offline-pwf": "tsx scripts/demo-offline-pwf.ts",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "smoke:npm": "node scripts/smoke-npm-package.mjs",
+    "validate:plugin": "claude plugin validate . || true"
   },
   "workspaces": [
     "packages/*",
@@ -43,6 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

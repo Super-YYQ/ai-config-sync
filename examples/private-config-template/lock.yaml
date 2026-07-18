@@ -1,7 +1,2 @@
 schemaVersion: 1
-entries:
-  - resourceId: planning-with-files
-    commit: offline-vendor-0000001
-    version: 0.0.0-offline
-    recipeId: planning-with-files
-    resolvedAt: "2026-07-18T00:00:00.000Z"
+entries: []

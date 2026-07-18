@@ -8,3 +8,4 @@ export * from "./merge-markdown.js";
 export * from "./secrets.js";
 export * from "./secret-resolver.js";
 export * from "./config-io.js";
+export * from "./codex-hooks.js";

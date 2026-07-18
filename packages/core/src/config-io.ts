@@ -155,8 +155,8 @@ export function resolveProfileResources(
       const allowed = meta.profiles ?? [];
       // Empty profiles list = unrestricted (legacy)
       if (allowed.length === 0) return true;
-      // Resource must list active profile or "base"
-      return allowed.includes(active) || allowed.includes("base");
+      // Must explicitly list the active profile (do NOT treat "base" as wildcard)
+      return allowed.includes(active);
     });
   }
 

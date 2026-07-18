@@ -79,11 +79,39 @@ export function claudeSettingsPath(home = os.homedir()): string {
 
 /** Codex user dirs (best-effort defaults). */
 export function codexHome(home = os.homedir()): string {
-  return path.join(home, ".codex");
+  return process.env.CODEX_HOME
+    ? expandHome(process.env.CODEX_HOME, home)
+    : path.join(home, ".codex");
+}
+
+/**
+ * Preferred user-level skill directories for Codex / agents ecosystem.
+ * Write default: ~/.agents/skills
+ * Also scan legacy ~/.codex/skills
+ */
+export function agentsSkillsDir(home = os.homedir()): string {
+  return path.join(home, ".agents", "skills");
 }
 
 export function codexSkillsDir(home = os.homedir()): string {
-  return path.join(codexHome(home), "skills");
+  // Prefer modern agents location for *writes*; callers that need all scan roots use listCodexSkillRoots
+  return agentsSkillsDir(home);
+}
+
+/** All directories that may contain Codex/agent skills (dedupe by caller). */
+export function listCodexSkillRoots(home = os.homedir()): Array<{
+  path: string;
+  legacy: boolean;
+  label: string;
+}> {
+  const roots: Array<{ path: string; legacy: boolean; label: string }> = [
+    { path: agentsSkillsDir(home), legacy: false, label: "agents" },
+  ];
+  const legacy = path.join(codexHome(home), "skills");
+  if (normalizePath(legacy, home) !== normalizePath(agentsSkillsDir(home), home)) {
+    roots.push({ path: legacy, legacy: true, label: "codex-legacy" });
+  }
+  return roots;
 }
 
 export function codexHooksDir(home = os.homedir()): string {

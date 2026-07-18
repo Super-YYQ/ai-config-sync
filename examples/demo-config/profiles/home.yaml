@@ -1,8 +1,10 @@
-profile: company
+profile: home
 extends:
   - base
 include:
-  resources: []
+  resources:
+    - demo-skill
+    - planning-with-files
 exclude:
   resources: []
 security:

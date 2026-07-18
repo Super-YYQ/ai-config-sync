@@ -15,7 +15,7 @@ describe("P0 review fixes", () => {
     home = await fs.mkdtemp(path.join(os.tmpdir(), "acs-p0-"));
     configRepo = path.join(home, "my-ai-config");
     await fs.cp(
-      path.resolve(__dirname, "../../examples/private-config-template"),
+      path.resolve(__dirname, "../../examples/demo-config"),
       configRepo,
       { recursive: true },
     );

@@ -1,6 +1,6 @@
 {
   "name": "@ai-config-sync/git-sync",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Git operations for private config repository",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,7 +15,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@ai-config-sync/core": "0.2.2"
+    "@ai-config-sync/core": "0.3.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

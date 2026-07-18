@@ -13,8 +13,9 @@ import { fileURLToPath } from "node:url";
 
 const keep = process.argv.includes("--keep");
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const template = path.join(root, "examples", "private-config-template");
-const cli = path.join(root, "packages", "cli", "dist", "index.js");
+const template = path.join(root, "examples", "demo-config");
+const cliBundled = path.join(root, "dist", "ai-config-sync.cjs");
+const cliPkg = path.join(root, "packages", "cli", "dist", "index.js");
 
 function banner(title: string) {
   console.log("\n" + "=".repeat(60));
@@ -22,7 +23,26 @@ function banner(title: string) {
   console.log("=".repeat(60));
 }
 
-function runCli(home: string, args: string[]): { code: number; out: string } {
+async function resolveCli(): Promise<string> {
+  try {
+    await fs.access(cliBundled);
+    return cliBundled;
+  } catch {
+    /* fallthrough */
+  }
+  try {
+    await fs.access(cliPkg);
+    return cliPkg;
+  } catch {
+    throw new Error("CLI not built. Run: npm run build && node scripts/build-plugin-cli.mjs");
+  }
+}
+
+function runCli(
+  cli: string,
+  home: string,
+  args: string[],
+): { code: number; out: string } {
   const r = spawnSync(process.execPath, [cli, ...args, "--home", home], {
     encoding: "utf8",
     cwd: root,
@@ -43,8 +63,11 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 async function main() {
-  if (!(await pathExists(cli))) {
-    console.error("CLI not built. Run: npm run build");
+  let cli: string;
+  try {
+    cli = await resolveCli();
+  } catch (e) {
+    console.error((e as Error).message);
     process.exitCode = 1;
     return;
   }
@@ -56,23 +79,25 @@ async function main() {
   banner("1) setup --profile offline-demo");
   console.log(`HOME (isolated): ${home}`);
   console.log(`Config repo:     ${configRepo}`);
-  let r = runCli(home, [
+  console.log(`CLI:             ${cli}`);
+  let r = runCli(cli, home, [
     "setup",
     "--config-path",
     configRepo,
     "--profile",
     "offline-demo",
+    "--program-root",
+    root,
   ]);
   console.log(r.out.trim());
   if (r.code !== 0) process.exitCode = 1;
 
-  banner("2) plan --offline (vendored planning-with-files only)");
-  r = runCli(home, ["plan", "--profile", "offline-demo"]);
-  // plan doesn't have --offline flag on CLI — sources are local vendored so OK
+  banner("2) plan (vendored planning-with-files only)");
+  r = runCli(cli, home, ["plan", "--profile", "offline-demo"]);
   console.log(r.out.trim());
 
   banner("3) apply --yes --allow-risk medium --offline");
-  r = runCli(home, [
+  r = runCli(cli, home, [
     "apply",
     "--profile",
     "offline-demo",
@@ -92,48 +117,48 @@ async function main() {
     "planning-with-files",
     "SKILL.md",
   );
-  const codexSkill = path.join(
+  // Prefer agents skills dir; also accept legacy
+  const codexSkillAgents = path.join(
+    home,
+    ".agents",
+    "skills",
+    "planning-with-files",
+    "SKILL.md",
+  );
+  const codexSkillLegacy = path.join(
     home,
     ".codex",
     "skills",
     "planning-with-files",
     "SKILL.md",
   );
+  const codexSkill = (await pathExists(codexSkillAgents))
+    ? codexSkillAgents
+    : codexSkillLegacy;
   const hooksJson = path.join(home, ".codex", "hooks.json");
   const configToml = path.join(home, ".codex", "config.toml");
-  const hookScripts = path.join(
-    home,
-    ".codex",
-    "hooks",
-    "planning-with-files",
-  );
 
   const checks: Array<[string, boolean]> = [
     ["Claude skill", await pathExists(claudeSkill)],
-    ["Codex skill", await pathExists(codexSkill)],
+    ["Codex/agents skill", await pathExists(codexSkill)],
     ["Codex hooks.json", await pathExists(hooksJson)],
     ["Codex config.toml", await pathExists(configToml)],
-    ["Codex hook scripts dir", await pathExists(hookScripts)],
   ];
   for (const [label, ok] of checks) {
-    console.log(`${ok ? "✓" : "✗"} ${label}: ${label.includes("skill") || label.includes("hooks") || label.includes("config") ? "" : ""}`.replace(/: $/, ""));
+    console.log(`${ok ? "✓" : "✗"} ${label}`);
     if (!ok) process.exitCode = 1;
   }
-  // print paths
   for (const [label, ok] of checks) {
-    if (ok) {
-      const p =
-        label === "Claude skill"
-          ? claudeSkill
-          : label === "Codex skill"
-            ? codexSkill
-            : label === "Codex hooks.json"
-              ? hooksJson
-              : label === "Codex config.toml"
-                ? configToml
-                : hookScripts;
-      console.log(`  → ${p}`);
-    }
+    if (!ok) continue;
+    const p =
+      label === "Claude skill"
+        ? claudeSkill
+        : label === "Codex/agents skill"
+          ? codexSkill
+          : label === "Codex hooks.json"
+            ? hooksJson
+            : configToml;
+    console.log(`  → ${p}`);
   }
 
   if (await pathExists(claudeSkill)) {
@@ -153,20 +178,8 @@ async function main() {
     console.log(await fs.readFile(configToml, "utf8"));
   }
 
-  if ((await pathExists(claudeSkill)) && (await pathExists(codexSkill))) {
-    await fs.appendFile(claudeSkill, "\n<!-- claude-local-edit -->\n", "utf8");
-    const codexBody = await fs.readFile(codexSkill, "utf8");
-    console.log(
-      `Independent copies: Codex skill ${
-        codexBody.includes("claude-local-edit")
-          ? "POLLUTED (bad)"
-          : "untouched (good)"
-      }`,
-    );
-  }
-
-  banner("5) second apply (expect SKIP for in-sync targets)");
-  r = runCli(home, [
+  banner("5) second apply (expect SKIP / no-changes)");
+  r = runCli(cli, home, [
     "apply",
     "--profile",
     "offline-demo",
@@ -177,17 +190,13 @@ async function main() {
   ]);
   console.log(r.out.trim());
 
-  banner("6) drift + doctor");
-  r = runCli(home, ["drift"]);
-  console.log(r.out.trim());
-  r = runCli(home, ["doctor"]);
+  banner("6) doctor");
+  r = runCli(cli, home, ["doctor"]);
   console.log(r.out.trim());
 
   banner("Done");
   if (keep) {
     console.log(`Kept isolated HOME at:\n  ${home}`);
-    console.log(`Inspect:\n  ${path.join(home, ".claude", "skills")}`);
-    console.log(`  ${path.join(home, ".codex")}`);
   } else {
     await fs.rm(home, { recursive: true, force: true });
     console.log("Temp HOME cleaned up (pass --keep to retain).");

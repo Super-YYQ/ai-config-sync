@@ -1,0 +1,36 @@
+schemaVersion: 1
+resources:
+  - id: demo-skill
+    kind: skill
+    source:
+      provider: local
+      path: sources/skills/demo-skill
+    targets:
+      claude:
+        enabled: true
+        recipeRef: recipes/demo-skill.yaml#claude
+      codex:
+        enabled: true
+        recipeRef: recipes/demo-skill.yaml#codex
+    profiles:
+      - home
+    versionPolicy: latest-confirm
+  - id: planning-with-files
+    kind: integration
+    source:
+      provider: vendored
+      repository: OthmanAdi/planning-with-files
+      path: sources/integrations/planning-with-files
+    targets:
+      claude:
+        enabled: true
+        recipeRef: recipes/planning-with-files.yaml#claude
+      codex:
+        enabled: true
+        recipeRef: recipes/planning-with-files.yaml#codex
+    profiles:
+      - home
+      - company
+      - offline-demo
+    versionPolicy: vendored
+    notes: Offline vendor snapshot for demos

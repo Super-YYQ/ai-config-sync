@@ -10,12 +10,20 @@ import {
   loadLocalConfig,
   localConfigPath,
   mergeJson,
+  mergeManagedCodexSessionStart,
+  hasManagedCodexSessionStart,
   pathExists,
   readJsonFile,
   saveLocalConfig,
   writeJsonFile,
   writeText,
   writeYamlFile,
+  mergeTomlText,
+  getTomlValue,
+  readText,
+  agentsSkillsDir,
+  codexConfigPath,
+  codexHooksManifestPath,
   type LocalConfig,
 } from "@ai-config-sync/core";
 import {
@@ -447,16 +455,44 @@ async function installClaudePlugin(
     );
   }
 
-  // User-level skill backup (works even if plugin slash cmds lag)
-  const skillSrc = path.join(pluginSrc, "skills", "config-sync");
-  const skillDest = path.join(home, ".claude", "skills", "config-sync");
-  const skillMd = path.join(skillDest, "SKILL.md");
-  if (await pathExists(skillSrc)) {
-    if (!(await pathExists(skillMd)) || needCopy) {
+  // Only install user-level skill when plugin install clearly failed (fallback).
+  // Successful plugin path should not duplicate ~/.claude/skills/config-sync.
+  const pluginEnabled = actions.some(
+    (a) =>
+      /plugin enable|already enabled|already installed/i.test(a) ||
+      a.includes("claude plugin install"),
+  );
+  if (!pluginEnabled) {
+    const skillSrc = path.join(pluginSrc, "skills", "config-sync");
+    const skillDest = path.join(home, ".claude", "skills", "config-sync");
+    const skillMd = path.join(skillDest, "SKILL.md");
+    if (await pathExists(skillSrc) && !(await pathExists(skillMd))) {
       await ensureDir(path.dirname(skillDest));
-      await fs.rm(skillDest, { recursive: true, force: true });
       await fs.cp(skillSrc, skillDest, { recursive: true });
-      actions.push("INSTALL Claude user skill: config-sync");
+      actions.push("INSTALL Claude user skill: config-sync (fallback)");
+    }
+  } else {
+    // Optional: remove managed fallback skill if it matches our content marker
+    const skillMd = path.join(
+      home,
+      ".claude",
+      "skills",
+      "config-sync",
+      "SKILL.md",
+    );
+    if (await pathExists(skillMd)) {
+      try {
+        const text = await fs.readFile(skillMd, "utf8");
+        if (
+          text.includes("ai-config-sync") &&
+          text.includes("跨电脑同步")
+        ) {
+          await fs.rm(path.dirname(skillMd), { recursive: true, force: true });
+          actions.push("REMOVE Claude fallback skill (plugin is active)");
+        }
+      } catch {
+        /* keep */
+      }
     }
   }
 
@@ -472,7 +508,8 @@ async function installCodexIntegration(
   programRoot?: string,
 ): Promise<string[]> {
   const actions: string[] = [];
-  const skillDest = path.join(home, ".codex", "skills", "config-sync");
+  // Prefer ~/.agents/skills (modern); still works if only legacy exists
+  const skillDest = path.join(agentsSkillsDir(home), "config-sync");
   let skillSrc: string | undefined;
   if (programRoot) {
     const p = path.join(
@@ -498,9 +535,9 @@ name: config-sync
 description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描技能」「恢复环境」时使用。
 ---
 
-# config-sync (Codex)
+# config-sync (Codex / agents)
 
-运行本机 CLI：
+运行本机 CLI（Plugin 内置 bin 或 npm 全局）：
 
 - \`ai-config-sync status\`
 - \`ai-config-sync scan\`
@@ -512,38 +549,44 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
 `,
       );
     }
-    actions.push("INSTALL Codex skill: config-sync");
+    actions.push(`INSTALL agents skill: config-sync → ${skillDest}`);
   }
 
-  // Merge SessionStart hook into ~/.codex/hooks.json if present or create
-  const hooksPath = path.join(home, ".codex", "hooks.json");
-  const managedHook = {
-    hooks: [
-      {
-        id: "ai-config-sync-session-start",
-        event: "SessionStart",
-        command: "ai-config-sync scan --light --write-pending",
-        timeout_ms: 20000,
-      },
-    ],
-  };
-  let base: unknown = { hooks: [] };
-  let hadManaged = false;
+  // Codex hooks.json — official event-map shape
+  const hooksPath = codexHooksManifestPath(home);
+  let base: unknown = {};
   if (await pathExists(hooksPath)) {
     try {
       base = await readJsonFile(hooksPath);
-      const hooks = (base as { hooks?: Array<{ id?: string }> }).hooks;
-      hadManaged = !!hooks?.some((h) => h.id === "ai-config-sync-session-start");
     } catch {
-      base = { hooks: [] };
+      // backup broken file
+      await fs.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      base = {};
+      actions.push(`BACKUP broken hooks.json → ${hooksPath}.bak-*`);
     }
   }
-  if (!hadManaged) {
-    const merged = mergeJson(base, managedHook, { preferManaged: true });
+  const { next, changed } = mergeManagedCodexSessionStart(base);
+  if (changed || !hasManagedCodexSessionStart(base)) {
     await ensureDir(path.dirname(hooksPath));
-    await writeJsonFile(hooksPath, merged);
-    actions.push("MERGE Codex hooks.json: ai-config-sync-session-start");
+    await writeJsonFile(hooksPath, next);
+    actions.push("MERGE Codex hooks.json SessionStart (event-map format)");
   }
+
+  // Ensure features.hooks = true
+  const cfgPath = codexConfigPath(home);
+  let toml = (await pathExists(cfgPath)) ? await readText(cfgPath) : "";
+  if (getTomlValue(toml, "features", "hooks") !== true) {
+    toml = mergeTomlText(toml, [
+      { section: "features", key: "hooks", value: true },
+    ]);
+    await ensureDir(path.dirname(cfgPath));
+    await writeText(cfgPath, toml);
+    actions.push("UPDATE Codex config.toml: features.hooks = true");
+  }
+
+  actions.push(
+    "NOTE: Codex may prompt to trust the SessionStart hook on first run.",
+  );
 
   return actions;
 }

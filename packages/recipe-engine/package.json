@@ -1,6 +1,6 @@
 {
   "name": "@ai-config-sync/recipe-engine",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Rule analyzer, plan/apply engines, recipe registry",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,11 +15,11 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@ai-config-sync/core": "0.2.2",
-    "@ai-config-sync/drivers": "0.2.2",
-    "@ai-config-sync/git-sync": "0.2.2",
-    "@ai-config-sync/state-manager": "0.2.2",
-    "@ai-config-sync/scanner": "0.2.2"
+    "@ai-config-sync/core": "0.3.0",
+    "@ai-config-sync/drivers": "0.3.0",
+    "@ai-config-sync/git-sync": "0.3.0",
+    "@ai-config-sync/state-manager": "0.3.0",
+    "@ai-config-sync/scanner": "0.3.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

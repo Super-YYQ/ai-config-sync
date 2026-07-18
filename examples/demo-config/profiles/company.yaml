@@ -2,9 +2,11 @@ profile: company
 extends:
   - base
 include:
-  resources: []
+  resources:
+    - planning-with-files
 exclude:
-  resources: []
+  resources:
+    - demo-skill
 security:
   maxRisk: medium
   allowAutomaticLatest: false

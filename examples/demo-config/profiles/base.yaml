@@ -1,6 +1,5 @@
-profile: company
-extends:
-  - base
+profile: base
+extends: []
 include:
   resources: []
 exclude:
