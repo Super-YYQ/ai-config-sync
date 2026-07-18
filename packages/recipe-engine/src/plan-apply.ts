@@ -54,6 +54,44 @@ export interface EngineContext {
   offline?: boolean;
 }
 
+/** Group key for apply — never join with characters that appear in resource ids. */
+export interface ResourceTargetKey {
+  resourceId: string;
+  target: TargetTool | "_";
+}
+
+/**
+ * Group plan actions by (resourceId, target) using nested maps so ids like
+ * `hooks:SessionStart` or `plugin@marketplace` are not truncated by split(":").
+ */
+export function groupActionsByResourceTarget(
+  actions: PlanAction[],
+): Map<ResourceTargetKey, PlanAction[]> {
+  const nested = new Map<string, Map<string, PlanAction[]>>();
+  for (const a of actions) {
+    const resourceId = a.resourceId ?? "_";
+    const target = (a.target ?? "_") as string;
+    let byTarget = nested.get(resourceId);
+    if (!byTarget) {
+      byTarget = new Map();
+      nested.set(resourceId, byTarget);
+    }
+    const list = byTarget.get(target) ?? [];
+    list.push(a);
+    byTarget.set(target, list);
+  }
+  const out = new Map<ResourceTargetKey, PlanAction[]>();
+  for (const [resourceId, byTarget] of nested) {
+    for (const [target, list] of byTarget) {
+      out.set(
+        { resourceId, target: target as TargetTool | "_" },
+        list,
+      );
+    }
+  }
+  return out;
+}
+
 async function resolveSourceRoot(
   ctx: EngineContext,
   resource: Resource,
@@ -510,17 +548,10 @@ export async function applyPlan(
   const manual: string[] = [];
   let hardFailure = false;
 
-  // Group actions by resource+target and apply once per group via driver
-  const groups = new Map<string, PlanAction[]>();
-  for (const a of actionable) {
-    const key = `${a.resourceId ?? "_"}:${a.target ?? "_"}`;
-    const list = groups.get(key) ?? [];
-    list.push(a);
-    groups.set(key, list);
-  }
+  // Group actions by resource+target without string-splitting (ids may contain ':')
+  const groups = groupActionsByResourceTarget(actionable);
 
-  for (const [key, group] of groups) {
-    const [resourceId, target] = key.split(":") as [string, TargetTool | "_"];
+  for (const [{ resourceId, target }, group] of groups) {
     if (resourceId === "_" || target === "_") {
       for (const a of group) {
         if (a.type === "MANUAL") manual.push(a.description);

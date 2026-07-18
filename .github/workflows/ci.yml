@@ -28,7 +28,10 @@ jobs:
         run: npm test
       - name: Pack dry-run
         run: npm pack --dry-run
-      - name: Smoke npm package
+      - name: Validate Claude plugin manifests
+        run: npm run validate:plugin
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '20'
+      - name: Smoke npm package (isolated tarball)
         run: npm run smoke:npm
         if: matrix.os == 'ubuntu-latest' && matrix.node == '20'
 

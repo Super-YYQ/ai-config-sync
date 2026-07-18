@@ -29,7 +29,7 @@
     "demo:offline-pwf": "tsx scripts/demo-offline-pwf.ts",
     "pack:check": "npm pack --dry-run",
     "smoke:npm": "node scripts/smoke-npm-package.mjs",
-    "validate:plugin": "claude plugin validate . || true"
+    "validate:plugin": "node scripts/validate-plugin.mjs"
   },
   "workspaces": [
     "packages/*",

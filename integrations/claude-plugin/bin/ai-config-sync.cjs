@@ -16371,45 +16371,103 @@ async function scanClaudePlugins(home, options) {
   }
   return out;
 }
+function collectCodexHookResources(raw, manifestPath, options) {
+  const out = [];
+  if (raw == null)
+    return out;
+  const pushEntry = (id, metadata, confidence = 0.7) => {
+    if (isSelfManagedResourceId(id))
+      return;
+    out.push({
+      id,
+      kind: "hook",
+      target: "codex",
+      path: manifestPath,
+      confidence,
+      classification: options.managedIds?.has(id) ? "managed" : "unmanaged",
+      metadata
+    });
+  };
+  const walkEventMap = (map) => {
+    for (const [event, value] of Object.entries(map)) {
+      if (event === "hooks")
+        continue;
+      if (!Array.isArray(value)) {
+        pushEntry(`hooks:${event}`, { event, value }, 0.6);
+        continue;
+      }
+      let index = 0;
+      for (const group of value) {
+        if (!group || typeof group !== "object")
+          continue;
+        const g = group;
+        const inner = Array.isArray(g.hooks) ? g.hooks : null;
+        if (inner) {
+          for (const h of inner) {
+            if (!h || typeof h !== "object")
+              continue;
+            const hook = h;
+            const id = String(hook.id ?? hook.name ?? `hooks:${event}:${index}`);
+            pushEntry(id, { event, group: g, hook }, 0.75);
+            index++;
+          }
+          if (inner.length === 0) {
+            pushEntry(`hooks:${event}`, { event, group: g }, 0.65);
+          }
+        } else {
+          const id = String(g.id ?? g.name ?? `hooks:${event}:${index}`);
+          pushEntry(id, { event, ...g }, 0.7);
+          index++;
+        }
+      }
+      if (value.length > 0 && !out.some((r) => r.id === `hooks:${event}`)) {
+        const hasStable = out.some((r) => r.metadata && r.metadata.event === event && r.id !== `hooks:${event}`);
+        if (!hasStable) {
+          pushEntry(`hooks:${event}`, { event, value }, 0.65);
+        } else if (
+          // ensure SessionStart style from setup is visible even when nested
+          !out.some((r) => String(r.id).includes(event))
+        ) {
+          pushEntry(`hooks:${event}`, { event, value }, 0.65);
+        }
+      }
+    }
+  };
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (!entry || typeof entry !== "object")
+        continue;
+      const e = entry;
+      pushEntry(String(e.id ?? e.name ?? "hook"), e);
+    }
+    return out;
+  }
+  if (typeof raw !== "object")
+    return out;
+  const obj = raw;
+  if (obj.hooks && typeof obj.hooks === "object" && !Array.isArray(obj.hooks)) {
+    walkEventMap(obj.hooks);
+    return out;
+  }
+  if (Array.isArray(obj.hooks)) {
+    for (const entry of obj.hooks) {
+      if (!entry || typeof entry !== "object")
+        continue;
+      const e = entry;
+      pushEntry(String(e.id ?? e.name ?? "hook"), e);
+    }
+    return out;
+  }
+  walkEventMap(obj);
+  return out;
+}
 async function scanCodexHooks(home, options) {
   const out = [];
   const manifestPath = codexHooksManifestPath(home);
   if (await pathExists(manifestPath)) {
     try {
       const raw = JSON.parse(await import_promises4.default.readFile(manifestPath, "utf8"));
-      const entries = Array.isArray(raw.hooks) ? raw.hooks : Array.isArray(raw) ? raw : [];
-      if (entries.length > 0) {
-        for (const entry of entries) {
-          const id = String(entry.id ?? entry.name ?? "hook");
-          if (isSelfManagedResourceId(id))
-            continue;
-          out.push({
-            id,
-            kind: "hook",
-            target: "codex",
-            path: manifestPath,
-            confidence: 0.7,
-            classification: options.managedIds?.has(id) ? "managed" : "unmanaged",
-            metadata: entry
-          });
-        }
-      } else {
-        for (const [event, value] of Object.entries(raw)) {
-          if (event === "hooks")
-            continue;
-          if (isSelfManagedResourceId(`hooks:${event}`))
-            continue;
-          out.push({
-            id: `hooks:${event}`,
-            kind: "hook",
-            target: "codex",
-            path: manifestPath,
-            confidence: 0.6,
-            classification: "unmanaged",
-            metadata: { event, value }
-          });
-        }
-      }
+      out.push(...collectCodexHookResources(raw, manifestPath, options));
     } catch {
     }
   }
@@ -17983,6 +18041,28 @@ async function checkVersionPolicy(options) {
 }
 
 // packages/recipe-engine/dist/plan-apply.js
+function groupActionsByResourceTarget(actions) {
+  const nested = /* @__PURE__ */ new Map();
+  for (const a of actions) {
+    const resourceId = a.resourceId ?? "_";
+    const target = a.target ?? "_";
+    let byTarget = nested.get(resourceId);
+    if (!byTarget) {
+      byTarget = /* @__PURE__ */ new Map();
+      nested.set(resourceId, byTarget);
+    }
+    const list = byTarget.get(target) ?? [];
+    list.push(a);
+    byTarget.set(target, list);
+  }
+  const out = /* @__PURE__ */ new Map();
+  for (const [resourceId, byTarget] of nested) {
+    for (const [target, list] of byTarget) {
+      out.set({ resourceId, target }, list);
+    }
+  }
+  return out;
+}
 async function resolveSourceRoot(ctx, resource) {
   if (ctx.sourceRoots?.[resource.id])
     return ctx.sourceRoots[resource.id];
@@ -18285,15 +18365,8 @@ async function applyPlan(ctx, plan) {
   const failed = [];
   const manual = [];
   let hardFailure = false;
-  const groups = /* @__PURE__ */ new Map();
-  for (const a of actionable) {
-    const key = `${a.resourceId ?? "_"}:${a.target ?? "_"}`;
-    const list = groups.get(key) ?? [];
-    list.push(a);
-    groups.set(key, list);
-  }
-  for (const [key, group] of groups) {
-    const [resourceId, target] = key.split(":");
+  const groups = groupActionsByResourceTarget(actionable);
+  for (const [{ resourceId, target }, group] of groups) {
     if (resourceId === "_" || target === "_") {
       for (const a of group) {
         if (a.type === "MANUAL")
@@ -19385,35 +19458,76 @@ var import_node_os2 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
-function packageRootFromHere() {
-  try {
-    const here = import_node_path18.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
-    const root = import_node_path18.default.resolve(here, "../../..");
-    return root;
-  } catch {
-    return void 0;
-  }
+async function looksLikeProgramRoot(dir) {
+  return pathExists(
+    import_node_path18.default.join(dir, "integrations", "claude-plugin", ".claude-plugin", "plugin.json")
+  );
 }
 async function detectProgramRoot(explicit) {
-  if (explicit && await pathExists(explicit)) return import_node_path18.default.resolve(explicit);
-  const fromModule = packageRootFromHere();
-  if (fromModule && await pathExists(
-    import_node_path18.default.join(fromModule, "integrations", "claude-plugin", ".claude-plugin")
-  )) {
-    return fromModule;
+  if (explicit && await pathExists(explicit)) {
+    const resolved = import_node_path18.default.resolve(explicit);
+    if (await looksLikeProgramRoot(resolved)) return resolved;
+    return resolved;
+  }
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (pluginRoot) {
+    const candidates = [
+      pluginRoot,
+      import_node_path18.default.resolve(pluginRoot, ".."),
+      import_node_path18.default.resolve(pluginRoot, "../.."),
+      import_node_path18.default.resolve(pluginRoot, "../../..")
+    ];
+    for (const c of candidates) {
+      if (await looksLikeProgramRoot(c)) return c;
+    }
+  }
+  try {
+    const here = import_node_path18.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
+    const candidates = [
+      import_node_path18.default.resolve(here, "../../.."),
+      // monorepo packages/cli/src
+      import_node_path18.default.resolve(here, ".."),
+      // npm package dist/
+      import_node_path18.default.resolve(here, "../..")
+    ];
+    for (const c of candidates) {
+      if (await looksLikeProgramRoot(c)) return c;
+    }
+  } catch {
+  }
+  try {
+    const argv1 = process.argv[1];
+    if (argv1) {
+      const binDir = import_node_path18.default.dirname(import_node_path18.default.resolve(argv1));
+      const candidates = [
+        import_node_path18.default.resolve(binDir, ".."),
+        // package root from dist/ai-config-sync.cjs
+        import_node_path18.default.resolve(binDir, "../.."),
+        import_node_path18.default.resolve(binDir, "../../..")
+      ];
+      for (const c of candidates) {
+        if (await looksLikeProgramRoot(c)) return c;
+      }
+    }
+  } catch {
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    if (await pathExists(
-      import_node_path18.default.join(dir, "integrations", "claude-plugin", ".claude-plugin")
-    )) {
-      return dir;
-    }
+    if (await looksLikeProgramRoot(dir)) return dir;
     const parent = import_node_path18.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   return void 0;
+}
+function isRunningInsideSelfPlugin() {
+  const root = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!root) return false;
+  const base = import_node_path18.default.basename(root).toLowerCase();
+  if (base.includes("ai-config-sync") || base.includes("config-sync")) {
+    return true;
+  }
+  return false;
 }
 async function detectConfigRepo(options, home) {
   let existingLink;
@@ -19587,88 +19701,92 @@ async function ensureMinimalConfigRepo(localPath) {
   }
   return actions;
 }
-async function installClaudePlugin(home, programRoot) {
+async function installClaudePlugin(home, programRoot, options = {}) {
   const actions = [];
   const pluginSrc = import_node_path18.default.join(programRoot, "integrations", "claude-plugin");
   if (!await pathExists(import_node_path18.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
     return actions;
   }
-  const marketplacesDir = import_node_path18.default.join(home, ".claude", "plugins", "marketplaces");
-  const dest = import_node_path18.default.join(marketplacesDir, "ai-config-sync");
-  await ensureDir(marketplacesDir);
-  const destPluginJson = import_node_path18.default.join(dest, ".claude-plugin", "plugin.json");
-  let needCopy = true;
-  if (await pathExists(destPluginJson)) {
-    try {
-      const a = await readJsonFile(
-        import_node_path18.default.join(pluginSrc, ".claude-plugin", "plugin.json")
-      );
-      const b = await readJsonFile(destPluginJson);
-      if (a.version && a.version === b.version) needCopy = false;
-    } catch {
-      needCopy = true;
-    }
-  }
-  if (needCopy) {
-    await import_promises8.default.rm(dest, { recursive: true, force: true });
-    await import_promises8.default.cp(pluginSrc, dest, { recursive: true });
-    actions.push(`INSTALL Claude marketplace copy \u2192 ${dest}`);
-  }
-  const knownPath = import_node_path18.default.join(
-    home,
-    ".claude",
-    "plugins",
-    "known_marketplaces.json"
-  );
-  let known = {};
-  if (await pathExists(knownPath)) {
-    try {
-      known = await readJsonFile(knownPath);
-    } catch {
-      known = {};
-    }
-  }
-  const prevKnown = known["ai-config-sync"];
-  if (!prevKnown || prevKnown.installLocation !== dest || needCopy) {
-    known["ai-config-sync"] = {
-      source: {
-        source: "directory",
-        path: dest
-      },
-      installLocation: dest,
-      lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    await writeJsonFile(knownPath, known);
-    actions.push("UPDATE known_marketplaces.json: ai-config-sync");
+  if (options.skipSelfPluginInstall || isRunningInsideSelfPlugin()) {
+    actions.push(
+      "SKIP Claude plugin install (already running inside ai-config-sync plugin)"
+    );
+    return actions;
   }
   const { execFile: execFile4 } = await import("node:child_process");
   const { promisify: promisify4 } = await import("node:util");
   const execFileAsync4 = promisify4(execFile4);
   const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-  let usedOnlineMarketplace = false;
+  const runClaude = async (args, timeout = 12e4) => {
+    await execFileAsync4(claudeBin, args, {
+      windowsHide: true,
+      timeout,
+      maxBuffer: 4 * 1024 * 1024
+    });
+  };
+  let claudeAvailable = true;
   try {
-    try {
-      await execFileAsync4(
-        claudeBin,
-        ["plugin", "marketplace", "add", "Super-YYQ/ai-config-sync"],
-        { windowsHide: true, timeout: 12e4, maxBuffer: 4 * 1024 * 1024 }
-      );
-      actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
-      usedOnlineMarketplace = true;
-    } catch (e) {
-      const msg = e.message || String(e);
-      if (/already|exists/i.test(msg)) {
-        usedOnlineMarketplace = true;
-        actions.push("claude marketplace already has ai-config-sync");
-      }
-    }
+    await runClaude(["--version"], 15e3);
   } catch {
+    claudeAvailable = false;
+  }
+  if (!claudeAvailable) {
+    actions.push(
+      "WARN claude CLI not found \u2014 skipped marketplace plugin install. Install Claude Code CLI, or install the plugin manually: `claude plugin marketplace add Super-YYQ/ai-config-sync`."
+    );
+    const skillSrc = import_node_path18.default.join(pluginSrc, "skills", "config-sync");
+    const skillDest = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
+    const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
+    if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
+      await ensureDir(import_node_path18.default.dirname(skillDest));
+      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
+      actions.push("INSTALL Claude user skill: config-sync (fallback, no claude CLI)");
+    }
+    return actions;
+  }
+  let marketplaceReady = false;
+  try {
+    await runClaude([
+      "plugin",
+      "marketplace",
+      "add",
+      "Super-YYQ/ai-config-sync"
+    ]);
+    actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
+    marketplaceReady = true;
+  } catch (e) {
+    const msg = e.message || String(e);
+    if (/already|exists/i.test(msg)) {
+      marketplaceReady = true;
+      actions.push("claude marketplace already has ai-config-sync");
+    } else if (options.allowLocalPluginInstall) {
+      try {
+        await runClaude(["plugin", "marketplace", "add", pluginSrc]);
+        actions.push(
+          `claude plugin marketplace add ${pluginSrc} (local/dev)`
+        );
+        marketplaceReady = true;
+      } catch (e2) {
+        const msg2 = e2.message || String(e2);
+        if (/already|exists/i.test(msg2)) {
+          marketplaceReady = true;
+          actions.push("claude local marketplace already registered");
+        } else {
+          actions.push(
+            `WARN claude marketplace add failed: ${msg2.slice(0, 200)}`
+          );
+        }
+      }
+    } else {
+      actions.push(
+        `WARN claude marketplace add failed: ${msg.slice(0, 200)}. Pass --allow-local-plugin-install for offline/dev directory marketplace.`
+      );
+    }
   }
   try {
-    await execFileAsync4(
-      claudeBin,
+    await runClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
-      { windowsHide: true, timeout: 6e4, maxBuffer: 2 * 1024 * 1024 }
+      6e4
     );
     actions.push("claude plugin install ai-config-sync@ai-config-sync");
   } catch (e) {
@@ -19676,14 +19794,13 @@ async function installClaudePlugin(home, programRoot) {
     if (/already installed/i.test(msg)) {
       actions.push("claude plugin already installed");
     } else {
-      messagesPushSafe(actions, `WARN claude plugin install: ${msg.slice(0, 200)}`);
+      actions.push(`WARN claude plugin install: ${msg.slice(0, 200)}`);
     }
   }
   try {
-    await execFileAsync4(
-      claudeBin,
+    await runClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
-      { windowsHide: true, timeout: 3e4, maxBuffer: 1024 * 1024 }
+      3e4
     );
     actions.push("claude plugin enable ai-config-sync@ai-config-sync");
   } catch (e) {
@@ -19691,67 +19808,17 @@ async function installClaudePlugin(home, programRoot) {
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
     } else {
-      const settingsPath = import_node_path18.default.join(home, ".claude", "settings.json");
-      let settings = {};
-      if (await pathExists(settingsPath)) {
-        try {
-          settings = await readJsonFile(settingsPath);
-        } catch {
-          settings = {};
-        }
-      }
-      const enabled = settings.enabledPlugins ?? {};
-      if (enabled["ai-config-sync@ai-config-sync"] !== true) {
-        enabled["ai-config-sync@ai-config-sync"] = true;
-        settings.enabledPlugins = enabled;
-        await writeJsonFile(settingsPath, settings);
-        actions.push(
-          "ENABLE via settings.json: ai-config-sync@ai-config-sync (claude enable failed)"
-        );
-      }
-      messagesPushSafe(actions, `WARN claude plugin enable: ${msg.slice(0, 160)}`);
+      actions.push(
+        `WARN claude plugin enable: ${msg.slice(0, 160)}. Run: claude plugin enable ai-config-sync@ai-config-sync`
+      );
     }
   }
-  if (!usedOnlineMarketplace) {
+  if (!marketplaceReady) {
     actions.push(
-      "NOTE: online marketplace add unavailable; using local directory marketplace"
+      "NOTE: marketplace not registered; plugin install may be incomplete"
     );
-  }
-  const pluginEnabled = actions.some(
-    (a) => /plugin enable|already enabled|already installed/i.test(a) || a.includes("claude plugin install")
-  );
-  if (!pluginEnabled) {
-    const skillSrc = import_node_path18.default.join(pluginSrc, "skills", "config-sync");
-    const skillDest = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
-    const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
-    if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-      await ensureDir(import_node_path18.default.dirname(skillDest));
-      await import_promises8.default.cp(skillSrc, skillDest, { recursive: true });
-      actions.push("INSTALL Claude user skill: config-sync (fallback)");
-    }
-  } else {
-    const skillMd = import_node_path18.default.join(
-      home,
-      ".claude",
-      "skills",
-      "config-sync",
-      "SKILL.md"
-    );
-    if (await pathExists(skillMd)) {
-      try {
-        const text = await import_promises8.default.readFile(skillMd, "utf8");
-        if (text.includes("ai-config-sync") && text.includes("\u8DE8\u7535\u8111\u540C\u6B65")) {
-          await import_promises8.default.rm(import_node_path18.default.dirname(skillMd), { recursive: true, force: true });
-          actions.push("REMOVE Claude fallback skill (plugin is active)");
-        }
-      } catch {
-      }
-    }
   }
   return actions;
-}
-function messagesPushSafe(actions, line) {
-  actions.push(line);
 }
 async function installCodexIntegration(home, programRoot) {
   const actions = [];
@@ -19997,7 +20064,10 @@ async function runSetup(options = {}) {
   }
   if (localConfig.targets.claude) {
     if (programRoot) {
-      const pluginActions = await installClaudePlugin(home, programRoot);
+      const pluginActions = await installClaudePlugin(home, programRoot, {
+        allowLocalPluginInstall: !!options.allowLocalPluginInstall,
+        skipSelfPluginInstall: !!options.skipSelfPluginInstall
+      });
       if (pluginActions.length) {
         actions.push(...pluginActions);
         if (status === "no-changes") status = "repaired";
@@ -20105,7 +20175,13 @@ function requireLinked(ctx, command) {
   }
   return true;
 }
-program2.command("setup").description("Initialize, link, repair, or reconfigure").option("--config-path <path>", "Local private config repository path").option("--repo <url>", "Git remote for private config repository").option("--profile <name>", "Profile name", "home").option("--plan", "Show planned setup actions only").option("--repair", "Repair missing integrations only").option("--reconfigure", "Rewrite local link and profile").option("--home <path>", "Override home directory (testing)").option("--no-claude", "Skip Claude integration").option("--no-codex", "Skip Codex integration").option("--program-root <path>", "Path to ai-config-sync program repo").action(async (opts) => {
+program2.command("setup").description("Initialize, link, repair, or reconfigure").option("--config-path <path>", "Local private config repository path").option("--repo <url>", "Git remote for private config repository").option("--profile <name>", "Profile name", "home").option("--plan", "Show planned setup actions only").option("--repair", "Repair missing integrations only").option("--reconfigure", "Rewrite local link and profile").option("--home <path>", "Override home directory (testing)").option("--no-claude", "Skip Claude integration").option("--no-codex", "Skip Codex integration").option("--program-root <path>", "Path to ai-config-sync program repo").option(
+  "--allow-local-plugin-install",
+  "Offline/dev: allow `claude plugin marketplace add <local dir>` (never rewrites Claude state files by hand)"
+).option(
+  "--skip-self-plugin-install",
+  "Skip Claude plugin install/enable (already running inside the plugin)"
+).action(async (opts) => {
   const mode = opts.plan ? "plan" : opts.reconfigure ? "reconfigure" : opts.repair ? "repair" : "default";
   const result = await runSetup({
     home: opts.home,
@@ -20115,7 +20191,9 @@ program2.command("setup").description("Initialize, link, repair, or reconfigure"
     mode,
     claude: opts.claude,
     codex: opts.codex,
-    programRoot: opts.programRoot
+    programRoot: opts.programRoot,
+    allowLocalPluginInstall: !!opts.allowLocalPluginInstall,
+    skipSelfPluginInstall: !!opts.skipSelfPluginInstall
   });
   for (const m of result.messages) console.log(m);
   if (result.actions.length) {

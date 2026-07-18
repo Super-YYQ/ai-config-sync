@@ -1,31 +1,38 @@
 /**
- * Lightweight SessionStart: use plugin-bundled CLI (on PATH as ai-config-sync)
- * or fall back to sibling bin/ file. Never call npx.
+ * Lightweight SessionStart: prefer plugin-bundled CLI FIRST, then PATH fallback.
+ * Never call npx — old global installs must not override the plugin version.
  */
 const { spawnSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
 function resolveCli() {
-  // 1) Plugin PATH / global
+  // 1) Plugin-bundled binary FIRST (CLAUDE_PLUGIN_ROOT / sibling bin)
+  const root =
+    process.env.CLAUDE_PLUGIN_ROOT || path.resolve(__dirname, "..");
+  const cjs = path.join(root, "bin", "ai-config-sync.cjs");
+  if (fs.existsSync(cjs)) {
+    return { cmd: process.execPath, argsPrefix: [cjs], via: "plugin-root" };
+  }
+
+  // 2) PATH / global only as fallback
   const which = spawnSync(
     process.platform === "win32" ? "where" : "which",
     ["ai-config-sync"],
-    { encoding: "utf8", windowsHide: true, shell: process.platform === "win32" },
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      shell: process.platform === "win32",
+    },
   );
   if (which.status === 0 && which.stdout) {
-    const first = which.stdout.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
-    if (first) return { cmd: first, argsPrefix: [] };
+    const first = which.stdout
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .find(Boolean);
+    if (first) return { cmd: first, argsPrefix: [], via: "path" };
   }
 
-  // 2) Sibling bundled binary
-  const root =
-    process.env.CLAUDE_PLUGIN_ROOT ||
-    path.resolve(__dirname, "..");
-  const cjs = path.join(root, "bin", "ai-config-sync.cjs");
-  if (fs.existsSync(cjs)) {
-    return { cmd: process.execPath, argsPrefix: [cjs] };
-  }
   return null;
 }
 
@@ -33,12 +40,7 @@ function run() {
   const resolved = resolveCli();
   if (!resolved) return;
 
-  const args = [
-    ...resolved.argsPrefix,
-    "scan",
-    "--light",
-    "--json",
-  ];
+  const args = [...resolved.argsPrefix, "scan", "--light", "--json"];
   const r = spawnSync(resolved.cmd, args, {
     encoding: "utf8",
     timeout: 15000,
@@ -54,7 +56,9 @@ function run() {
         x.classification !== "managed" &&
         x.classification !== "system-cache" &&
         x.kind !== "config" &&
-        !String(x.id || "").toLowerCase().includes("ai-config-sync") &&
+        !String(x.id || "")
+          .toLowerCase()
+          .includes("ai-config-sync") &&
         String(x.id || "") !== "config-sync",
     );
     if (unmanaged.length > 0) {

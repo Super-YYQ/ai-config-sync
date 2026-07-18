@@ -51,6 +51,18 @@ export interface SetupOptions {
   codex?: boolean;
   /** Absolute path to program repo (ai-config-sync). Auto-detected when possible. */
   programRoot?: string;
+  /**
+   * Explicit opt-in for offline/dev: copy integrations/claude-plugin into a
+   * temporary directory marketplace via `claude plugin marketplace add <dir>`.
+   * Never rewrites known_marketplaces.json / settings.json by hand.
+   * Default false — production setup only uses official `claude plugin` CLI.
+   */
+  allowLocalPluginInstall?: boolean;
+  /**
+   * When true (or when CLAUDE_PLUGIN_ROOT is set and matches this install),
+   * skip installing/enabling the Claude plugin — it is already running.
+   */
+  skipSelfPluginInstall?: boolean;
 }
 
 export interface SetupResult {
@@ -62,43 +74,112 @@ export interface SetupResult {
 
 function packageRootFromHere(): string | undefined {
   try {
-    // packages/cli/src -> packages/cli -> packages -> repo root
+    // Source: packages/cli/src|dist -> packages/cli -> packages -> repo root
+    // Bundled CJS: dist/ai-config-sync.cjs -> dist -> package root
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const root = path.resolve(here, "../../..");
-    return root;
+    const candidates = [
+      path.resolve(here, "../../.."), // monorepo from packages/cli/{src,dist}
+      path.resolve(here, ".."), // npm package from dist/
+      here,
+    ];
+    return candidates[0];
   } catch {
     return undefined;
   }
 }
 
+async function looksLikeProgramRoot(dir: string): Promise<boolean> {
+  return pathExists(
+    path.join(dir, "integrations", "claude-plugin", ".claude-plugin", "plugin.json"),
+  );
+}
+
+/**
+ * Locate the installed ai-config-sync package root (contains integrations/).
+ * Works from monorepo checkout, npm package install, and CLAUDE_PLUGIN_ROOT.
+ */
 async function detectProgramRoot(
   explicit?: string,
 ): Promise<string | undefined> {
-  if (explicit && (await pathExists(explicit))) return path.resolve(explicit);
-  const fromModule = packageRootFromHere();
-  if (
-    fromModule &&
-    (await pathExists(
-      path.join(fromModule, "integrations", "claude-plugin", ".claude-plugin"),
-    ))
-  ) {
-    return fromModule;
+  if (explicit && (await pathExists(explicit))) {
+    const resolved = path.resolve(explicit);
+    if (await looksLikeProgramRoot(resolved)) return resolved;
+    // allow explicit even if incomplete — caller decides
+    return resolved;
   }
+
+  // Prefer Claude plugin root when session is already inside the plugin
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (pluginRoot) {
+    // Plugin layout: integrations/claude-plugin is the plugin itself;
+    // package root is parent of integrations when installed via npm,
+    // or marketplace checkout root.
+    const candidates = [
+      pluginRoot,
+      path.resolve(pluginRoot, ".."),
+      path.resolve(pluginRoot, "../.."),
+      path.resolve(pluginRoot, "../../.."),
+    ];
+    for (const c of candidates) {
+      if (await looksLikeProgramRoot(c)) return c;
+    }
+  }
+
+  // From this module location (source or bundled)
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      path.resolve(here, "../../.."), // monorepo packages/cli/src
+      path.resolve(here, ".."), // npm package dist/
+      path.resolve(here, "../.."),
+    ];
+    for (const c of candidates) {
+      if (await looksLikeProgramRoot(c)) return c;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // From require.resolve / process.argv[1] when running bundled bin
+  try {
+    const argv1 = process.argv[1];
+    if (argv1) {
+      const binDir = path.dirname(path.resolve(argv1));
+      const candidates = [
+        path.resolve(binDir, ".."), // package root from dist/ai-config-sync.cjs
+        path.resolve(binDir, "../.."),
+        path.resolve(binDir, "../../.."),
+      ];
+      for (const c of candidates) {
+        if (await looksLikeProgramRoot(c)) return c;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   // cwd walk
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    if (
-      await pathExists(
-        path.join(dir, "integrations", "claude-plugin", ".claude-plugin"),
-      )
-    ) {
-      return dir;
-    }
+    if (await looksLikeProgramRoot(dir)) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   return undefined;
+}
+
+/** True when this process is already running as the Claude plugin itself. */
+function isRunningInsideSelfPlugin(): boolean {
+  const root = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!root) return false;
+  const base = path.basename(root).toLowerCase();
+  // marketplace installs often use the plugin name as directory
+  if (base.includes("ai-config-sync") || base.includes("config-sync")) {
+    return true;
+  }
+  // Also check plugin.json name when present (sync best-effort)
+  return false;
 }
 
 async function detectConfigRepo(
@@ -302,11 +383,21 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
 
 /**
  * Install Claude Code plugin so user can use /ai-config-sync:* and skill in chat.
- * Prefer official `claude plugin` CLI; fall back to marketplace files + enable.
+ *
+ * Only uses official `claude plugin marketplace/install/enable` CLI.
+ * Does NOT copy into ~/.claude/plugins/marketplaces or rewrite
+ * known_marketplaces.json / settings.json (those are Claude-managed).
+ *
+ * Offline/dev: pass allowLocalPluginInstall to add a directory marketplace
+ * via `claude plugin marketplace add <abs-path>` — still no hand-written state.
  */
 async function installClaudePlugin(
   home: string,
   programRoot: string,
+  options: {
+    allowLocalPluginInstall?: boolean;
+    skipSelfPluginInstall?: boolean;
+  } = {},
 ): Promise<string[]> {
   const actions: string[] = [];
   const pluginSrc = path.join(programRoot, "integrations", "claude-plugin");
@@ -314,94 +405,102 @@ async function installClaudePlugin(
     return actions;
   }
 
-  const marketplacesDir = path.join(home, ".claude", "plugins", "marketplaces");
-  const dest = path.join(marketplacesDir, "ai-config-sync");
-  await ensureDir(marketplacesDir);
-
-  const destPluginJson = path.join(dest, ".claude-plugin", "plugin.json");
-  let needCopy = true;
-  if (await pathExists(destPluginJson)) {
-    try {
-      const a = await readJsonFile<{ version?: string }>(
-        path.join(pluginSrc, ".claude-plugin", "plugin.json"),
-      );
-      const b = await readJsonFile<{ version?: string }>(destPluginJson);
-      if (a.version && a.version === b.version) needCopy = false;
-    } catch {
-      needCopy = true;
-    }
-  }
-  if (needCopy) {
-    await fs.rm(dest, { recursive: true, force: true });
-    await fs.cp(pluginSrc, dest, { recursive: true });
-    actions.push(`INSTALL Claude marketplace copy → ${dest}`);
+  if (
+    options.skipSelfPluginInstall ||
+    isRunningInsideSelfPlugin()
+  ) {
+    actions.push(
+      "SKIP Claude plugin install (already running inside ai-config-sync plugin)",
+    );
+    return actions;
   }
 
-  // known_marketplaces.json (Claude also maintains this)
-  const knownPath = path.join(
-    home,
-    ".claude",
-    "plugins",
-    "known_marketplaces.json",
-  );
-  let known: Record<string, unknown> = {};
-  if (await pathExists(knownPath)) {
-    try {
-      known = await readJsonFile(knownPath);
-    } catch {
-      known = {};
-    }
-  }
-  const prevKnown = known["ai-config-sync"] as
-    | { installLocation?: string }
-    | undefined;
-  if (!prevKnown || prevKnown.installLocation !== dest || needCopy) {
-    known["ai-config-sync"] = {
-      source: {
-        source: "directory",
-        path: dest,
-      },
-      installLocation: dest,
-      lastUpdated: new Date().toISOString(),
-    };
-    await writeJsonFile(knownPath, known);
-    actions.push("UPDATE known_marketplaces.json: ai-config-sync");
-  }
-
-  // Prefer GitHub-style online marketplace when possible (same as other plugins).
-  // Fall back to local directory copy for offline/dev.
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
   const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
 
-  let usedOnlineMarketplace = false;
+  const runClaude = async (args: string[], timeout = 120000) => {
+    await execFileAsync(claudeBin, args, {
+      windowsHide: true,
+      timeout,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+  };
+
+  let claudeAvailable = true;
   try {
-    // Add marketplace from GitHub if not already present
-    try {
-      await execFileAsync(
-        claudeBin,
-        ["plugin", "marketplace", "add", "Super-YYQ/ai-config-sync"],
-        { windowsHide: true, timeout: 120000, maxBuffer: 4 * 1024 * 1024 },
-      );
-      actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
-      usedOnlineMarketplace = true;
-    } catch (e) {
-      const msg = (e as Error).message || String(e);
-      if (/already|exists/i.test(msg)) {
-        usedOnlineMarketplace = true;
-        actions.push("claude marketplace already has ai-config-sync");
-      }
-    }
+    await runClaude(["--version"], 15000);
   } catch {
-    /* claude missing — use directory copy already done */
+    claudeAvailable = false;
   }
 
+  if (!claudeAvailable) {
+    actions.push(
+      "WARN claude CLI not found — skipped marketplace plugin install. " +
+        "Install Claude Code CLI, or install the plugin manually: " +
+        "`claude plugin marketplace add Super-YYQ/ai-config-sync`.",
+    );
+    // Optional skill fallback only — never touch marketplace internals
+    const skillSrc = path.join(pluginSrc, "skills", "config-sync");
+    const skillDest = path.join(home, ".claude", "skills", "config-sync");
+    const skillMd = path.join(skillDest, "SKILL.md");
+    if ((await pathExists(skillSrc)) && !(await pathExists(skillMd))) {
+      await ensureDir(path.dirname(skillDest));
+      await fs.cp(skillSrc, skillDest, { recursive: true });
+      actions.push("INSTALL Claude user skill: config-sync (fallback, no claude CLI)");
+    }
+    return actions;
+  }
+
+  // 1) Prefer GitHub marketplace registration
+  let marketplaceReady = false;
   try {
-    await execFileAsync(
-      claudeBin,
+    await runClaude([
+      "plugin",
+      "marketplace",
+      "add",
+      "Super-YYQ/ai-config-sync",
+    ]);
+    actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
+    marketplaceReady = true;
+  } catch (e) {
+    const msg = (e as Error).message || String(e);
+    if (/already|exists/i.test(msg)) {
+      marketplaceReady = true;
+      actions.push("claude marketplace already has ai-config-sync");
+    } else if (options.allowLocalPluginInstall) {
+      // 2) Explicit offline/dev: register local directory via official CLI only
+      try {
+        await runClaude(["plugin", "marketplace", "add", pluginSrc]);
+        actions.push(
+          `claude plugin marketplace add ${pluginSrc} (local/dev)`,
+        );
+        marketplaceReady = true;
+      } catch (e2) {
+        const msg2 = (e2 as Error).message || String(e2);
+        if (/already|exists/i.test(msg2)) {
+          marketplaceReady = true;
+          actions.push("claude local marketplace already registered");
+        } else {
+          actions.push(
+            `WARN claude marketplace add failed: ${msg2.slice(0, 200)}`,
+          );
+        }
+      }
+    } else {
+      actions.push(
+        `WARN claude marketplace add failed: ${msg.slice(0, 200)}. ` +
+          "Pass --allow-local-plugin-install for offline/dev directory marketplace.",
+      );
+    }
+  }
+
+  // 3) Install + enable via official CLI only (no settings.json writes)
+  try {
+    await runClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
-      { windowsHide: true, timeout: 60000, maxBuffer: 2 * 1024 * 1024 },
+      60000,
     );
     actions.push("claude plugin install ai-config-sync@ai-config-sync");
   } catch (e) {
@@ -409,15 +508,14 @@ async function installClaudePlugin(
     if (/already installed/i.test(msg)) {
       actions.push("claude plugin already installed");
     } else {
-      messagesPushSafe(actions, `WARN claude plugin install: ${msg.slice(0, 200)}`);
+      actions.push(`WARN claude plugin install: ${msg.slice(0, 200)}`);
     }
   }
 
   try {
-    await execFileAsync(
-      claudeBin,
+    await runClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
-      { windowsHide: true, timeout: 30000, maxBuffer: 1024 * 1024 },
+      30000,
     );
     actions.push("claude plugin enable ai-config-sync@ai-config-sync");
   } catch (e) {
@@ -425,82 +523,21 @@ async function installClaudePlugin(
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
     } else {
-      // Fallback: write enabledPlugins in settings.json
-      const settingsPath = path.join(home, ".claude", "settings.json");
-      let settings: Record<string, unknown> = {};
-      if (await pathExists(settingsPath)) {
-        try {
-          settings = await readJsonFile(settingsPath);
-        } catch {
-          settings = {};
-        }
-      }
-      const enabled =
-        (settings.enabledPlugins as Record<string, unknown> | undefined) ?? {};
-      if (enabled["ai-config-sync@ai-config-sync"] !== true) {
-        enabled["ai-config-sync@ai-config-sync"] = true;
-        settings.enabledPlugins = enabled;
-        await writeJsonFile(settingsPath, settings);
-        actions.push(
-          "ENABLE via settings.json: ai-config-sync@ai-config-sync (claude enable failed)",
-        );
-      }
-      messagesPushSafe(actions, `WARN claude plugin enable: ${msg.slice(0, 160)}`);
+      // Do NOT rewrite settings.json — leave enable to the user / Claude CLI
+      actions.push(
+        `WARN claude plugin enable: ${msg.slice(0, 160)}. ` +
+          "Run: claude plugin enable ai-config-sync@ai-config-sync",
+      );
     }
   }
 
-  if (!usedOnlineMarketplace) {
+  if (!marketplaceReady) {
     actions.push(
-      "NOTE: online marketplace add unavailable; using local directory marketplace",
+      "NOTE: marketplace not registered; plugin install may be incomplete",
     );
-  }
-
-  // Only install user-level skill when plugin install clearly failed (fallback).
-  // Successful plugin path should not duplicate ~/.claude/skills/config-sync.
-  const pluginEnabled = actions.some(
-    (a) =>
-      /plugin enable|already enabled|already installed/i.test(a) ||
-      a.includes("claude plugin install"),
-  );
-  if (!pluginEnabled) {
-    const skillSrc = path.join(pluginSrc, "skills", "config-sync");
-    const skillDest = path.join(home, ".claude", "skills", "config-sync");
-    const skillMd = path.join(skillDest, "SKILL.md");
-    if (await pathExists(skillSrc) && !(await pathExists(skillMd))) {
-      await ensureDir(path.dirname(skillDest));
-      await fs.cp(skillSrc, skillDest, { recursive: true });
-      actions.push("INSTALL Claude user skill: config-sync (fallback)");
-    }
-  } else {
-    // Optional: remove managed fallback skill if it matches our content marker
-    const skillMd = path.join(
-      home,
-      ".claude",
-      "skills",
-      "config-sync",
-      "SKILL.md",
-    );
-    if (await pathExists(skillMd)) {
-      try {
-        const text = await fs.readFile(skillMd, "utf8");
-        if (
-          text.includes("ai-config-sync") &&
-          text.includes("跨电脑同步")
-        ) {
-          await fs.rm(path.dirname(skillMd), { recursive: true, force: true });
-          actions.push("REMOVE Claude fallback skill (plugin is active)");
-        }
-      } catch {
-        /* keep */
-      }
-    }
   }
 
   return actions;
-}
-
-function messagesPushSafe(actions: string[], line: string) {
-  actions.push(line);
 }
 
 async function installCodexIntegration(
@@ -796,7 +833,10 @@ export async function runSetup(
   // Integrations
   if (localConfig.targets.claude) {
     if (programRoot) {
-      const pluginActions = await installClaudePlugin(home, programRoot);
+      const pluginActions = await installClaudePlugin(home, programRoot, {
+        allowLocalPluginInstall: !!options.allowLocalPluginInstall,
+        skipSelfPluginInstall: !!options.skipSelfPluginInstall,
+      });
       if (pluginActions.length) {
         actions.push(...pluginActions);
         if (status === "no-changes") status = "repaired";

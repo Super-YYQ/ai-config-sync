@@ -353,6 +353,125 @@ async function scanClaudePlugins(
   return out;
 }
 
+/**
+ * Parse Codex hooks.json shapes:
+ * - legacy: { hooks: [ { id, ... }, ... ] } or bare array
+ * - event map: { hooks: { SessionStart: [ matcher groups ], Stop: [...] } }
+ * - top-level event map: { SessionStart: [...], Stop: [...] }
+ */
+function collectCodexHookResources(
+  raw: unknown,
+  manifestPath: string,
+  options: ScanOptions,
+): ScannedResource[] {
+  const out: ScannedResource[] = [];
+  if (raw == null) return out;
+
+  const pushEntry = (
+    id: string,
+    metadata: Record<string, unknown>,
+    confidence = 0.7,
+  ) => {
+    if (isSelfManagedResourceId(id)) return;
+    out.push({
+      id,
+      kind: "hook",
+      target: "codex",
+      path: manifestPath,
+      confidence,
+      classification: options.managedIds?.has(id) ? "managed" : "unmanaged",
+      metadata,
+    });
+  };
+
+  const walkEventMap = (map: Record<string, unknown>) => {
+    for (const [event, value] of Object.entries(map)) {
+      if (event === "hooks") continue;
+      if (!Array.isArray(value)) {
+        // single object or opaque value
+        pushEntry(`hooks:${event}`, { event, value }, 0.6);
+        continue;
+      }
+      // Event map: event -> matcher groups -> hooks[]
+      let index = 0;
+      for (const group of value) {
+        if (!group || typeof group !== "object") continue;
+        const g = group as Record<string, unknown>;
+        const inner = Array.isArray(g.hooks) ? (g.hooks as unknown[]) : null;
+        if (inner) {
+          for (const h of inner) {
+            if (!h || typeof h !== "object") continue;
+            const hook = h as Record<string, unknown>;
+            const id = String(
+              hook.id ?? hook.name ?? `hooks:${event}:${index}`,
+            );
+            pushEntry(id, { event, group: g, hook }, 0.75);
+            index++;
+          }
+          // also surface the event itself when groups have no named hooks
+          if (inner.length === 0) {
+            pushEntry(`hooks:${event}`, { event, group: g }, 0.65);
+          }
+        } else {
+          const id = String(g.id ?? g.name ?? `hooks:${event}:${index}`);
+          pushEntry(id, { event, ...g }, 0.7);
+          index++;
+        }
+      }
+      // Always expose the event bucket for drift/capture when there are entries
+      if (value.length > 0 && !out.some((r) => r.id === `hooks:${event}`)) {
+        // If we only got anonymous command hooks, keep a stable event-level id
+        const hasStable = out.some(
+          (r) =>
+            r.metadata &&
+            (r.metadata as { event?: string }).event === event &&
+            r.id !== `hooks:${event}`,
+        );
+        if (!hasStable) {
+          pushEntry(`hooks:${event}`, { event, value }, 0.65);
+        } else if (
+          // ensure SessionStart style from setup is visible even when nested
+          !out.some((r) => String(r.id).includes(event))
+        ) {
+          pushEntry(`hooks:${event}`, { event, value }, 0.65);
+        }
+      }
+    }
+  };
+
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      if (!entry || typeof entry !== "object") continue;
+      const e = entry as Record<string, unknown>;
+      pushEntry(String(e.id ?? e.name ?? "hook"), e);
+    }
+    return out;
+  }
+
+  if (typeof raw !== "object") return out;
+  const obj = raw as Record<string, unknown>;
+
+  // Preferred Codex shape: { hooks: { SessionStart: [...], ... } }
+  if (obj.hooks && typeof obj.hooks === "object" && !Array.isArray(obj.hooks)) {
+    walkEventMap(obj.hooks as Record<string, unknown>);
+    return out;
+  }
+
+  // Legacy: { hooks: [ ... ] }
+  if (Array.isArray(obj.hooks)) {
+    for (const entry of obj.hooks) {
+      if (!entry || typeof entry !== "object") continue;
+      const e = entry as Record<string, unknown>;
+      pushEntry(String(e.id ?? e.name ?? "hook"), e);
+    }
+    return out;
+  }
+
+  // Top-level event map without wrapping `hooks` key
+  walkEventMap(obj);
+  return out;
+}
+
 async function scanCodexHooks(
   home: string,
   options: ScanOptions,
@@ -361,49 +480,8 @@ async function scanCodexHooks(
   const manifestPath = codexHooksManifestPath(home);
   if (await pathExists(manifestPath)) {
     try {
-      const raw = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
-        hooks?: unknown;
-        [k: string]: unknown;
-      };
-      // Support either {hooks: [...]} or event-keyed object
-      const entries: Array<Record<string, unknown>> = Array.isArray(raw.hooks)
-        ? (raw.hooks as Array<Record<string, unknown>>)
-        : Array.isArray(raw)
-          ? (raw as Array<Record<string, unknown>>)
-          : [];
-
-      if (entries.length > 0) {
-        for (const entry of entries) {
-          const id = String(entry.id ?? entry.name ?? "hook");
-          if (isSelfManagedResourceId(id)) continue;
-          out.push({
-            id,
-            kind: "hook",
-            target: "codex",
-            path: manifestPath,
-            confidence: 0.7,
-            classification: options.managedIds?.has(id)
-              ? "managed"
-              : "unmanaged",
-            metadata: entry,
-          });
-        }
-      } else {
-        // event map style
-        for (const [event, value] of Object.entries(raw)) {
-          if (event === "hooks") continue;
-          if (isSelfManagedResourceId(`hooks:${event}`)) continue;
-          out.push({
-            id: `hooks:${event}`,
-            kind: "hook",
-            target: "codex",
-            path: manifestPath,
-            confidence: 0.6,
-            classification: "unmanaged",
-            metadata: { event, value },
-          });
-        }
-      }
+      const raw = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+      out.push(...collectCodexHookResources(raw, manifestPath, options));
     } catch {
       /* ignore */
     }

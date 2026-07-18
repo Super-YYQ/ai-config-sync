@@ -128,6 +128,14 @@ program
   .option("--no-claude", "Skip Claude integration")
   .option("--no-codex", "Skip Codex integration")
   .option("--program-root <path>", "Path to ai-config-sync program repo")
+  .option(
+    "--allow-local-plugin-install",
+    "Offline/dev: allow `claude plugin marketplace add <local dir>` (never rewrites Claude state files by hand)",
+  )
+  .option(
+    "--skip-self-plugin-install",
+    "Skip Claude plugin install/enable (already running inside the plugin)",
+  )
   .action(async (opts) => {
     const mode = opts.plan
       ? "plan"
@@ -145,6 +153,8 @@ program
       claude: opts.claude,
       codex: opts.codex,
       programRoot: opts.programRoot,
+      allowLocalPluginInstall: !!opts.allowLocalPluginInstall,
+      skipSelfPluginInstall: !!opts.skipSelfPluginInstall,
     });
     for (const m of result.messages) console.log(m);
     if (result.actions.length) {
