@@ -9,6 +9,7 @@ import {
   codexHooksManifestPath,
   codexSkillsDir,
   hashDirectory,
+  isSelfManagedResourceId,
   listDirNames,
   pathExists,
   shortHash,
@@ -151,6 +152,7 @@ async function scanSkills(
   const names = await listDirNames(dir);
   const out: ScannedResource[] = [];
   for (const name of names) {
+    if (isSelfManagedResourceId(name)) continue;
     const full = path.join(dir, name);
     const source = await detectSkillSource(full);
     let hash: string | undefined;
@@ -203,6 +205,7 @@ async function scanClaudePlugins(
       };
       for (const p of data.plugins ?? []) {
         const id = p.id ?? p.name ?? "unknown-plugin";
+        if (isSelfManagedResourceId(id)) continue;
         const managed = options.managedIds?.has(id) ?? false;
         out.push({
           id,
@@ -235,6 +238,9 @@ async function scanClaudePlugins(
   const marketplaces = path.join(pluginsRoot, "marketplaces");
   if (await pathExists(marketplaces)) {
     for (const name of await listDirNames(marketplaces)) {
+      if (isSelfManagedResourceId(name) || isSelfManagedResourceId(`marketplace:${name}`)) {
+        continue;
+      }
       out.push({
         id: `marketplace:${name}`,
         kind: "plugin",
@@ -257,7 +263,7 @@ async function scanClaudePlugins(
       };
       if (settings.enabledPlugins) {
         for (const [key, enabled] of Object.entries(settings.enabledPlugins)) {
-          const existing = out.find((r) => r.id === key || r.id.endsWith(key));
+          if (isSelfManagedResourceId(key)) continue;          const existing = out.find((r) => r.id === key || r.id.endsWith(key));
           if (existing) {
             existing.metadata = {
               ...existing.metadata,
@@ -308,6 +314,7 @@ async function scanCodexHooks(
       if (entries.length > 0) {
         for (const entry of entries) {
           const id = String(entry.id ?? entry.name ?? "hook");
+          if (isSelfManagedResourceId(id)) continue;
           out.push({
             id,
             kind: "hook",
@@ -324,6 +331,7 @@ async function scanCodexHooks(
         // event map style
         for (const [event, value] of Object.entries(raw)) {
           if (event === "hooks") continue;
+          if (isSelfManagedResourceId(`hooks:${event}`)) continue;
           out.push({
             id: `hooks:${event}`,
             kind: "hook",
@@ -342,6 +350,9 @@ async function scanCodexHooks(
 
   const hooksDir = codexHooksDir(home);
   for (const name of await listDirNames(hooksDir)) {
+    if (isSelfManagedResourceId(name) || isSelfManagedResourceId(`hook-script:${name}`)) {
+      continue;
+    }
     out.push({
       id: `hook-script:${name}`,
       kind: "hook",

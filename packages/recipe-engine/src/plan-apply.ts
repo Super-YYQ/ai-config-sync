@@ -175,11 +175,20 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
   );
   const allIds = resourcesFile.resources.map((r) => r.id);
   const selectedIds = new Set(
-    resolveProfileResources(profile, allIds, parents),
+    resolveProfileResources(
+      profile,
+      allIds,
+      parents,
+      resourcesFile.resources.map((r) => ({ id: r.id, profiles: r.profiles })),
+    ),
   );
   const resources = resourcesFile.resources.filter((r) =>
     selectedIds.has(r.id),
   );
+
+  const maxRisk = profile.security?.maxRisk ?? "medium";
+  const riskRankLocal = (r: "low" | "medium" | "high") =>
+    r === "low" ? 1 : r === "medium" ? 2 : 3;
 
   const registry = await loadRecipeRegistry(
     path.join(ctx.configRepoPath, "recipes"),
@@ -320,16 +329,34 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
                   : p.description.startsWith("CREATE")
                     ? "CREATE"
                     : "UPDATE";
+        // Profile security.maxRisk: downgrade/block higher risk actions
+        let risk = p.risk;
+        let requiresConfirmation = p.risk !== "low";
+        let description = p.description;
+        if (riskRankLocal(p.risk) > riskRankLocal(maxRisk)) {
+          actions.push({
+            id: `a${++actionSeq}`,
+            type: "MANUAL",
+            target,
+            resourceId: resource.id,
+            description: `MANUAL blocked by profile maxRisk=${maxRisk}: ${p.description}`,
+            risk: p.risk,
+            driver: targetRecipe.driver,
+            paths: p.paths,
+            requiresConfirmation: true,
+          });
+          continue;
+        }
         actions.push({
           id: `a${++actionSeq}`,
           type,
           target,
           resourceId: resource.id,
-          description: p.description,
-          risk: p.risk,
+          description,
+          risk,
           driver: targetRecipe.driver,
           paths: p.paths,
-          requiresConfirmation: p.risk !== "low",
+          requiresConfirmation,
         });
       }
     }

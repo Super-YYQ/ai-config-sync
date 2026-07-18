@@ -441,20 +441,35 @@ function isCommandAllowed(
   allowlist: string[][] | undefined,
   risk: RiskLevel,
 ): boolean {
-  // Default safe prefixes
+  // Deny-by-default for free-form shell. Only exact safe prefixes.
+  // Prefer dedicated drivers (install-plugin, npx-skills, generic-skill) over run-cli.
   const defaults = [
-    ["claude"],
-    ["npx", "skills"],
+    ["claude", "plugin", "marketplace", "add"],
+    ["claude", "plugin", "install"],
+    ["claude", "plugin", "enable"],
+    ["claude", "plugin", "disable"],
+    ["claude", "plugin", "list"],
+    ["npx", "skills", "add"],
+    ["npx", "--yes", "skills", "add"],
     ["npx", "ai-config-sync"],
-    ["git"],
-    ["node"],
-    ["npm"],
+    ["npx", "--yes", "ai-config-sync"],
   ];
   const list = allowlist ?? defaults;
-  const allowed = list.some((prefix) =>
-    prefix.every((p, i) => cmd[i] === p),
+  const allowed = list.some(
+    (prefix) =>
+      prefix.length <= cmd.length && prefix.every((p, i) => cmd[i] === p),
   );
+  // high risk never auto-allowed without explicit allowlist from caller
   if (risk === "high" && !allowlist) return false;
+  // block dangerous git/node/npm free-form even if someone widens defaults by mistake
+  const bin = cmd[0];
+  if (bin === "git" || bin === "node" || bin === "npm" || bin === "npx") {
+    if (bin === "npx") {
+      // only skills / ai-config-sync as above
+      return allowed;
+    }
+    return false;
+  }
   return allowed;
 }
 

@@ -13,6 +13,7 @@ import {
   RecipeSchema,
   LocalConfigSchema,
   resolveProfileResources,
+  isSelfManagedResourceId,
   type Profile,
 } from "@ai-config-sync/core";
 
@@ -147,5 +148,41 @@ describe("resolveProfileResources", () => {
     const ids = resolveProfileResources(company, ["a", "b", "c"], [base]);
     expect(ids).toContain("a");
     expect(ids).not.toContain("b");
+  });
+
+  it("enforces resource.profiles isolation", () => {
+    const company: Profile = {
+      profile: "company",
+      extends: [],
+      include: { resources: [] },
+      exclude: { resources: [] },
+      security: {
+        maxRisk: "medium",
+        allowAutomaticLatest: false,
+        secrets: { provider: "local-only" },
+      },
+    };
+    const ids = resolveProfileResources(
+      company,
+      ["home-only", "both", "unrestricted"],
+      [],
+      [
+        { id: "home-only", profiles: ["home"] },
+        { id: "both", profiles: ["home", "company"] },
+        { id: "unrestricted", profiles: [] },
+      ],
+    );
+    expect(ids).not.toContain("home-only");
+    expect(ids).toContain("both");
+    expect(ids).toContain("unrestricted");
+  });
+});
+
+describe("self-managed exclusion", () => {
+  it("excludes config-sync and ai-config-sync ids", () => {
+    expect(isSelfManagedResourceId("config-sync")).toBe(true);
+    expect(isSelfManagedResourceId("ai-config-sync@ai-config-sync")).toBe(true);
+    expect(isSelfManagedResourceId("marketplace:ai-config-sync")).toBe(true);
+    expect(isSelfManagedResourceId("docx")).toBe(false);
   });
 });

@@ -96,34 +96,79 @@ async function detectProgramRoot(
 async function detectConfigRepo(
   options: SetupOptions,
   home: string,
-): Promise<{ localPath?: string; remote?: string; reason: string }> {
+): Promise<{
+  localPath?: string;
+  remote?: string;
+  reason: string;
+  /** Existing machine link, if any — checked before any clone/write. */
+  existingLink?: LocalConfig;
+  blocked?: string;
+}> {
+  let existingLink: LocalConfig | undefined;
+  if (await hasLocalConfig(home)) {
+    try {
+      existingLink = await loadLocalConfig(localConfigPath(home));
+    } catch {
+      existingLink = undefined;
+    }
+  }
+
+  // Explicit path wins only after comparing with existing link (unless reconfigure handled later)
   if (options.configPath) {
+    const localPath = path.resolve(expandHome(options.configPath, home));
     return {
-      localPath: path.resolve(expandHome(options.configPath, home)),
-      remote: options.repo,
+      localPath,
+      remote: options.repo ?? existingLink?.configRepository.remote,
       reason: "cli --config-path",
+      existingLink,
     };
   }
+
+  // --repo without path: prefer already-linked path when remote matches
   if (options.repo && !options.configPath) {
+    if (existingLink) {
+      const sameRemote = remotesMatch(
+        options.repo,
+        existingLink.configRepository.remote,
+      );
+      if (sameRemote || !existingLink.configRepository.remote) {
+        return {
+          localPath: existingLink.configRepository.localPath,
+          remote: options.repo,
+          reason: "existing link matches --repo",
+          existingLink,
+        };
+      }
+      // Different remote already linked — do not pick a new default clone path yet
+      return {
+        reason: "existing link conflicts with --repo",
+        existingLink,
+        remote: options.repo,
+        localPath: existingLink.configRepository.localPath,
+        blocked:
+          `Already linked to ${existingLink.configRepository.localPath}` +
+          (existingLink.configRepository.remote
+            ? ` (${existingLink.configRepository.remote})`
+            : "") +
+          `. Requested --repo ${options.repo}. Use --reconfigure to switch, or --config-path for a different directory.`,
+      };
+    }
     const defaultPath = path.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
-      reason: "cli --repo",
+      reason: "cli --repo (new default path)",
+      existingLink,
     };
   }
 
-  if (await hasLocalConfig(home)) {
-    try {
-      const cfg = await loadLocalConfig(localConfigPath(home));
-      return {
-        localPath: cfg.configRepository.localPath,
-        remote: cfg.configRepository.remote ?? options.repo,
-        reason: "local config.yaml",
-      };
-    } catch {
-      /* fallthrough */
-    }
+  if (existingLink) {
+    return {
+      localPath: existingLink.configRepository.localPath,
+      remote: existingLink.configRepository.remote ?? options.repo,
+      reason: "local config.yaml",
+      existingLink,
+    };
   }
 
   const envRepo = process.env.AI_CONFIG_SYNC_REPO;
@@ -165,7 +210,7 @@ async function detectConfigRepo(
     }
   }
 
-  return { reason: "not found" };
+  return { reason: "not found", existingLink };
 }
 
 async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
@@ -516,6 +561,46 @@ export async function runSetup(
   const detected = await detectConfigRepo(options, home);
   messages.push(`Detection: ${detected.reason}`);
 
+  if (detected.blocked && mode !== "reconfigure" && mode !== "plan") {
+    return {
+      status: "planned",
+      messages: [...messages, detected.blocked],
+      actions: [],
+    };
+  }
+
+  if (detected.blocked && mode === "plan") {
+    return {
+      status: "planned",
+      messages: [...messages, detected.blocked],
+      actions: [],
+    };
+  }
+
+  // Guard: existing link points elsewhere — stop before clone/skeleton
+  if (
+    detected.existingLink &&
+    mode !== "reconfigure" &&
+    options.configPath
+  ) {
+    const existingPath = path.resolve(
+      detected.existingLink.configRepository.localPath,
+    );
+    const requested = path.resolve(expandHome(options.configPath, home));
+    if (existingPath !== requested) {
+      return {
+        status: "planned",
+        messages: [
+          ...messages,
+          `Already linked to ${existingPath}.`,
+          `Requested --config-path ${requested}.`,
+          "Use --reconfigure to switch, or omit --config-path to reuse the existing link.",
+        ],
+        actions: [],
+      };
+    }
+  }
+
   if (!detected.localPath && !detected.remote) {
     return {
       status: "planned",
@@ -549,6 +634,7 @@ export async function runSetup(
     if (mode === "plan") {
       actions.push(`CLONE ${remote} -> ${localPath}`);
     } else {
+      // Only clone after all link conflicts resolved
       await cloneRepo(remote, localPath);
       actions.push(`CLONE ${remote} -> ${localPath}`);
       messages.push(`Cloned ${remote}`);

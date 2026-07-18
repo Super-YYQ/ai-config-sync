@@ -109,13 +109,21 @@ export function recipePath(configRepoRoot: string, rel: string): string {
 }
 
 /**
- * Resolve profile resource ids: start from include list (or all if empty include + base),
- * apply extends chain, then exclude.
+ * Resolve profile resource ids.
+ *
+ * Rules:
+ * 1. Start from include lists along extends chain (empty base include = all ids).
+ * 2. Apply exclude lists.
+ * 3. Also require resource.profiles to allow the active profile name
+ *    (or "base"), unless the resource has no profiles restriction.
+ *
+ * resourcesMeta is optional: when provided, enforces resource.profiles isolation.
  */
 export function resolveProfileResources(
   profile: Profile,
   allResourceIds: string[],
   parentProfiles: Profile[] = [],
+  resourcesMeta?: Array<{ id: string; profiles?: string[] }>,
 ): string[] {
   const chain = [...parentProfiles, profile];
   let included = new Set<string>();
@@ -136,7 +144,41 @@ export function resolveProfileResources(
     for (const id of allResourceIds) included.add(id);
   }
 
-  return [...included].filter((id) => !excluded.has(id));
+  let ids = [...included].filter((id) => !excluded.has(id));
+
+  if (resourcesMeta && resourcesMeta.length > 0) {
+    const byId = new Map(resourcesMeta.map((r) => [r.id, r]));
+    const active = profile.profile;
+    ids = ids.filter((id) => {
+      const meta = byId.get(id);
+      if (!meta) return true;
+      const allowed = meta.profiles ?? [];
+      // Empty profiles list = unrestricted (legacy)
+      if (allowed.length === 0) return true;
+      // Resource must list active profile or "base"
+      return allowed.includes(active) || allowed.includes("base");
+    });
+  }
+
+  return ids;
+}
+
+/** Built-in resources that must never be capture/synced (self). */
+export const SELF_MANAGED_RESOURCE_IDS = new Set([
+  "config-sync",
+  "ai-config-sync",
+  "ai-config-sync@ai-config-sync",
+  "marketplace:ai-config-sync",
+  "hook-script:ai-config-sync-session-start",
+  "ai-config-sync-session-start",
+]);
+
+export function isSelfManagedResourceId(id: string): boolean {
+  if (SELF_MANAGED_RESOURCE_IDS.has(id)) return true;
+  const lower = id.toLowerCase();
+  if (lower === "config-sync") return true;
+  if (lower.includes("ai-config-sync")) return true;
+  return false;
 }
 
 export function isConfigRepository(rootFiles: string[]): boolean {

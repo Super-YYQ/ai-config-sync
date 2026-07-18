@@ -181,3 +181,26 @@ npm run demo:offline-pwf   # 离线恢复演示
 ```
 
 版本 0.2.1 · MIT
+
+---
+
+## 实现成熟度（对照审查）
+
+静态审查（ChatGPT 对修改前版本）指出的问题，当前状态：
+
+| 项 | 状态 |
+|----|------|
+| 两仓库架构 / Schema / Skill 隔离 | 已有 |
+| Setup 先读本机配置再 Clone（P0-1） | **已修** |
+| Profile `resource.profiles` 隔离（P0-6） | **已修** |
+| Capture 双工具 Recipe 不互相覆盖（P0-3） | **已修** |
+| Capture 优先分析原始 GitHub 源（P0-2） | **已修（骨架）** |
+| 排除自身 plugin/skill 不同步 | **已修** |
+| run-cli 收紧白名单（P0-8） | **已修** |
+| Claude 在线 Marketplace 安装（P0-4） | **已修** |
+| Codex SessionStart Hook 安装 | **已修** |
+| 精确事务回滚（P0-7） | 未完成 |
+| 一条 `npx` 发布包（P0-9） | 未完成 |
+| 真实 LLM Provider / Lock 闭环 | 部分 |
+
+请仍在测试环境验证；公司真机配置请谨慎。

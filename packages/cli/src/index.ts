@@ -309,7 +309,12 @@ program
     const proposals = await buildCaptureProposals(
       inventryDiff(scan, managedIds),
       configRepoPath,
-      { aiEnabled, homeHint: home },
+      {
+        aiEnabled,
+        homeHint: home,
+        home,
+        offline: false,
+      },
     );
     if (opts.json) {
       console.log(JSON.stringify(proposals, null, 2));
