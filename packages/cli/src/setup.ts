@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   ConfigRepoSchema,
   ensureDir,
@@ -8,8 +9,11 @@ import {
   isConfigRepository,
   loadLocalConfig,
   localConfigPath,
+  mergeJson,
   pathExists,
+  readJsonFile,
   saveLocalConfig,
+  writeJsonFile,
   writeText,
   writeYamlFile,
   type LocalConfig,
@@ -37,6 +41,8 @@ export interface SetupOptions {
   mode?: SetupMode;
   claude?: boolean;
   codex?: boolean;
+  /** Absolute path to program repo (ai-config-sync). Auto-detected when possible. */
+  programRoot?: string;
 }
 
 export interface SetupResult {
@@ -44,6 +50,47 @@ export interface SetupResult {
   messages: string[];
   localConfig?: LocalConfig;
   actions: string[];
+}
+
+function packageRootFromHere(): string | undefined {
+  try {
+    // packages/cli/src -> packages/cli -> packages -> repo root
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const root = path.resolve(here, "../../..");
+    return root;
+  } catch {
+    return undefined;
+  }
+}
+
+async function detectProgramRoot(
+  explicit?: string,
+): Promise<string | undefined> {
+  if (explicit && (await pathExists(explicit))) return path.resolve(explicit);
+  const fromModule = packageRootFromHere();
+  if (
+    fromModule &&
+    (await pathExists(
+      path.join(fromModule, "integrations", "claude-plugin", ".claude-plugin"),
+    ))
+  ) {
+    return fromModule;
+  }
+  // cwd walk
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    if (
+      await pathExists(
+        path.join(dir, "integrations", "claude-plugin", ".claude-plugin"),
+      )
+    ) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
 }
 
 async function detectConfigRepo(
@@ -58,7 +105,6 @@ async function detectConfigRepo(
     };
   }
   if (options.repo && !options.configPath) {
-    // default clone location
     const defaultPath = path.join(home, "ai-config", "yyq-ai-config");
     return {
       localPath: defaultPath,
@@ -67,7 +113,6 @@ async function detectConfigRepo(
     };
   }
 
-  // existing local config
   if (await hasLocalConfig(home)) {
     try {
       const cfg = await loadLocalConfig(localConfigPath(home));
@@ -81,7 +126,6 @@ async function detectConfigRepo(
     }
   }
 
-  // env
   const envRepo = process.env.AI_CONFIG_SYNC_REPO;
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
@@ -97,7 +141,6 @@ async function detectConfigRepo(
     };
   }
 
-  // walk parents for config.yaml / resources.yaml
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     const files = await fs.readdir(dir).catch(() => [] as string[]);
@@ -109,7 +152,6 @@ async function detectConfigRepo(
     dir = parent;
   }
 
-  // limited default dirs
   const candidates = [
     path.join(home, "ai-config", "yyq-ai-config"),
     path.join(home, "Git", "yyq-ai-config"),
@@ -151,6 +193,7 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
     "sources/skills",
     "sources/hooks",
     "sources/claude-plugins",
+    "sources/integrations",
     "instructions/common",
     "instructions/claude",
     "instructions/codex",
@@ -161,7 +204,6 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
       actions.push(`CREATE dir ${d}`);
     }
   }
-  // base/home profiles
   const baseProfile = path.join(localPath, "profiles", "base.yaml");
   if (!(await pathExists(baseProfile))) {
     await writeYamlFile(baseProfile, {
@@ -205,111 +247,228 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
   return actions;
 }
 
-async function installIntegrationStubs(
+/**
+ * Install Claude Code plugin so user can use /ai-config-sync:* and skill in chat.
+ * Mirrors Claude's marketplace layout under ~/.claude/plugins/
+ */
+async function installClaudePlugin(
   home: string,
-  targets: { claude: boolean; codex: boolean },
+  programRoot: string,
 ): Promise<string[]> {
   const actions: string[] = [];
-  // Claude: drop a skill entry that points at CLI
-  if (targets.claude) {
-    const skillDir = path.join(home, ".claude", "skills", "config-sync");
-    const skillMd = path.join(skillDir, "SKILL.md");
-    if (!(await pathExists(skillMd))) {
-      await ensureDir(skillDir);
-      await writeText(
-        skillMd,
-        `---
-name: config-sync
-description: AI Agent config sync — scan, capture, restore, doctor via ai-config-sync CLI
----
-
-# config-sync
-
-Use the \`ai-config-sync\` / \`agent-sync\` CLI for deterministic config sync.
-
-## Commands
-
-- \`ai-config-sync status\`
-- \`ai-config-sync scan\`
-- \`ai-config-sync capture\`
-- \`ai-config-sync plan\`
-- \`ai-config-sync apply --yes --allow-risk medium\`
-- \`ai-config-sync doctor\`
-- \`ai-config-sync restore\` (alias of apply)
-
-Hooks should only run lightweight \`ai-config-sync scan --light\`.
-`,
-      );
-      actions.push("INSTALL Claude skill: config-sync");
-    }
-
-    // SessionStart hook hint in settings — field-level, do not overwrite file
-    // We only create a hook script the user can wire; avoid destructive settings writes in setup.
-    const hooksDir = path.join(home, ".claude", "hooks");
-    const hookScript = path.join(hooksDir, "ai-config-sync-session-start.js");
-    if (!(await pathExists(hookScript))) {
-      await ensureDir(hooksDir);
-      await writeText(
-        hookScript,
-        `/**
- * Lightweight SessionStart hook for ai-config-sync.
- * Run: node ~/.claude/hooks/ai-config-sync-session-start.js
- * Wire this into Claude Code SessionStart hooks manually or via the plugin.
- */
-const { spawnSync } = require("child_process");
-const r = spawnSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  ["ai-config-sync", "scan", "--light", "--json"],
-  { encoding: "utf8", timeout: 15000, windowsHide: true }
-);
-if (r.status === 0 && r.stdout) {
-  try {
-    const data = JSON.parse(r.stdout);
-    const unmanaged = (data.resources || []).filter(
-      (x) => x.classification !== "managed" && x.kind !== "config"
-    );
-    if (unmanaged.length > 0) {
-      console.error(
-        \`[ai-config-sync] \${unmanaged.length} unmanaged resource(s). Run /config-sync:capture or ai-config-sync capture.\`
-      );
-    }
-  } catch {
-    /* ignore */
+  const pluginSrc = path.join(programRoot, "integrations", "claude-plugin");
+  if (!(await pathExists(path.join(pluginSrc, ".claude-plugin", "plugin.json")))) {
+    return actions;
   }
-}
-`,
+
+  const marketplacesDir = path.join(home, ".claude", "plugins", "marketplaces");
+  const dest = path.join(marketplacesDir, "ai-config-sync");
+  await ensureDir(marketplacesDir);
+
+  const destPluginJson = path.join(dest, ".claude-plugin", "plugin.json");
+  let needCopy = true;
+  if (await pathExists(destPluginJson)) {
+    try {
+      const a = await readJsonFile<{ version?: string }>(
+        path.join(pluginSrc, ".claude-plugin", "plugin.json"),
       );
-      actions.push("INSTALL Claude hook script: ai-config-sync-session-start.js");
+      const b = await readJsonFile<{ version?: string }>(destPluginJson);
+      if (a.version && a.version === b.version) needCopy = false;
+    } catch {
+      needCopy = true;
+    }
+  }
+  if (needCopy) {
+    await fs.rm(dest, { recursive: true, force: true });
+    await fs.cp(pluginSrc, dest, { recursive: true });
+    actions.push(`INSTALL Claude marketplace copy → ${dest}`);
+  }
+
+  // known_marketplaces.json
+  const knownPath = path.join(
+    home,
+    ".claude",
+    "plugins",
+    "known_marketplaces.json",
+  );
+  let known: Record<string, unknown> = {};
+  if (await pathExists(knownPath)) {
+    try {
+      known = await readJsonFile(knownPath);
+    } catch {
+      known = {};
+    }
+  }
+  const prevKnown = known["ai-config-sync"] as
+    | { installLocation?: string }
+    | undefined;
+  if (!prevKnown || prevKnown.installLocation !== dest || needCopy) {
+    known["ai-config-sync"] = {
+      source: {
+        source: "directory",
+        path: dest,
+      },
+      installLocation: dest,
+      lastUpdated: new Date().toISOString(),
+    };
+    await writeJsonFile(knownPath, known);
+    actions.push("UPDATE known_marketplaces.json: ai-config-sync");
+  }
+
+  // settings.json — field-level merge only our keys
+  const settingsPath = path.join(home, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  if (await pathExists(settingsPath)) {
+    try {
+      settings = await readJsonFile(settingsPath);
+    } catch {
+      settings = {};
     }
   }
 
-  if (targets.codex) {
-    const skillDir = path.join(home, ".codex", "skills", "config-sync");
-    const skillMd = path.join(skillDir, "SKILL.md");
-    if (!(await pathExists(skillMd))) {
-      await ensureDir(skillDir);
-      await writeText(
-        skillMd,
-        `---
-name: config-sync
-description: Sync AI agent skills/plugins via ai-config-sync
----
+  const enabled =
+    (settings.enabledPlugins as Record<string, unknown> | undefined) ?? {};
+  const extra =
+    (settings.extraKnownMarketplaces as Record<string, unknown> | undefined) ??
+    {};
+  const alreadyEnabled = enabled["ai-config-sync@ai-config-sync"] === true;
+  const alreadyExtra = !!extra["ai-config-sync"];
 
-# config-sync
+  if (!alreadyEnabled || !alreadyExtra) {
+    const managed = {
+      extraKnownMarketplaces: {
+        "ai-config-sync": {
+          source: {
+            source: "directory",
+            path: dest,
+          },
+        },
+      },
+      enabledPlugins: {
+        "ai-config-sync@ai-config-sync": true,
+      },
+    };
 
-Run \`ai-config-sync\` CLI for scan/capture/restore/doctor.
+    const merged = mergeJson(settings, managed, {
+      preferManaged: true,
+    }) as Record<string, unknown>;
 
-Prefer deterministic recipes after first confirmation. Do not execute untrusted install scripts.
-`,
-      );
-      actions.push("INSTALL Codex skill: config-sync");
+    const extraM =
+      (merged.extraKnownMarketplaces as Record<string, unknown> | undefined) ??
+      {};
+    extraM["ai-config-sync"] = {
+      source: { source: "directory", path: dest },
+    };
+    merged.extraKnownMarketplaces = extraM;
+    const enabledM =
+      (merged.enabledPlugins as Record<string, unknown> | undefined) ?? {};
+    enabledM["ai-config-sync@ai-config-sync"] = true;
+    merged.enabledPlugins = enabledM;
+
+    await writeJsonFile(settingsPath, merged);
+    actions.push("ENABLE Claude plugin: ai-config-sync@ai-config-sync");
+  }
+
+  // Also install user-level skill (works even if plugin load fails)
+  const skillSrc = path.join(pluginSrc, "skills", "config-sync");
+  const skillDest = path.join(home, ".claude", "skills", "config-sync");
+  const skillMd = path.join(skillDest, "SKILL.md");
+  if (await pathExists(skillSrc)) {
+    if (!(await pathExists(skillMd)) || needCopy) {
+      await ensureDir(path.dirname(skillDest));
+      await fs.rm(skillDest, { recursive: true, force: true });
+      await fs.cp(skillSrc, skillDest, { recursive: true });
+      actions.push("INSTALL Claude user skill: config-sync");
     }
   }
 
   return actions;
 }
 
-export async function runSetup(options: SetupOptions = {}): Promise<SetupResult> {
+async function installCodexIntegration(
+  home: string,
+  programRoot?: string,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const skillDest = path.join(home, ".codex", "skills", "config-sync");
+  let skillSrc: string | undefined;
+  if (programRoot) {
+    const p = path.join(
+      programRoot,
+      "integrations",
+      "codex",
+      "skills",
+      "config-sync",
+    );
+    if (await pathExists(p)) skillSrc = p;
+  }
+
+  const skillMd = path.join(skillDest, "SKILL.md");
+  if (!(await pathExists(skillMd))) {
+    await ensureDir(skillDest);
+    if (skillSrc) {
+      await fs.cp(skillSrc, skillDest, { recursive: true });
+    } else {
+      await writeText(
+        skillMd,
+        `---
+name: config-sync
+description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描技能」「恢复环境」时使用。
+---
+
+# config-sync (Codex)
+
+运行本机 CLI：
+
+- \`ai-config-sync status\`
+- \`ai-config-sync scan\`
+- \`ai-config-sync capture --yes\`
+- \`ai-config-sync restore --yes --allow-risk medium\`
+- \`ai-config-sync doctor\`
+
+先 plan 再 apply。不要把密钥写进 git。
+`,
+      );
+    }
+    actions.push("INSTALL Codex skill: config-sync");
+  }
+
+  // Merge SessionStart hook into ~/.codex/hooks.json if present or create
+  const hooksPath = path.join(home, ".codex", "hooks.json");
+  const managedHook = {
+    hooks: [
+      {
+        id: "ai-config-sync-session-start",
+        event: "SessionStart",
+        command: "ai-config-sync scan --light --write-pending",
+        timeout_ms: 20000,
+      },
+    ],
+  };
+  let base: unknown = { hooks: [] };
+  let hadManaged = false;
+  if (await pathExists(hooksPath)) {
+    try {
+      base = await readJsonFile(hooksPath);
+      const hooks = (base as { hooks?: Array<{ id?: string }> }).hooks;
+      hadManaged = !!hooks?.some((h) => h.id === "ai-config-sync-session-start");
+    } catch {
+      base = { hooks: [] };
+    }
+  }
+  if (!hadManaged) {
+    const merged = mergeJson(base, managedHook, { preferManaged: true });
+    await ensureDir(path.dirname(hooksPath));
+    await writeJsonFile(hooksPath, merged);
+    actions.push("MERGE Codex hooks.json: ai-config-sync-session-start");
+  }
+
+  return actions;
+}
+
+export async function runSetup(
+  options: SetupOptions = {},
+): Promise<SetupResult> {
   const home = options.home ?? os.homedir();
   const mode = options.mode ?? "default";
   const messages: string[] = [];
@@ -326,6 +485,11 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       messages: [
         ...messages,
         "No config repository found. Provide --config-path or --repo.",
+        "",
+        "快速开始：",
+        "  1. 复制 examples/yyq-ai-config-template 为你的私有仓库",
+        "  2. ai-config-sync setup --config-path <路径> --profile home",
+        "  3. 打开 Claude Code，说「扫描配置」或使用 /ai-config-sync:scan",
       ],
       actions: [],
     };
@@ -334,7 +498,6 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
   let localPath = detected.localPath!;
   let remote = detected.remote;
 
-  // Clone if needed
   if (!(await pathExists(localPath))) {
     if (!remote) {
       return {
@@ -354,7 +517,6 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
       messages.push(`Cloned ${remote}`);
     }
   } else {
-    // exists — verify remote if git
     if (await isGitRepo(localPath)) {
       const existingRemote = await getRemoteUrl(localPath);
       if (remote && existingRemote && !remotesMatch(remote, existingRemote)) {
@@ -381,10 +543,11 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
   if (mode === "plan") {
     actions.push(`LINK ~/.ai-config-sync -> ${localPath}`);
     actions.push(`PROFILE ${options.profile ?? "home"}`);
+    actions.push("INSTALL Claude plugin ai-config-sync (skill + slash commands)");
+    actions.push("INSTALL Codex skill config-sync");
     return { status: "planned", messages, actions };
   }
 
-  // Ensure schema skeleton (idempotent)
   actions.push(...(await ensureMinimalConfigRepo(localPath)));
 
   const profile = options.profile ?? "home";
@@ -405,30 +568,33 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
   const cfgPath = localConfigPath(home);
   let status: SetupResult["status"] = "initialized";
 
-  if (await pathExists(cfgPath) && mode !== "reconfigure") {
-    const prev = await loadLocalConfig(cfgPath);
-    const samePath =
-      path.resolve(prev.configRepository.localPath) === path.resolve(localPath);
-    const sameProfile = prev.profile === profile;
-    if (samePath && sameProfile && mode === "default") {
-      // repair integrations only
-      status = "no-changes";
-    } else if (!samePath && mode !== "repair") {
-      messages.push(
-        `Existing link points to ${prev.configRepository.localPath}. Use --reconfigure to switch.`,
-      );
-      if (mode === "default") {
-        // still allow repair of integrations
-        status = "repaired";
+  if ((await pathExists(cfgPath)) && mode !== "reconfigure") {
+    try {
+      const prev = await loadLocalConfig(cfgPath);
+      const samePath =
+        path.resolve(prev.configRepository.localPath) ===
+        path.resolve(localPath);
+      const sameProfile = prev.profile === profile;
+      if (samePath && sameProfile && mode === "default") {
+        status = "no-changes";
+      } else if (!samePath && mode !== "repair") {
+        messages.push(
+          `Existing link points to ${prev.configRepository.localPath}. Use --reconfigure to switch.`,
+        );
+        if (mode === "default") status = "repaired";
       }
+    } catch {
+      /* rewrite */
     }
   }
 
-  // Write local config (idempotent content)
-  if (mode === "reconfigure" || !(await pathExists(cfgPath)) || status !== "no-changes") {
-    // only rewrite when needed
+  if (
+    mode === "reconfigure" ||
+    !(await pathExists(cfgPath)) ||
+    status !== "no-changes"
+  ) {
     let shouldWrite = true;
-    if (await pathExists(cfgPath) && mode !== "reconfigure") {
+    if ((await pathExists(cfgPath)) && mode !== "reconfigure") {
       try {
         const prev = await loadLocalConfig(cfgPath);
         if (
@@ -452,19 +618,66 @@ export async function runSetup(options: SetupOptions = {}): Promise<SetupResult>
     }
   }
 
+  const programRoot = await detectProgramRoot(options.programRoot);
+  if (programRoot) {
+    messages.push(`Program root: ${programRoot}`);
+  } else {
+    messages.push(
+      "Program root not found — Claude plugin files may be incomplete. Run setup from ai-config-sync repo or pass --program-root.",
+    );
+  }
+
   // Integrations
-  const integ = await installIntegrationStubs(home, {
-    claude: localConfig.targets.claude,
-    codex: localConfig.targets.codex,
-  });
-  if (integ.length > 0) {
-    actions.push(...integ);
-    if (status === "no-changes") status = "repaired";
+  if (localConfig.targets.claude) {
+    if (programRoot) {
+      const pluginActions = await installClaudePlugin(home, programRoot);
+      if (pluginActions.length) {
+        actions.push(...pluginActions);
+        if (status === "no-changes") status = "repaired";
+      }
+    } else {
+      // Minimal skill fallback without plugin
+      const skillDir = path.join(home, ".claude", "skills", "config-sync");
+      const skillMd = path.join(skillDir, "SKILL.md");
+      if (!(await pathExists(skillMd))) {
+        await ensureDir(skillDir);
+        await writeText(
+          skillMd,
+          `---
+name: config-sync
+description: 同步 AI Agent 配置。用户说「同步配置」「扫描技能」时使用。
+user-invocable: true
+---
+
+# config-sync
+
+运行 \`ai-config-sync status|scan|capture|restore|doctor\`。
+`,
+        );
+        actions.push("INSTALL Claude skill: config-sync (fallback)");
+        if (status === "no-changes") status = "repaired";
+      }
+    }
+  }
+
+  if (localConfig.targets.codex) {
+    const codexActions = await installCodexIntegration(home, programRoot);
+    if (codexActions.length) {
+      actions.push(...codexActions);
+      if (status === "no-changes") status = "repaired";
+    }
   }
 
   if (actions.length === 0) {
     status = "no-changes";
     messages.push("No changes");
+  } else {
+    messages.push("");
+    messages.push("接下来在 Claude Code 里可以：");
+    messages.push("  · 输入 /ai-config-sync:scan   扫描本机技能");
+    messages.push("  · 输入 /ai-config-sync:capture 把新技能写入私有仓库");
+    messages.push("  · 或直接说：「帮我扫描配置」「同步配置到仓库」");
+    messages.push("  · 新开会话后 SessionStart 会轻量提示未纳管资源");
   }
 
   await appendLog(`setup status=${status} path=${localPath}`, home);

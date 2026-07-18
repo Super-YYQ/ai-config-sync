@@ -1,17 +1,19 @@
 {
-  "name": "ai-config-sync-marketplace",
+  "name": "ai-config-sync",
   "owner": {
-    "name": "Super-YYQ"
+    "name": "Super-YYQ",
+    "url": "https://github.com/Super-YYQ"
   },
   "metadata": {
-    "description": "Marketplace entry for ai-config-sync Claude Code plugin",
-    "version": "0.1.0"
+    "description": "AI Agent 配置同步：在 Claude Code 里 scan / capture / restore",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "ai-config-sync",
       "source": "./",
-      "description": "Private-repo based AI agent config sync"
+      "description": "把本机 Skill/Plugin 同步到私有配置仓库，并在新电脑上恢复",
+      "version": "0.2.0"
     }
   ]
 }

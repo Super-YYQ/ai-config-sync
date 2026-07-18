@@ -81,6 +81,7 @@ program
   .option("--home <path>", "Override home directory (testing)")
   .option("--no-claude", "Skip Claude integration")
   .option("--no-codex", "Skip Codex integration")
+  .option("--program-root <path>", "Path to ai-config-sync program repo")
   .action(async (opts) => {
     const mode = opts.plan
       ? "plan"
@@ -97,6 +98,7 @@ program
       mode,
       claude: opts.claude,
       codex: opts.codex,
+      programRoot: opts.programRoot,
     });
     for (const m of result.messages) console.log(m);
     if (result.actions.length) {

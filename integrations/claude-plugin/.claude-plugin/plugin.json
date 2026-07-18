@@ -1,8 +1,19 @@
 {
   "name": "ai-config-sync",
-  "description": "AI Agent configuration sync — scan, capture, restore across Claude Code and Codex",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "AI Agent 配置同步：scan / capture / restore / doctor。在 Claude Code 对话中用斜杠命令或直接说「扫描配置」「同步配置」。",
   "author": {
-    "name": "Super-YYQ"
-  }
+    "name": "Super-YYQ",
+    "url": "https://github.com/Super-YYQ/ai-config-sync"
+  },
+  "repository": "https://github.com/Super-YYQ/ai-config-sync",
+  "license": "MIT",
+  "keywords": [
+    "config-sync",
+    "skills",
+    "plugins",
+    "claude-code",
+    "codex",
+    "dotfiles"
+  ]
 }
