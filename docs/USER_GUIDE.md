@@ -60,18 +60,34 @@ setup 会做这些事（幂等，可重复跑）：
 
 ## 在 Claude Code 里怎么用（重点）
 
-### 方式 A：斜杠命令（推荐）
+### 斜杠命令的真实名字
 
-打开 Claude Code，输入 `/` 搜索：
+Claude Code 里 Plugin 命令一般是：
 
-| 命令 | 干什么 |
-|------|--------|
-| `/ai-config-sync:status` | 看当前关联的仓库和 Profile |
-| `/ai-config-sync:scan` | 扫描本机装了哪些 Skill/Plugin |
-| `/ai-config-sync:capture` | 把新装的东西记进私有仓库 |
-| `/ai-config-sync:restore` | 按仓库恢复到本机 |
-| `/ai-config-sync:doctor` | 检查是否健康 |
-| `/ai-config-sync:repair` | 修复入口（命令丢了就跑这个） |
+```
+/ai-config-sync:scan
+/ai-config-sync:status
+/ai-config-sync:capture
+...
+```
+
+如果 `/` 菜单里搜不到：
+
+1. 确认插件已启用：
+   ```bash
+   claude plugin list
+   # 应看到 ai-config-sync@ai-config-sync  Status: enabled
+   ```
+2. 若是 disabled：
+   ```bash
+   claude plugin install ai-config-sync@ai-config-sync
+   claude plugin enable ai-config-sync@ai-config-sync
+   ```
+3. **完全退出并新开** Claude Code（旧会话不会加载新插件命令）。
+4. 仍没有命令时，用 Skill 方式：直接说「扫描配置」或「运行 config-sync scan」。
+
+**注意：** 当前会话若只加载了 `config-sync` Skill，也可以直接让我执行扫描，不必等斜杠菜单。
+
 
 ### 方式 B：直接说话
 

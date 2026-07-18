@@ -249,7 +249,7 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
 
 /**
  * Install Claude Code plugin so user can use /ai-config-sync:* and skill in chat.
- * Mirrors Claude's marketplace layout under ~/.claude/plugins/
+ * Prefer official `claude plugin` CLI; fall back to marketplace files + enable.
  */
 async function installClaudePlugin(
   home: string,
@@ -284,7 +284,7 @@ async function installClaudePlugin(
     actions.push(`INSTALL Claude marketplace copy → ${dest}`);
   }
 
-  // known_marketplaces.json
+  // known_marketplaces.json (Claude also maintains this)
   const knownPath = path.join(
     home,
     ".claude",
@@ -315,61 +315,65 @@ async function installClaudePlugin(
     actions.push("UPDATE known_marketplaces.json: ai-config-sync");
   }
 
-  // settings.json — field-level merge only our keys
-  const settingsPath = path.join(home, ".claude", "settings.json");
-  let settings: Record<string, unknown> = {};
-  if (await pathExists(settingsPath)) {
-    try {
-      settings = await readJsonFile(settingsPath);
-    } catch {
-      settings = {};
+  // Official CLI: install + enable (creates cache entry that powers slash commands)
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execFileAsync = promisify(execFile);
+  const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+
+  try {
+    await execFileAsync(
+      claudeBin,
+      ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
+      { windowsHide: true, timeout: 60000, maxBuffer: 2 * 1024 * 1024 },
+    );
+    actions.push("claude plugin install ai-config-sync@ai-config-sync");
+  } catch (e) {
+    const msg = (e as Error).message || String(e);
+    if (/already installed/i.test(msg)) {
+      actions.push("claude plugin already installed");
+    } else {
+      messagesPushSafe(actions, `WARN claude plugin install: ${msg.slice(0, 200)}`);
     }
   }
 
-  const enabled =
-    (settings.enabledPlugins as Record<string, unknown> | undefined) ?? {};
-  const extra =
-    (settings.extraKnownMarketplaces as Record<string, unknown> | undefined) ??
-    {};
-  const alreadyEnabled = enabled["ai-config-sync@ai-config-sync"] === true;
-  const alreadyExtra = !!extra["ai-config-sync"];
-
-  if (!alreadyEnabled || !alreadyExtra) {
-    const managed = {
-      extraKnownMarketplaces: {
-        "ai-config-sync": {
-          source: {
-            source: "directory",
-            path: dest,
-          },
-        },
-      },
-      enabledPlugins: {
-        "ai-config-sync@ai-config-sync": true,
-      },
-    };
-
-    const merged = mergeJson(settings, managed, {
-      preferManaged: true,
-    }) as Record<string, unknown>;
-
-    const extraM =
-      (merged.extraKnownMarketplaces as Record<string, unknown> | undefined) ??
-      {};
-    extraM["ai-config-sync"] = {
-      source: { source: "directory", path: dest },
-    };
-    merged.extraKnownMarketplaces = extraM;
-    const enabledM =
-      (merged.enabledPlugins as Record<string, unknown> | undefined) ?? {};
-    enabledM["ai-config-sync@ai-config-sync"] = true;
-    merged.enabledPlugins = enabledM;
-
-    await writeJsonFile(settingsPath, merged);
-    actions.push("ENABLE Claude plugin: ai-config-sync@ai-config-sync");
+  try {
+    await execFileAsync(
+      claudeBin,
+      ["plugin", "enable", "ai-config-sync@ai-config-sync"],
+      { windowsHide: true, timeout: 30000, maxBuffer: 1024 * 1024 },
+    );
+    actions.push("claude plugin enable ai-config-sync@ai-config-sync");
+  } catch (e) {
+    const msg = (e as Error).message || String(e);
+    if (/already enabled/i.test(msg)) {
+      actions.push("claude plugin already enabled");
+    } else {
+      // Fallback: write enabledPlugins in settings.json
+      const settingsPath = path.join(home, ".claude", "settings.json");
+      let settings: Record<string, unknown> = {};
+      if (await pathExists(settingsPath)) {
+        try {
+          settings = await readJsonFile(settingsPath);
+        } catch {
+          settings = {};
+        }
+      }
+      const enabled =
+        (settings.enabledPlugins as Record<string, unknown> | undefined) ?? {};
+      if (enabled["ai-config-sync@ai-config-sync"] !== true) {
+        enabled["ai-config-sync@ai-config-sync"] = true;
+        settings.enabledPlugins = enabled;
+        await writeJsonFile(settingsPath, settings);
+        actions.push(
+          "ENABLE via settings.json: ai-config-sync@ai-config-sync (claude enable failed)",
+        );
+      }
+      messagesPushSafe(actions, `WARN claude plugin enable: ${msg.slice(0, 160)}`);
+    }
   }
 
-  // Also install user-level skill (works even if plugin load fails)
+  // User-level skill backup (works even if plugin slash cmds lag)
   const skillSrc = path.join(pluginSrc, "skills", "config-sync");
   const skillDest = path.join(home, ".claude", "skills", "config-sync");
   const skillMd = path.join(skillDest, "SKILL.md");
@@ -383,6 +387,10 @@ async function installClaudePlugin(
   }
 
   return actions;
+}
+
+function messagesPushSafe(actions: string[], line: string) {
+  actions.push(line);
 }
 
 async function installCodexIntegration(
