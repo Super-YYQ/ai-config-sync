@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "AI Agent 配置同步：在 Claude Code 里扫描、备份、恢复 Skill/Plugin",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "ai-config-sync",
       "source": "./integrations/claude-plugin",
       "description": "把本机 Skill/Plugin 同步到私有配置仓库，并在新电脑上恢复",
-      "version": "0.3.0"
+      "version": "0.4.0"
     }
   ]
 }

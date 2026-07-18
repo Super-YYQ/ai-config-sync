@@ -50,7 +50,7 @@ program
   .description(
     "AI Agent config sync — private config repo + Claude Code / Codex integrations",
   )
-  .version("0.3.0");
+  .version("0.4.0");
 
 function homeOpt(cmd: { opts: () => { home?: string } }): string {
   return expandHome(cmd.opts().home ?? os.homedir());

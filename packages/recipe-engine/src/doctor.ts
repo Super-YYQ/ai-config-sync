@@ -10,6 +10,8 @@ import {
   loadResources,
   pathExists,
   readText,
+  hasManagedCodexSessionStart,
+  readJsonFile,
   type LocalConfig,
 } from "@ai-config-sync/core";
 import { getState } from "@ai-config-sync/state-manager";
@@ -59,7 +61,7 @@ export async function runDoctor(options: {
     }
   }
 
-  // git / node
+  // git / node / ai-config-sync CLI
   for (const bin of ["git", "node"]) {
     try {
       const { execFile } = await import("node:child_process");
@@ -78,6 +80,29 @@ export async function runDoctor(options: {
         message: `${bin} not found on PATH`,
       });
     }
+  }
+
+  // CLI on PATH or plugin bin
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const out = await execFileAsync("ai-config-sync", ["--version"], {
+      windowsHide: true,
+      encoding: "utf8",
+    });
+    findings.push({
+      severity: "ok",
+      code: "cli-present",
+      message: `ai-config-sync CLI: ${String(out.stdout || out.stderr || "").trim()}`,
+    });
+  } catch {
+    findings.push({
+      severity: "warn",
+      code: "cli-missing",
+      message:
+        "ai-config-sync not on PATH (Claude Plugin bin may still work in-session)",
+    });
   }
 
   // Config repo
@@ -185,12 +210,34 @@ export async function runDoctor(options: {
 
   const hooksManifest = codexHooksManifestPath(home);
   if (await pathExists(hooksManifest)) {
-    findings.push({
-      severity: "ok",
-      code: "codex-hooks-manifest",
-      message: "Codex hooks.json present",
-      path: hooksManifest,
-    });
+    try {
+      const hooks = await readJsonFile(hooksManifest);
+      const managed = hasManagedCodexSessionStart(hooks);
+      findings.push({
+        severity: managed ? "ok" : "warn",
+        code: managed ? "codex-hooks-managed" : "codex-hooks-unmanaged",
+        message: managed
+          ? "Codex SessionStart ai-config-sync hook present"
+          : "Codex hooks.json present but managed SessionStart not found",
+        path: hooksManifest,
+      });
+      if (Array.isArray((hooks as { hooks?: unknown }).hooks)) {
+        findings.push({
+          severity: "warn",
+          code: "codex-hooks-legacy-array",
+          message:
+            "hooks.json uses legacy array form; prefer event-map SessionStart",
+          path: hooksManifest,
+        });
+      }
+    } catch {
+      findings.push({
+        severity: "error",
+        code: "codex-hooks-invalid",
+        message: "hooks.json unreadable or invalid JSON",
+        path: hooksManifest,
+      });
+    }
   }
 
   // State installed vs disk

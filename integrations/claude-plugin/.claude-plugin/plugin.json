@@ -1,6 +1,6 @@
 {
   "name": "ai-config-sync",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI Agent 配置同步：scan / capture / restore / doctor。安装本插件即可使用（内置 CLI，无需单独 npm 全局安装）。",
   "author": {
     "name": "Super-YYQ",

@@ -43,6 +43,33 @@ export interface DriverResult {
   message: string;
   pathsTouched: string[];
   externalManual?: boolean;
+  /** Optional receipt for compensating rollback of external installs. */
+  receipt?: ApplyReceipt;
+}
+
+export interface ApplyReceipt {
+  driver: string;
+  resourceId: string;
+  target: TargetTool;
+  /** Marketplace was added by this apply (not pre-existing). */
+  marketplaceAdded?: boolean;
+  marketplaceName?: string;
+  marketplaceRepo?: string;
+  /** Plugin was installed by this apply. */
+  pluginInstalled?: boolean;
+  /** Plugin was enabled by this apply. */
+  pluginEnabled?: boolean;
+  /** Plugin id e.g. name@marketplace */
+  pluginId?: string;
+  /** Already present before apply — do not uninstall on rollback. */
+  previouslyInstalled?: boolean;
+  previouslyEnabled?: boolean;
+  actions?: string[];
+}
+
+export interface DriverRollbackResult {
+  ok: boolean;
+  message: string;
 }
 
 export interface Driver {
@@ -53,6 +80,10 @@ export interface Driver {
   ): Promise<Array<{ description: string; risk: RiskLevel; paths: string[] }>>;
   apply(recipe: TargetRecipe, ctx: DriverContext): Promise<DriverResult>;
   verify?(recipe: TargetRecipe, ctx: DriverContext): Promise<DriverResult>;
+  rollback?(
+    receipt: ApplyReceipt,
+    ctx: DriverContext,
+  ): Promise<DriverRollbackResult>;
 }
 
 function destSkillDir(target: TargetTool, resourceId: string, home: string): string {
@@ -505,6 +536,8 @@ export const claudeMarketplaceDriver: Driver = {
     const marketplace = recipe.marketplace;
     const scope = recipe.scope ?? "user";
     const pathsTouched: string[] = [];
+    const pluginId =
+      marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
 
     if (ctx.dryRun) {
       return {
@@ -515,67 +548,106 @@ export const claudeMarketplaceDriver: Driver = {
       };
     }
 
-    const commands: string[][] = [];
+    // Probe existing install so rollback won't uninstall pre-existing plugins
+    let previouslyInstalled = false;
+    let previouslyEnabled = false;
+    try {
+      const listOut = await execFileAsync("claude", ["plugin", "list"], {
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+        encoding: "utf8",
+      });
+      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+      if (text.includes(pluginId) || text.includes(plugin)) {
+        previouslyInstalled = true;
+        if (/enabled|✔/i.test(text)) previouslyEnabled = true;
+      }
+    } catch {
+      /* claude missing or list failed */
+    }
+
+    const receipt: ApplyReceipt = {
+      driver: "claude-marketplace",
+      resourceId: ctx.resourceId,
+      target: ctx.target,
+      marketplaceName: marketplace,
+      marketplaceRepo: recipe.marketplaceRepository,
+      pluginId,
+      previouslyInstalled,
+      previouslyEnabled,
+      marketplaceAdded: false,
+      pluginInstalled: false,
+      pluginEnabled: false,
+      actions: [],
+    };
+
+    const commands: Array<{ cmd: string[]; kind: "marketplace" | "install" | "enable" }> =
+      [];
     if (recipe.marketplaceRepository) {
-      // github style: owner/repo
-      commands.push([
-        "claude",
-        "plugin",
-        "marketplace",
-        "add",
-        recipe.marketplaceRepository,
-      ]);
+      commands.push({
+        kind: "marketplace",
+        cmd: [
+          "claude",
+          "plugin",
+          "marketplace",
+          "add",
+          recipe.marketplaceRepository,
+        ],
+      });
     }
     if (marketplace && plugin) {
-      commands.push([
-        "claude",
-        "plugin",
-        "install",
-        `${plugin}@${marketplace}`,
-        "--scope",
-        scope,
-      ]);
-      commands.push([
-        "claude",
-        "plugin",
-        "enable",
-        `${plugin}@${marketplace}`,
-      ]);
+      commands.push({
+        kind: "install",
+        cmd: [
+          "claude",
+          "plugin",
+          "install",
+          `${plugin}@${marketplace}`,
+          "--scope",
+          scope,
+        ],
+      });
+      commands.push({
+        kind: "enable",
+        cmd: ["claude", "plugin", "enable", `${plugin}@${marketplace}`],
+      });
     } else if (plugin) {
-      commands.push([
-        "claude",
-        "plugin",
-        "install",
-        plugin,
-        "--scope",
-        scope,
-      ]);
+      commands.push({
+        kind: "install",
+        cmd: ["claude", "plugin", "install", plugin, "--scope", scope],
+      });
     }
 
     const messages: string[] = [];
-    for (const cmd of commands) {
+    for (const { cmd, kind } of commands) {
       try {
-        const { execFile } = await import("node:child_process");
-        const { promisify } = await import("node:util");
-        const execFileAsync = promisify(execFile);
         await execFileAsync(cmd[0]!, cmd.slice(1), {
           windowsHide: true,
           maxBuffer: 5 * 1024 * 1024,
         });
         messages.push(`ok: ${cmd.join(" ")}`);
+        receipt.actions!.push(cmd.join(" "));
+        if (kind === "marketplace") receipt.marketplaceAdded = true;
+        if (kind === "install") receipt.pluginInstalled = true;
+        if (kind === "enable") receipt.pluginEnabled = true;
       } catch (e) {
         const err = (e as Error).message;
-        // treat already installed/enabled as ok
         if (/already installed|already enabled|already exists/i.test(err)) {
           messages.push(`ok(exists): ${cmd.join(" ")}`);
+          if (kind === "install") previouslyInstalled = true;
+          if (kind === "enable") previouslyEnabled = true;
           continue;
         }
         messages.push(`fail: ${cmd.join(" ")} (${err})`);
-        // ALL steps must succeed — fail the whole install
         return {
           ok: false,
           message: `Claude plugin install incomplete: ${messages.join("; ")}`,
           pathsTouched,
+          receipt: {
+            ...receipt,
+            previouslyInstalled,
+            previouslyEnabled,
+          },
         };
       }
     }
@@ -593,7 +665,82 @@ export const claudeMarketplaceDriver: Driver = {
       ok: true,
       message: messages.join("; "),
       pathsTouched,
+      receipt: {
+        ...receipt,
+        previouslyInstalled,
+        previouslyEnabled,
+      },
     };
+  },
+
+  async rollback(receipt, ctx) {
+    const messages: string[] = [];
+    // Only undo what we added; never remove pre-existing installs
+    if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
+      try {
+        await execFileAsync(
+          "claude",
+          ["plugin", "disable", receipt.pluginId],
+          { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
+        );
+        messages.push(`disabled ${receipt.pluginId}`);
+      } catch (e) {
+        messages.push(`disable failed: ${(e as Error).message}`);
+      }
+    }
+    if (
+      receipt.pluginInstalled &&
+      !receipt.previouslyInstalled &&
+      receipt.pluginId
+    ) {
+      try {
+        await execFileAsync(
+          "claude",
+          ["plugin", "uninstall", receipt.pluginId],
+          { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
+        );
+        messages.push(`uninstalled ${receipt.pluginId}`);
+      } catch (e) {
+        messages.push(`uninstall failed: ${(e as Error).message}`);
+      }
+    }
+    // Do not remove marketplaces automatically — too destructive / shared
+    return {
+      ok: true,
+      message:
+        messages.length > 0
+          ? messages.join("; ")
+          : `no external rollback needed for ${ctx.resourceId}`,
+    };
+  },
+
+  async verify(recipe, ctx) {
+    const plugin = recipe.plugin ?? ctx.resourceId;
+    const marketplace = recipe.marketplace;
+    const pluginId =
+      marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
+    try {
+      const listOut = await execFileAsync("claude", ["plugin", "list"], {
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+        encoding: "utf8",
+      });
+      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+      const present = text.includes(pluginId) || text.includes(plugin);
+      return {
+        ok: present,
+        message: present
+          ? `plugin present: ${pluginId}`
+          : `plugin missing: ${pluginId}`,
+        pathsTouched: [],
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        message: `verify failed: ${(e as Error).message}`,
+        pathsTouched: [],
+      };
+    }
   },
 };
 

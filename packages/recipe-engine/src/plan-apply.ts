@@ -11,6 +11,7 @@ import {
   pathExists,
   resolveProfileResources,
   shortHash,
+  localStatePath,
   type LocalConfig,
   type Plan,
   type PlanAction,
@@ -19,12 +20,18 @@ import {
   type Resource,
   type RiskLevel,
   type TargetTool,
+  type StateFile,
 } from "@ai-config-sync/core";
-import { getDriver, recipePathsValid } from "@ai-config-sync/drivers";
+import {
+  getDriver,
+  recipePathsValid,
+  type ApplyReceipt,
+} from "@ai-config-sync/drivers";
 import {
   beginTransaction,
   confirmCreatedPaths,
-  markInstalled,
+  getState,
+  putState,
   appendLog,
   rollbackBackup,
   type BackupRecord,
@@ -451,9 +458,13 @@ export async function applyPlan(
         .filter(Boolean),
     ),
   ];
+  // Always include state.json in transaction so partial installed marks can be restored
+  const statePath = localStatePath(ctx.home);
+  if (!paths.includes(statePath)) paths.push(statePath);
+
   let tx: BackupRecord | undefined;
   let backupId: string | undefined;
-  if (!ctx.dryRun && paths.length > 0) {
+  if (!ctx.dryRun) {
     tx = await beginTransaction(
       paths,
       `apply ${activePlan.id}`,
@@ -469,6 +480,30 @@ export async function applyPlan(
   const registry = await loadRecipeRegistry(
     path.join(ctx.configRepoPath, "recipes"),
   );
+
+  // State draft: mutate in memory; commit only on full success
+  const stateDraft: StateFile = structuredClone(await getState(ctx.home));
+  const receipts: ApplyReceipt[] = [];
+
+  function draftMark(
+    resourceId: string,
+    target: TargetTool,
+    info: {
+      status: "installed" | "missing" | "drift" | "failed" | "manual";
+      version?: string;
+      commit?: string;
+      path?: string;
+      hash?: string;
+      notes?: string;
+    },
+  ) {
+    const entry = stateDraft.installed[resourceId] ?? {};
+    entry[target] = {
+      ...info,
+      lastChecked: new Date().toISOString(),
+    };
+    stateDraft.installed[resourceId] = entry;
+  }
 
   const applied: string[] = [];
   const failed: Array<{ actionId: string; error: string }> = [];
@@ -503,7 +538,10 @@ export async function applyPlan(
 
     const resource = resourcesFile.resources.find((r) => r.id === resourceId);
     if (!resource) {
-      failed.push({ actionId: group[0]!.id, error: `resource not found: ${resourceId}` });
+      failed.push({
+        actionId: group[0]!.id,
+        error: `resource not found: ${resourceId}`,
+      });
       hardFailure = true;
       break;
     }
@@ -521,7 +559,6 @@ export async function applyPlan(
     }
 
     const sourceRoot = await resolveSourceRoot(ctx, resource);
-
     const driver = getDriver(targetRecipe.driver);
     try {
       const result = await driver.apply(targetRecipe, {
@@ -531,14 +568,15 @@ export async function applyPlan(
         sourceRoot,
         dryRun: ctx.dryRun,
       });
+      if (result.receipt) receipts.push(result.receipt);
+
       if (result.externalManual) {
         manual.push(result.message);
-        await markInstalled(
-          resourceId,
-          target,
-          { status: "manual", notes: result.message, path: result.pathsTouched[0] },
-          ctx.home,
-        );
+        draftMark(resourceId, target, {
+          status: "manual",
+          notes: result.message,
+          path: result.pathsTouched[0],
+        });
       } else if (!result.ok) {
         if (
           /sourceRoot|source not|recipe-stale|Source skill path missing|requiredPath missing/i.test(
@@ -546,20 +584,16 @@ export async function applyPlan(
           )
         ) {
           manual.push(result.message);
-          await markInstalled(
-            resourceId,
-            target,
-            { status: "manual", notes: result.message },
-            ctx.home,
-          );
+          draftMark(resourceId, target, {
+            status: "manual",
+            notes: result.message,
+          });
         } else {
           failed.push({ actionId: group[0]!.id, error: result.message });
-          await markInstalled(
-            resourceId,
-            target,
-            { status: "failed", notes: result.message },
-            ctx.home,
-          );
+          draftMark(resourceId, target, {
+            status: "failed",
+            notes: result.message,
+          });
           hardFailure = true;
           break;
         }
@@ -583,17 +617,12 @@ export async function applyPlan(
         if (tx && result.pathsTouched.length) {
           await confirmCreatedPaths(tx, result.pathsTouched, ctx.home);
         }
-        await markInstalled(
-          resourceId,
-          target,
-          {
-            status: "installed",
-            path: dest,
-            hash,
-            notes: result.message,
-          },
-          ctx.home,
-        );
+        draftMark(resourceId, target, {
+          status: "installed",
+          path: dest,
+          hash,
+          notes: result.message,
+        });
       }
       await appendLog(
         `apply ${resourceId}@${target}: ${result.message}`,
@@ -610,20 +639,50 @@ export async function applyPlan(
   }
 
   let autoRolledBack = false;
-  if (hardFailure && tx && !ctx.dryRun) {
-    try {
-      await rollbackBackup(tx.id, ctx.home);
-      autoRolledBack = true;
-      await appendLog(
-        `auto-rollback ${tx.id} after apply failure`,
-        ctx.home,
-      );
-    } catch (e) {
-      failed.push({
-        actionId: "rollback",
-        error: `auto-rollback failed: ${(e as Error).message}`,
-      });
+  if (hardFailure && !ctx.dryRun) {
+    // Compensating external driver rollbacks (newest first)
+    for (const receipt of [...receipts].reverse()) {
+      try {
+        const d = getDriver(receipt.driver as never);
+        if (d.rollback) {
+          const rr = await d.rollback(receipt, {
+            home: ctx.home,
+            resourceId: receipt.resourceId,
+            target: receipt.target,
+          });
+          await appendLog(
+            `driver-rollback ${receipt.driver}:${receipt.resourceId}: ${rr.message}`,
+            ctx.home,
+          );
+        }
+      } catch (e) {
+        failed.push({
+          actionId: "driver-rollback",
+          error: `${receipt.driver}: ${(e as Error).message}`,
+        });
+      }
     }
+    if (tx) {
+      try {
+        await rollbackBackup(tx.id, ctx.home);
+        autoRolledBack = true;
+        await appendLog(
+          `auto-rollback ${tx.id} after apply failure`,
+          ctx.home,
+        );
+      } catch (e) {
+        failed.push({
+          actionId: "rollback",
+          error: `auto-rollback failed: ${(e as Error).message}`,
+        });
+      }
+    }
+    // Do NOT commit stateDraft — disk state restored from backup
+  } else if (!ctx.dryRun) {
+    // Commit state only after full success (manuals/skips ok)
+    stateDraft.lastSuccessfulApply = new Date().toISOString();
+    stateDraft.profile = ctx.profileName;
+    await putState(stateDraft, ctx.home);
   }
 
   return {

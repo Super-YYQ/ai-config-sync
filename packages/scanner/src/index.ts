@@ -54,8 +54,49 @@ export interface ScanOptions {
 
 async function detectSkillSource(
   skillDir: string,
+  home: string,
 ): Promise<{ candidate?: string; confidence: number; meta: Record<string, unknown> }> {
   const meta: Record<string, unknown> = {};
+  // skills-lock / agents lock (npx skills)
+  for (const lockRel of [
+    path.join(home, ".agents", ".skill-lock.json"),
+    path.join(home, ".agents", "skills-lock.json"),
+    path.join(skillDir, "skills-lock.json"),
+    path.join(skillDir, "..", "skills-lock.json"),
+  ]) {
+    if (!(await pathExists(lockRel))) continue;
+    try {
+      const raw = JSON.parse(await fs.readFile(lockRel, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      const name = path.basename(skillDir);
+      const skills = raw.skills as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const entry =
+        (skills && skills[name]) ||
+        (raw[name] as Record<string, unknown> | undefined);
+      if (entry) {
+        const repo =
+          (entry.repository as string | undefined) ||
+          (entry.repo as string | undefined) ||
+          (typeof entry.source === "string" ? entry.source : undefined);
+        if (repo) {
+          return {
+            candidate: String(repo)
+              .replace(/^https?:\/\/github\.com\//, "")
+              .replace(/\.git$/, ""),
+            confidence: 0.93,
+            meta: { ...meta, from: "skills-lock", lock: lockRel },
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   // SKILL.md frontmatter or body often has repository links
   const skillMd = path.join(skillDir, "SKILL.md");
   if (await pathExists(skillMd)) {
@@ -72,7 +113,6 @@ async function detectSkillSource(
           meta: { ...meta, from: "SKILL.md" },
         };
       }
-      // package.json repository
     } catch {
       /* ignore */
     }
@@ -151,10 +191,11 @@ async function scanSkills(
 ): Promise<ScannedResource[]> {
   const names = await listDirNames(dir);
   const out: ScannedResource[] = [];
+  const home = options.home ?? process.env.HOME ?? process.env.USERPROFILE ?? "";
   for (const name of names) {
     if (isSelfManagedResourceId(name)) continue;
     const full = path.join(dir, name);
-    const source = await detectSkillSource(full);
+    const source = await detectSkillSource(full, home);
     let hash: string | undefined;
     if (!options.light) {
       try {

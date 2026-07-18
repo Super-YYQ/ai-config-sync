@@ -2,7 +2,7 @@
 
 在 **Claude Code / Codex** 中管理 Skill、Plugin，并同步到私有 Git 仓库。
 
-> **状态：v0.3.0 Alpha Hardening**  
+> **状态：v0.4.0 Alpha Hardening**  
 > Claude Plugin 已内置 CLI（无需单独 `npm i -g` 也可在插件 PATH 中调用）。  
 > npm 包使用打包后的单文件 `dist/ai-config-sync.cjs`。  
 > 请先在隔离 HOME / 测试环境验证，再用于公司真机。
@@ -120,4 +120,4 @@ npm run smoke:npm
 - 变更：`CHANGELOG.md`  
 - 计划基线：v0.3 Alpha Hardening（审查2 + 后续优化计划）
 
-MIT · v0.3.0
+MIT · v0.4.0

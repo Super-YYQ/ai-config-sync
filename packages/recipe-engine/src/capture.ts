@@ -17,6 +17,7 @@ import type { ScannedResource } from "@ai-config-sync/scanner";
 import { resolveCachedSource } from "@ai-config-sync/git-sync";
 import { analyzeSourceTree } from "./analyzer.js";
 import { analyzeWithOptionalAi } from "./ai-assistant.js";
+import { vendorSkillDirectory } from "./vendor.js";
 
 export interface CaptureItem {
   scanned: ScannedResource;
@@ -30,13 +31,24 @@ export interface CaptureItem {
 }
 
 function logicalId(s: ScannedResource): string {
-  // Prefer github repo short name as id when available
+  // Prefer stable id: name only for skills; include subpath hint in metadata later
+  if (s.kind === "skill") return s.id;
   if (s.sourceCandidate) {
     const repo = s.sourceCandidate.replace(/\.git$/i, "");
     const short = repo.includes("/") ? repo.split("/").pop()! : repo;
+    // plugins: keep scanned id if it has marketplace@ form
+    if (s.id.includes("@")) return s.id.split("@")[0] || short || s.id;
     return short || s.id;
   }
   return s.id;
+}
+
+/** Canonical key to avoid merging unrelated skills from same monorepo. */
+function groupKey(s: ScannedResource): string {
+  const name = logicalId(s);
+  const repo = s.sourceCandidate?.replace(/\.git$/i, "") ?? "local";
+  // Do not merge different skill names even if same repo
+  return `${repo}::${name}::${s.kind}`;
 }
 
 /**
@@ -63,7 +75,7 @@ export async function buildCaptureProposals(
   );
   const existingIds = new Set(existing.resources.map((r) => r.id));
 
-  // Group by logical resource id
+  // Group by logical resource id (repo + name, not repo alone)
   const groups = new Map<string, ScannedResource[]>();
   for (const s of scanned) {
     if (s.kind === "config") continue;
@@ -73,14 +85,16 @@ export async function buildCaptureProposals(
     const id = logicalId(s);
     if (isSelfManagedResourceId(id)) continue;
     if (existingIds.has(id) && !options.includeManaged) continue;
-    const list = groups.get(id) ?? [];
+    const key = groupKey(s);
+    const list = groups.get(key) ?? [];
     list.push(s);
-    groups.set(id, list);
+    groups.set(key, list);
   }
 
   const items: CaptureItem[] = [];
 
-  for (const [id, group] of groups) {
+  for (const [, group] of groups) {
+    const id = logicalId(group[0]!);
     // Prefer a skill entry as representative for path
     const primary =
       group.find((g) => g.kind === "skill") ??
@@ -218,13 +232,11 @@ export async function buildCaptureProposals(
             provider: "github",
             repository: sourceCandidate,
           }
-        : usedRemoteSource
-          ? { provider: "github", repository: sourceCandidate }
-          : {
-              provider: "local",
-              // Prefer vendoring relative path later; keep path for now
-              path: primary.path,
-            },
+        : {
+            // Will be rewritten to vendored on commit if still local absolute
+            provider: "local",
+            path: primary.path,
+          },
       targets: {
         ...(targetRecipes.claude
           ? {
@@ -258,7 +270,7 @@ export async function buildCaptureProposals(
             : {}),
       },
       profiles: ["home"],
-      versionPolicy: "latest-confirm",
+      versionPolicy: sourceCandidate ? "latest-confirm" : "vendored",
     };
 
     let suggestedRecipe: Recipe | undefined;
@@ -359,6 +371,56 @@ export async function commitCaptureItems(
   }
 
   for (const item of batchById.values()) {
+    // Auto-vendor local absolute skills so second machine can restore
+    if (
+      item.suggestedResource.source?.provider === "local" &&
+      item.suggestedResource.source.path &&
+      path.isAbsolute(item.suggestedResource.source.path) &&
+      item.scanned.kind === "skill"
+    ) {
+      const v = await vendorSkillDirectory(
+        item.suggestedResource.source.path,
+        configRepoPath,
+        item.suggestedResource.id,
+      );
+      if (!v.ok) {
+        throw new Error(
+          `Cannot capture ${item.suggestedResource.id}: ${v.message}` +
+            (v.blockedSecrets.length
+              ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}`
+              : ""),
+        );
+      }
+      item.suggestedResource = {
+        ...item.suggestedResource,
+        source: {
+          provider: "vendored",
+          path: v.destRel,
+        },
+        versionPolicy: "vendored",
+      };
+      if (item.suggestedRecipe) {
+        item.suggestedRecipe = {
+          ...item.suggestedRecipe,
+          source: item.suggestedResource.source,
+          versionPolicy: "vendored",
+          targets: Object.fromEntries(
+            Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
+              t,
+              tr
+                ? {
+                    ...tr,
+                    sourcePaths: { skill: "." },
+                    requiredPaths: ["SKILL.md"],
+                    driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill",
+                  }
+                : tr,
+            ]),
+          ) as Recipe["targets"],
+        };
+      }
+    }
+
     const prev = byId.get(item.suggestedResource.id);
     if (prev) {
       byId.set(item.suggestedResource.id, {

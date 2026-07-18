@@ -975,8 +975,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path18 = require("node:path");
-    var fs7 = require("node:fs");
+    var path19 = require("node:path");
+    var fs8 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1908,11 +1908,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path18.resolve(baseDir, baseName);
-          if (fs7.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path18.extname(baseName))) return void 0;
+          const localBin = path19.resolve(baseDir, baseName);
+          if (fs8.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path19.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs7.existsSync(`${localBin}${ext}`)
+            (ext) => fs8.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1924,21 +1924,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs7.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs8.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path18.resolve(
-            path18.dirname(resolvedScriptPath),
+          executableDir = path19.resolve(
+            path19.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path18.basename(
+            const legacyName = path19.basename(
               this._scriptPath,
-              path18.extname(this._scriptPath)
+              path19.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1949,7 +1949,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path18.extname(executableFile));
+        launchWithNode = sourceExt.includes(path19.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2789,7 +2789,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path18.basename(filename, path18.extname(filename));
+        this._name = path19.basename(filename, path19.extname(filename));
         return this;
       }
       /**
@@ -2803,9 +2803,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path19) {
-        if (path19 === void 0) return this._executableDir;
-        this._executableDir = path19;
+      executableDir(path20) {
+        if (path20 === void 0) return this._executableDir;
+        this._executableDir = path20;
         return this;
       }
       /**
@@ -3447,8 +3447,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path18, errorMaps, issueData } = params;
-      const fullPath = [...path18, ...issueData.path || []];
+      const { data, path: path19, errorMaps, issueData } = params;
+      const fullPath = [...path19, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -3756,11 +3756,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value, path18, key) {
+      constructor(parent, value, path19, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path18;
+        this._path = path19;
         this._key = key;
       }
       get path() {
@@ -7623,17 +7623,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path18) {
-      const ctrl = callVisitor(key, node, visitor, path18);
+    function visit_(key, node, visitor, path19) {
+      const ctrl = callVisitor(key, node, visitor, path19);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path18, ctrl);
-        return visit_(key, ctrl, visitor, path18);
+        replaceNode(key, path19, ctrl);
+        return visit_(key, ctrl, visitor, path19);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path18 = Object.freeze(path18.concat(node));
+          path19 = Object.freeze(path19.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path18);
+            const ci = visit_(i, node.items[i], visitor, path19);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7644,13 +7644,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path18 = Object.freeze(path18.concat(node));
-          const ck = visit_("key", node.key, visitor, path18);
+          path19 = Object.freeze(path19.concat(node));
+          const ck = visit_("key", node.key, visitor, path19);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path18);
+          const cv = visit_("value", node.value, visitor, path19);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7671,17 +7671,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path18) {
-      const ctrl = await callVisitor(key, node, visitor, path18);
+    async function visitAsync_(key, node, visitor, path19) {
+      const ctrl = await callVisitor(key, node, visitor, path19);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path18, ctrl);
-        return visitAsync_(key, ctrl, visitor, path18);
+        replaceNode(key, path19, ctrl);
+        return visitAsync_(key, ctrl, visitor, path19);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path18 = Object.freeze(path18.concat(node));
+          path19 = Object.freeze(path19.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path18);
+            const ci = await visitAsync_(i, node.items[i], visitor, path19);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7692,13 +7692,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path18 = Object.freeze(path18.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path18);
+          path19 = Object.freeze(path19.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path19);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path18);
+          const cv = await visitAsync_("value", node.value, visitor, path19);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7725,23 +7725,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path18) {
+    function callVisitor(key, node, visitor, path19) {
       if (typeof visitor === "function")
-        return visitor(key, node, path18);
+        return visitor(key, node, path19);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path18);
+        return visitor.Map?.(key, node, path19);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path18);
+        return visitor.Seq?.(key, node, path19);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path18);
+        return visitor.Pair?.(key, node, path19);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path18);
+        return visitor.Scalar?.(key, node, path19);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path18);
+        return visitor.Alias?.(key, node, path19);
       return void 0;
     }
-    function replaceNode(key, path18, node) {
-      const parent = path18[path18.length - 1];
+    function replaceNode(key, path19, node) {
+      const parent = path19[path19.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -8351,10 +8351,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path18, value) {
+    function collectionFromPath(schema, path19, value) {
       let v = value;
-      for (let i = path18.length - 1; i >= 0; --i) {
-        const k = path18[i];
+      for (let i = path19.length - 1; i >= 0; --i) {
+        const k = path19[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -8373,7 +8373,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path18) => path18 == null || typeof path18 === "object" && !!path18[Symbol.iterator]().next().done;
+    var isEmptyPath = (path19) => path19 == null || typeof path19 === "object" && !!path19[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -8403,11 +8403,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path18, value) {
-        if (isEmptyPath(path18))
+      addIn(path19, value) {
+        if (isEmptyPath(path19))
           this.add(value);
         else {
-          const [key, ...rest] = path18;
+          const [key, ...rest] = path19;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -8421,8 +8421,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path18) {
-        const [key, ...rest] = path18;
+      deleteIn(path19) {
+        const [key, ...rest] = path19;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -8436,8 +8436,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path18, keepScalar) {
-        const [key, ...rest] = path18;
+      getIn(path19, keepScalar) {
+        const [key, ...rest] = path19;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -8455,8 +8455,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path18) {
-        const [key, ...rest] = path18;
+      hasIn(path19) {
+        const [key, ...rest] = path19;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -8466,8 +8466,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path18, value) {
-        const [key, ...rest] = path18;
+      setIn(path19, value) {
+        const [key, ...rest] = path19;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -10982,9 +10982,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path18, value) {
+      addIn(path19, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path18, value);
+          this.contents.addIn(path19, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -11059,14 +11059,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path18) {
-        if (Collection.isEmptyPath(path18)) {
+      deleteIn(path19) {
+        if (Collection.isEmptyPath(path19)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path18) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path19) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -11081,10 +11081,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path18, keepScalar) {
-        if (Collection.isEmptyPath(path18))
+      getIn(path19, keepScalar) {
+        if (Collection.isEmptyPath(path19))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path18, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path19, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -11095,10 +11095,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path18) {
-        if (Collection.isEmptyPath(path18))
+      hasIn(path19) {
+        if (Collection.isEmptyPath(path19))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path18) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path19) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -11115,13 +11115,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path18, value) {
-        if (Collection.isEmptyPath(path18)) {
+      setIn(path19, value) {
+        if (Collection.isEmptyPath(path19)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path18), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path19), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path18, value);
+          this.contents.setIn(path19, value);
         }
       }
       /**
@@ -13081,9 +13081,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path18) => {
+    visit.itemAtPath = (cst, path19) => {
       let item = cst;
-      for (const [field, index] of path18) {
+      for (const [field, index] of path19) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -13092,23 +13092,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path18) => {
-      const parent = visit.itemAtPath(cst, path18.slice(0, -1));
-      const field = path18[path18.length - 1][0];
+    visit.parentCollection = (cst, path19) => {
+      const parent = visit.itemAtPath(cst, path19.slice(0, -1));
+      const field = path19[path19.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path18, item, visitor) {
-      let ctrl = visitor(item, path18);
+    function _visit(path19, item, visitor) {
+      let ctrl = visitor(item, path19);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path18.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path19.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -13119,10 +13119,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path18);
+            ctrl = ctrl(item, path19);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path18) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path19) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -14424,14 +14424,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs8 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs7, sep: [] });
+                map.items.push({ start, key: fs8, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs7);
+                this.stack.push(fs8);
               } else {
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs8, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -14559,13 +14559,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs8 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs7, sep: [] });
+                fc.items.push({ start: [], key: fs8, sep: [] });
               else if (it.sep)
-                this.stack.push(fs7);
+                this.stack.push(fs8);
               else
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs8, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -15034,10 +15034,10 @@ function isPlainObject(v) {
 function hasId(v) {
   return isPlainObject(v) && typeof v.id === "string";
 }
-function pathAllowed(path18, owned) {
+function pathAllowed(path19, owned) {
   if (!owned || owned.length === 0)
     return true;
-  return owned.some((o) => path18 === o || path18.startsWith(`${o}.`) || o.startsWith(`${path18}.`));
+  return owned.some((o) => path19 === o || path19.startsWith(`${o}.`) || o.startsWith(`${path19}.`));
 }
 function mergeJson(base, managed, options = {}, currentPath = "") {
   const preferManaged = options.preferManaged ?? true;
@@ -15326,7 +15326,7 @@ function redact(match) {
     return "***";
   return `${match.slice(0, 4)}\u2026${match.slice(-4)} (len=${match.length})`;
 }
-function scanTextForSecrets(text, path18) {
+function scanTextForSecrets(text, path19) {
   const findings = [];
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -15339,7 +15339,7 @@ function scanTextForSecrets(text, path18) {
           rule: rule.name,
           line: i + 1,
           preview: redact(m[0]),
-          path: path18
+          path: path19
         });
       }
     }
@@ -15870,8 +15870,34 @@ init_dist();
 var import_promises3 = __toESM(require("node:fs/promises"), 1);
 var import_node_path5 = __toESM(require("node:path"), 1);
 init_dist();
-async function detectSkillSource(skillDir) {
+async function detectSkillSource(skillDir, home) {
   const meta = {};
+  for (const lockRel of [
+    import_node_path5.default.join(home, ".agents", ".skill-lock.json"),
+    import_node_path5.default.join(home, ".agents", "skills-lock.json"),
+    import_node_path5.default.join(skillDir, "skills-lock.json"),
+    import_node_path5.default.join(skillDir, "..", "skills-lock.json")
+  ]) {
+    if (!await pathExists(lockRel))
+      continue;
+    try {
+      const raw = JSON.parse(await import_promises3.default.readFile(lockRel, "utf8"));
+      const name = import_node_path5.default.basename(skillDir);
+      const skills = raw.skills;
+      const entry = skills && skills[name] || raw[name];
+      if (entry) {
+        const repo = entry.repository || entry.repo || (typeof entry.source === "string" ? entry.source : void 0);
+        if (repo) {
+          return {
+            candidate: String(repo).replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, ""),
+            confidence: 0.93,
+            meta: { ...meta, from: "skills-lock", lock: lockRel }
+          };
+        }
+      }
+    } catch {
+    }
+  }
   const skillMd = import_node_path5.default.join(skillDir, "SKILL.md");
   if (await pathExists(skillMd)) {
     try {
@@ -15940,11 +15966,12 @@ async function detectSkillSource(skillDir) {
 async function scanSkills(dir, target, options) {
   const names = await listDirNames(dir);
   const out = [];
+  const home = options.home ?? process.env.HOME ?? process.env.USERPROFILE ?? "";
   for (const name of names) {
     if (isSelfManagedResourceId(name))
       continue;
     const full = import_node_path5.default.join(dir, name);
-    const source = await detectSkillSource(full);
+    const source = await detectSkillSource(full, home);
     let hash;
     if (!options.light) {
       try {
@@ -16217,17 +16244,6 @@ async function getState(home) {
 async function putState(state, home) {
   await ensureStateDirs(home);
   await saveState(import_node_path6.default.join(defaultStateRoot(home), "state.json"), state);
-}
-async function markInstalled(resourceId, target, info, home) {
-  const state = await getState(home);
-  const entry = state.installed[resourceId] ?? {};
-  entry[target] = {
-    ...info,
-    lastChecked: (/* @__PURE__ */ new Date()).toISOString()
-  };
-  state.installed[resourceId] = entry;
-  await putState(state, home);
-  return state;
 }
 async function loadPending(home) {
   const p = pendingEventsPath(home);
@@ -17299,6 +17315,7 @@ var claudeMarketplaceDriver = {
     const marketplace = recipe.marketplace;
     const scope = recipe.scope ?? "user";
     const pathsTouched = [];
+    const pluginId = marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
     if (ctx.dryRun) {
       return {
         ok: true,
@@ -17307,63 +17324,106 @@ var claudeMarketplaceDriver = {
         pathsTouched: []
       };
     }
+    let previouslyInstalled = false;
+    let previouslyEnabled = false;
+    try {
+      const listOut = await execFileAsync3("claude", ["plugin", "list"], {
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+        encoding: "utf8"
+      });
+      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+      if (text.includes(pluginId) || text.includes(plugin)) {
+        previouslyInstalled = true;
+        if (/enabled|✔/i.test(text))
+          previouslyEnabled = true;
+      }
+    } catch {
+    }
+    const receipt = {
+      driver: "claude-marketplace",
+      resourceId: ctx.resourceId,
+      target: ctx.target,
+      marketplaceName: marketplace,
+      marketplaceRepo: recipe.marketplaceRepository,
+      pluginId,
+      previouslyInstalled,
+      previouslyEnabled,
+      marketplaceAdded: false,
+      pluginInstalled: false,
+      pluginEnabled: false,
+      actions: []
+    };
     const commands = [];
     if (recipe.marketplaceRepository) {
-      commands.push([
-        "claude",
-        "plugin",
-        "marketplace",
-        "add",
-        recipe.marketplaceRepository
-      ]);
+      commands.push({
+        kind: "marketplace",
+        cmd: [
+          "claude",
+          "plugin",
+          "marketplace",
+          "add",
+          recipe.marketplaceRepository
+        ]
+      });
     }
     if (marketplace && plugin) {
-      commands.push([
-        "claude",
-        "plugin",
-        "install",
-        `${plugin}@${marketplace}`,
-        "--scope",
-        scope
-      ]);
-      commands.push([
-        "claude",
-        "plugin",
-        "enable",
-        `${plugin}@${marketplace}`
-      ]);
+      commands.push({
+        kind: "install",
+        cmd: [
+          "claude",
+          "plugin",
+          "install",
+          `${plugin}@${marketplace}`,
+          "--scope",
+          scope
+        ]
+      });
+      commands.push({
+        kind: "enable",
+        cmd: ["claude", "plugin", "enable", `${plugin}@${marketplace}`]
+      });
     } else if (plugin) {
-      commands.push([
-        "claude",
-        "plugin",
-        "install",
-        plugin,
-        "--scope",
-        scope
-      ]);
+      commands.push({
+        kind: "install",
+        cmd: ["claude", "plugin", "install", plugin, "--scope", scope]
+      });
     }
     const messages = [];
-    for (const cmd of commands) {
+    for (const { cmd, kind } of commands) {
       try {
-        const { execFile: execFile4 } = await import("node:child_process");
-        const { promisify: promisify4 } = await import("node:util");
-        const execFileAsync4 = promisify4(execFile4);
-        await execFileAsync4(cmd[0], cmd.slice(1), {
+        await execFileAsync3(cmd[0], cmd.slice(1), {
           windowsHide: true,
           maxBuffer: 5 * 1024 * 1024
         });
         messages.push(`ok: ${cmd.join(" ")}`);
+        receipt.actions.push(cmd.join(" "));
+        if (kind === "marketplace")
+          receipt.marketplaceAdded = true;
+        if (kind === "install")
+          receipt.pluginInstalled = true;
+        if (kind === "enable")
+          receipt.pluginEnabled = true;
       } catch (e) {
         const err = e.message;
         if (/already installed|already enabled|already exists/i.test(err)) {
           messages.push(`ok(exists): ${cmd.join(" ")}`);
+          if (kind === "install")
+            previouslyInstalled = true;
+          if (kind === "enable")
+            previouslyEnabled = true;
           continue;
         }
         messages.push(`fail: ${cmd.join(" ")} (${err})`);
         return {
           ok: false,
           message: `Claude plugin install incomplete: ${messages.join("; ")}`,
-          pathsTouched
+          pathsTouched,
+          receipt: {
+            ...receipt,
+            previouslyInstalled,
+            previouslyEnabled
+          }
         };
       }
     }
@@ -17378,8 +17438,61 @@ var claudeMarketplaceDriver = {
     return {
       ok: true,
       message: messages.join("; "),
-      pathsTouched
+      pathsTouched,
+      receipt: {
+        ...receipt,
+        previouslyInstalled,
+        previouslyEnabled
+      }
     };
+  },
+  async rollback(receipt, ctx) {
+    const messages = [];
+    if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
+      try {
+        await execFileAsync3("claude", ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        messages.push(`disabled ${receipt.pluginId}`);
+      } catch (e) {
+        messages.push(`disable failed: ${e.message}`);
+      }
+    }
+    if (receipt.pluginInstalled && !receipt.previouslyInstalled && receipt.pluginId) {
+      try {
+        await execFileAsync3("claude", ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        messages.push(`uninstalled ${receipt.pluginId}`);
+      } catch (e) {
+        messages.push(`uninstall failed: ${e.message}`);
+      }
+    }
+    return {
+      ok: true,
+      message: messages.length > 0 ? messages.join("; ") : `no external rollback needed for ${ctx.resourceId}`
+    };
+  },
+  async verify(recipe, ctx) {
+    const plugin = recipe.plugin ?? ctx.resourceId;
+    const marketplace = recipe.marketplace;
+    const pluginId = marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
+    try {
+      const listOut = await execFileAsync3("claude", ["plugin", "list"], {
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+        encoding: "utf8"
+      });
+      const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+      const present = text.includes(pluginId) || text.includes(plugin);
+      return {
+        ok: present,
+        message: present ? `plugin present: ${pluginId}` : `plugin missing: ${pluginId}`,
+        pathsTouched: []
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        message: `verify failed: ${e.message}`,
+        pathsTouched: []
+      };
+    }
   }
 };
 var npxSkillsDriver = {
@@ -17868,14 +17981,27 @@ async function applyPlan(ctx, plan) {
   const paths = [
     ...new Set(actionable.filter((a) => a.type !== "MANUAL").flatMap((a) => a.paths).filter(Boolean))
   ];
+  const statePath = localStatePath(ctx.home);
+  if (!paths.includes(statePath))
+    paths.push(statePath);
   let tx;
   let backupId;
-  if (!ctx.dryRun && paths.length > 0) {
+  if (!ctx.dryRun) {
     tx = await beginTransaction(paths, `apply ${activePlan.id}`, ctx.home, activePlan.actions);
     backupId = tx.id;
   }
   const resourcesFile = await loadResources(import_node_path12.default.join(ctx.configRepoPath, "resources.yaml"));
   const registry = await loadRecipeRegistry(import_node_path12.default.join(ctx.configRepoPath, "recipes"));
+  const stateDraft = structuredClone(await getState(ctx.home));
+  const receipts = [];
+  function draftMark(resourceId, target, info) {
+    const entry = stateDraft.installed[resourceId] ?? {};
+    entry[target] = {
+      ...info,
+      lastChecked: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    stateDraft.installed[resourceId] = entry;
+  }
   const applied = [];
   const failed = [];
   const manual = [];
@@ -17907,7 +18033,10 @@ async function applyPlan(ctx, plan) {
     }
     const resource = resourcesFile.resources.find((r) => r.id === resourceId);
     if (!resource) {
-      failed.push({ actionId: group[0].id, error: `resource not found: ${resourceId}` });
+      failed.push({
+        actionId: group[0].id,
+        error: `resource not found: ${resourceId}`
+      });
       hardFailure = true;
       break;
     }
@@ -17927,16 +18056,28 @@ async function applyPlan(ctx, plan) {
         sourceRoot,
         dryRun: ctx.dryRun
       });
+      if (result.receipt)
+        receipts.push(result.receipt);
       if (result.externalManual) {
         manual.push(result.message);
-        await markInstalled(resourceId, target, { status: "manual", notes: result.message, path: result.pathsTouched[0] }, ctx.home);
+        draftMark(resourceId, target, {
+          status: "manual",
+          notes: result.message,
+          path: result.pathsTouched[0]
+        });
       } else if (!result.ok) {
         if (/sourceRoot|source not|recipe-stale|Source skill path missing|requiredPath missing/i.test(result.message)) {
           manual.push(result.message);
-          await markInstalled(resourceId, target, { status: "manual", notes: result.message }, ctx.home);
+          draftMark(resourceId, target, {
+            status: "manual",
+            notes: result.message
+          });
         } else {
           failed.push({ actionId: group[0].id, error: result.message });
-          await markInstalled(resourceId, target, { status: "failed", notes: result.message }, ctx.home);
+          draftMark(resourceId, target, {
+            status: "failed",
+            notes: result.message
+          });
           hardFailure = true;
           break;
         }
@@ -17957,12 +18098,12 @@ async function applyPlan(ctx, plan) {
         if (tx && result.pathsTouched.length) {
           await confirmCreatedPaths(tx, result.pathsTouched, ctx.home);
         }
-        await markInstalled(resourceId, target, {
+        draftMark(resourceId, target, {
           status: "installed",
           path: dest,
           hash,
           notes: result.message
-        }, ctx.home);
+        });
       }
       await appendLog(`apply ${resourceId}@${target}: ${result.message}`, ctx.home);
     } catch (e) {
@@ -17975,17 +18116,41 @@ async function applyPlan(ctx, plan) {
     }
   }
   let autoRolledBack = false;
-  if (hardFailure && tx && !ctx.dryRun) {
-    try {
-      await rollbackBackup(tx.id, ctx.home);
-      autoRolledBack = true;
-      await appendLog(`auto-rollback ${tx.id} after apply failure`, ctx.home);
-    } catch (e) {
-      failed.push({
-        actionId: "rollback",
-        error: `auto-rollback failed: ${e.message}`
-      });
+  if (hardFailure && !ctx.dryRun) {
+    for (const receipt of [...receipts].reverse()) {
+      try {
+        const d = getDriver(receipt.driver);
+        if (d.rollback) {
+          const rr = await d.rollback(receipt, {
+            home: ctx.home,
+            resourceId: receipt.resourceId,
+            target: receipt.target
+          });
+          await appendLog(`driver-rollback ${receipt.driver}:${receipt.resourceId}: ${rr.message}`, ctx.home);
+        }
+      } catch (e) {
+        failed.push({
+          actionId: "driver-rollback",
+          error: `${receipt.driver}: ${e.message}`
+        });
+      }
     }
+    if (tx) {
+      try {
+        await rollbackBackup(tx.id, ctx.home);
+        autoRolledBack = true;
+        await appendLog(`auto-rollback ${tx.id} after apply failure`, ctx.home);
+      } catch (e) {
+        failed.push({
+          actionId: "rollback",
+          error: `auto-rollback failed: ${e.message}`
+        });
+      }
+    }
+  } else if (!ctx.dryRun) {
+    stateDraft.lastSuccessfulApply = (/* @__PURE__ */ new Date()).toISOString();
+    stateDraft.profile = ctx.profileName;
+    await putState(stateDraft, ctx.home);
   }
   return {
     plan: activePlan,
@@ -18030,7 +18195,7 @@ async function buildDriftReport(ctx) {
 }
 
 // packages/recipe-engine/dist/capture.js
-var import_node_path14 = __toESM(require("node:path"), 1);
+var import_node_path15 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -18116,17 +18281,126 @@ async function analyzeWithOptionalAi(request, options = {}) {
   return { candidates, usedAi, notes, promptContext };
 }
 
+// packages/recipe-engine/dist/vendor.js
+var import_promises6 = __toESM(require("node:fs/promises"), 1);
+var import_node_path14 = __toESM(require("node:path"), 1);
+init_dist();
+var SKIP_DIR_NAMES = /* @__PURE__ */ new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "coverage",
+  "cache",
+  "logs",
+  ".cache",
+  "__pycache__",
+  ".venv",
+  "venv"
+]);
+var SKIP_FILE_GLOBS = [
+  /^\.env($|\.)/i,
+  /^auth\.json$/i,
+  /\.key$/i,
+  /\.pem$/i,
+  /\.p12$/i,
+  /\.pfx$/i,
+  /id_rsa/i,
+  /id_ed25519/i,
+  /\.secret\./i
+];
+function shouldSkipFile(name) {
+  return SKIP_FILE_GLOBS.some((re) => re.test(name));
+}
+async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId) {
+  const destRel = import_node_path14.default.posix.join("sources", "skills", resourceId);
+  const destAbs = import_node_path14.default.join(configRepoPath, "sources", "skills", resourceId);
+  if (!await pathExists(sourceDir)) {
+    return {
+      ok: false,
+      destRel,
+      destAbs,
+      filesCopied: 0,
+      blockedSecrets: [],
+      message: `source missing: ${sourceDir}`
+    };
+  }
+  const files = await listFilesRecursive(sourceDir, {
+    ignoreNames: [...SKIP_DIR_NAMES]
+  });
+  const blockedSecrets = [];
+  const toCopy = [];
+  for (const full of files) {
+    const base = import_node_path14.default.basename(full);
+    if (shouldSkipFile(base))
+      continue;
+    const rel = import_node_path14.default.relative(sourceDir, full);
+    try {
+      const text = await readText(full);
+      const findings = scanTextForSecrets(text, rel);
+      if (findings.length) {
+        for (const f of findings) {
+          blockedSecrets.push({ path: rel, rule: f.rule });
+        }
+        continue;
+      }
+    } catch {
+    }
+    toCopy.push(full);
+  }
+  if (blockedSecrets.length) {
+    return {
+      ok: false,
+      destRel,
+      destAbs,
+      filesCopied: 0,
+      blockedSecrets,
+      message: `Secret scan blocked vendor (${blockedSecrets.length} finding(s))`
+    };
+  }
+  if (await pathExists(destAbs)) {
+    await import_promises6.default.rm(destAbs, { recursive: true, force: true });
+  }
+  await ensureDir(destAbs);
+  let copied = 0;
+  for (const full of toCopy) {
+    const rel = import_node_path14.default.relative(sourceDir, full);
+    const out = import_node_path14.default.join(destAbs, rel);
+    await ensureDir(import_node_path14.default.dirname(out));
+    await import_promises6.default.copyFile(full, out);
+    copied++;
+  }
+  const hash = shortHash(await hashDirectory(destAbs));
+  return {
+    ok: true,
+    destRel,
+    destAbs,
+    hash,
+    filesCopied: copied,
+    blockedSecrets: [],
+    message: `vendored ${copied} file(s) \u2192 ${destRel}`
+  };
+}
+
 // packages/recipe-engine/dist/capture.js
 function logicalId(s) {
+  if (s.kind === "skill")
+    return s.id;
   if (s.sourceCandidate) {
     const repo = s.sourceCandidate.replace(/\.git$/i, "");
     const short = repo.includes("/") ? repo.split("/").pop() : repo;
+    if (s.id.includes("@"))
+      return s.id.split("@")[0] || short || s.id;
     return short || s.id;
   }
   return s.id;
 }
+function groupKey(s) {
+  const name = logicalId(s);
+  const repo = s.sourceCandidate?.replace(/\.git$/i, "") ?? "local";
+  return `${repo}::${name}::${s.kind}`;
+}
 async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
-  const existing = await loadResources(import_node_path14.default.join(configRepoPath, "resources.yaml"));
+  const existing = await loadResources(import_node_path15.default.join(configRepoPath, "resources.yaml"));
   const existingIds = new Set(existing.resources.map((r) => r.id));
   const groups = /* @__PURE__ */ new Map();
   for (const s of scanned) {
@@ -18143,12 +18417,14 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
       continue;
     if (existingIds.has(id) && !options.includeManaged)
       continue;
-    const list = groups.get(id) ?? [];
+    const key = groupKey(s);
+    const list = groups.get(key) ?? [];
     list.push(s);
-    groups.set(id, list);
+    groups.set(key, list);
   }
   const items = [];
-  for (const [id, group] of groups) {
+  for (const [, group] of groups) {
+    const id = logicalId(group[0]);
     const primary = group.find((g) => g.kind === "skill") ?? group.find((g) => g.kind === "plugin") ?? group[0];
     const sourceCandidate = group.map((g) => g.sourceCandidate).find(Boolean) ?? primary.sourceCandidate;
     let analyzeRoot = primary.path;
@@ -18245,9 +18521,9 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
       source: sourceCandidate ? {
         provider: "github",
         repository: sourceCandidate
-      } : usedRemoteSource ? { provider: "github", repository: sourceCandidate } : {
+      } : {
+        // Will be rewritten to vendored on commit if still local absolute
         provider: "local",
-        // Prefer vendoring relative path later; keep path for now
         path: primary.path
       },
       targets: {
@@ -18275,12 +18551,12 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
         } : {}
       },
       profiles: ["home"],
-      versionPolicy: "latest-confirm"
+      versionPolicy: sourceCandidate ? "latest-confirm" : "vendored"
     };
     let suggestedRecipe;
     if (Object.keys(targetRecipes).length > 0) {
       let existingTargets = {};
-      const recipeFile = import_node_path14.default.join(configRepoPath, "recipes", `${id}.yaml`);
+      const recipeFile = import_node_path15.default.join(configRepoPath, "recipes", `${id}.yaml`);
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -18313,7 +18589,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
   return items;
 }
 async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
-  const resourcesPath = import_node_path14.default.join(configRepoPath, "resources.yaml");
+  const resourcesPath = import_node_path15.default.join(configRepoPath, "resources.yaml");
   const existing = await loadResources(resourcesPath);
   const byId = new Map(existing.resources.map((r) => [r.id, r]));
   const recipePaths = [];
@@ -18354,6 +18630,36 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
     });
   }
   for (const item of batchById.values()) {
+    if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path15.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
+      const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id);
+      if (!v.ok) {
+        throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
+      }
+      item.suggestedResource = {
+        ...item.suggestedResource,
+        source: {
+          provider: "vendored",
+          path: v.destRel
+        },
+        versionPolicy: "vendored"
+      };
+      if (item.suggestedRecipe) {
+        item.suggestedRecipe = {
+          ...item.suggestedRecipe,
+          source: item.suggestedResource.source,
+          versionPolicy: "vendored",
+          targets: Object.fromEntries(Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
+            t,
+            tr ? {
+              ...tr,
+              sourcePaths: { skill: "." },
+              requiredPaths: ["SKILL.md"],
+              driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill"
+            } : tr
+          ]))
+        };
+      }
+    }
     const prev = byId.get(item.suggestedResource.id);
     if (prev) {
       byId.set(item.suggestedResource.id, {
@@ -18368,7 +18674,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
       byId.set(item.suggestedResource.id, item.suggestedResource);
     }
     if (item.suggestedRecipe) {
-      const recipeFile = import_node_path14.default.join(configRepoPath, "recipes", `${item.suggestedResource.id}.yaml`);
+      const recipeFile = import_node_path15.default.join(configRepoPath, "recipes", `${item.suggestedResource.id}.yaml`);
       let baseTargets = item.suggestedRecipe.targets;
       if (await pathExists(recipeFile)) {
         try {
@@ -18398,7 +18704,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
 }
 
 // packages/recipe-engine/dist/doctor.js
-var import_node_path15 = __toESM(require("node:path"), 1);
+var import_node_path16 = __toESM(require("node:path"), 1);
 init_dist();
 async function runDoctor(options) {
   const findings = [];
@@ -18441,6 +18747,26 @@ async function runDoctor(options) {
         message: `${bin} not found on PATH`
       });
     }
+  }
+  try {
+    const { execFile: execFile4 } = await import("node:child_process");
+    const { promisify: promisify4 } = await import("node:util");
+    const execFileAsync4 = promisify4(execFile4);
+    const out = await execFileAsync4("ai-config-sync", ["--version"], {
+      windowsHide: true,
+      encoding: "utf8"
+    });
+    findings.push({
+      severity: "ok",
+      code: "cli-present",
+      message: `ai-config-sync CLI: ${String(out.stdout || out.stderr || "").trim()}`
+    });
+  } catch {
+    findings.push({
+      severity: "warn",
+      code: "cli-missing",
+      message: "ai-config-sync not on PATH (Claude Plugin bin may still work in-session)"
+    });
   }
   if (options.configRepoPath) {
     const repo = options.configRepoPath;
@@ -18486,7 +18812,7 @@ async function runDoctor(options) {
           });
         }
       }
-      const resourcesPath = import_node_path15.default.join(repo, "resources.yaml");
+      const resourcesPath = import_node_path16.default.join(repo, "resources.yaml");
       if (!await pathExists(resourcesPath)) {
         findings.push({
           severity: "warn",
@@ -18542,12 +18868,31 @@ async function runDoctor(options) {
   }
   const hooksManifest = codexHooksManifestPath(home);
   if (await pathExists(hooksManifest)) {
-    findings.push({
-      severity: "ok",
-      code: "codex-hooks-manifest",
-      message: "Codex hooks.json present",
-      path: hooksManifest
-    });
+    try {
+      const hooks = await readJsonFile(hooksManifest);
+      const managed = hasManagedCodexSessionStart(hooks);
+      findings.push({
+        severity: managed ? "ok" : "warn",
+        code: managed ? "codex-hooks-managed" : "codex-hooks-unmanaged",
+        message: managed ? "Codex SessionStart ai-config-sync hook present" : "Codex hooks.json present but managed SessionStart not found",
+        path: hooksManifest
+      });
+      if (Array.isArray(hooks.hooks)) {
+        findings.push({
+          severity: "warn",
+          code: "codex-hooks-legacy-array",
+          message: "hooks.json uses legacy array form; prefer event-map SessionStart",
+          path: hooksManifest
+        });
+      }
+    } catch {
+      findings.push({
+        severity: "error",
+        code: "codex-hooks-invalid",
+        message: "hooks.json unreadable or invalid JSON",
+        path: hooksManifest
+      });
+    }
   }
   const state = await getState(home);
   for (const [id, targets] of Object.entries(state.installed)) {
@@ -18567,7 +18912,7 @@ async function runDoctor(options) {
   }
   if (options.configRepoPath) {
     try {
-      const res = await loadResources(import_node_path15.default.join(options.configRepoPath, "resources.yaml"));
+      const res = await loadResources(import_node_path16.default.join(options.configRepoPath, "resources.yaml"));
       const refs = collectSecretRefs(res);
       if (refs.length > 0) {
         const checks = await checkSecrets(refs, "env");
@@ -18605,37 +18950,37 @@ function formatDoctor(report) {
 }
 
 // packages/cli/src/setup.ts
-var import_node_path16 = __toESM(require("node:path"), 1);
-var import_promises6 = __toESM(require("node:fs/promises"), 1);
+var import_node_path17 = __toESM(require("node:path"), 1);
+var import_promises7 = __toESM(require("node:fs/promises"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
 function packageRootFromHere() {
   try {
-    const here = import_node_path16.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
-    const root = import_node_path16.default.resolve(here, "../../..");
+    const here = import_node_path17.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
+    const root = import_node_path17.default.resolve(here, "../../..");
     return root;
   } catch {
     return void 0;
   }
 }
 async function detectProgramRoot(explicit) {
-  if (explicit && await pathExists(explicit)) return import_node_path16.default.resolve(explicit);
+  if (explicit && await pathExists(explicit)) return import_node_path17.default.resolve(explicit);
   const fromModule = packageRootFromHere();
   if (fromModule && await pathExists(
-    import_node_path16.default.join(fromModule, "integrations", "claude-plugin", ".claude-plugin")
+    import_node_path17.default.join(fromModule, "integrations", "claude-plugin", ".claude-plugin")
   )) {
     return fromModule;
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     if (await pathExists(
-      import_node_path16.default.join(dir, "integrations", "claude-plugin", ".claude-plugin")
+      import_node_path17.default.join(dir, "integrations", "claude-plugin", ".claude-plugin")
     )) {
       return dir;
     }
-    const parent = import_node_path16.default.dirname(dir);
+    const parent = import_node_path17.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -18651,7 +18996,7 @@ async function detectConfigRepo(options, home) {
     }
   }
   if (options.configPath) {
-    const localPath = import_node_path16.default.resolve(expandHome(options.configPath, home));
+    const localPath = import_node_path17.default.resolve(expandHome(options.configPath, home));
     return {
       localPath,
       remote: options.repo ?? existingLink?.configRepository.remote,
@@ -18681,7 +19026,7 @@ async function detectConfigRepo(options, home) {
         blocked: `Already linked to ${existingLink.configRepository.localPath}` + (existingLink.configRepository.remote ? ` (${existingLink.configRepository.remote})` : "") + `. Requested --repo ${options.repo}. Use --reconfigure to switch, or --config-path for a different directory.`
       };
     }
-    const defaultPath = import_node_path16.default.join(home, "ai-config", "my-ai-config");
+    const defaultPath = import_node_path17.default.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
@@ -18701,34 +19046,34 @@ async function detectConfigRepo(options, home) {
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
       return {
-        localPath: import_node_path16.default.join(home, "ai-config", "my-ai-config"),
+        localPath: import_node_path17.default.join(home, "ai-config", "my-ai-config"),
         remote: envRepo,
         reason: "AI_CONFIG_SYNC_REPO"
       };
     }
     return {
-      localPath: import_node_path16.default.resolve(expandHome(envRepo, home)),
+      localPath: import_node_path17.default.resolve(expandHome(envRepo, home)),
       reason: "AI_CONFIG_SYNC_REPO path"
     };
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    const files = await import_promises6.default.readdir(dir).catch(() => []);
+    const files = await import_promises7.default.readdir(dir).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: dir, reason: "cwd walk" };
     }
-    const parent = import_node_path16.default.dirname(dir);
+    const parent = import_node_path17.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   const candidates = [
-    import_node_path16.default.join(home, "ai-config", "my-ai-config"),
-    import_node_path16.default.join(home, "Git", "my-ai-config"),
-    import_node_path16.default.join(home, "git", "my-ai-config")
+    import_node_path17.default.join(home, "ai-config", "my-ai-config"),
+    import_node_path17.default.join(home, "Git", "my-ai-config"),
+    import_node_path17.default.join(home, "git", "my-ai-config")
   ];
   for (const c of candidates) {
     if (!await pathExists(c)) continue;
-    const files = await import_promises6.default.readdir(c).catch(() => []);
+    const files = await import_promises7.default.readdir(c).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: c, reason: "default directory" };
     }
@@ -18738,18 +19083,18 @@ async function detectConfigRepo(options, home) {
 async function ensureMinimalConfigRepo(localPath) {
   const actions = [];
   await ensureDir(localPath);
-  const configYaml = import_node_path16.default.join(localPath, "config.yaml");
+  const configYaml = import_node_path17.default.join(localPath, "config.yaml");
   if (!await pathExists(configYaml)) {
     await writeYamlFile(
       configYaml,
       ConfigRepoSchema.parse({
-        name: import_node_path16.default.basename(localPath),
+        name: import_node_path17.default.basename(localPath),
         defaultProfile: "home"
       })
     );
     actions.push(`CREATE ${configYaml}`);
   }
-  const resources = import_node_path16.default.join(localPath, "resources.yaml");
+  const resources = import_node_path17.default.join(localPath, "resources.yaml");
   if (!await pathExists(resources)) {
     await writeYamlFile(resources, { schemaVersion: 1, resources: [] });
     actions.push(`CREATE ${resources}`);
@@ -18765,13 +19110,13 @@ async function ensureMinimalConfigRepo(localPath) {
     "instructions/claude",
     "instructions/codex"
   ]) {
-    const full = import_node_path16.default.join(localPath, d);
+    const full = import_node_path17.default.join(localPath, d);
     if (!await pathExists(full)) {
       await ensureDir(full);
       actions.push(`CREATE dir ${d}`);
     }
   }
-  const baseProfile = import_node_path16.default.join(localPath, "profiles", "base.yaml");
+  const baseProfile = import_node_path17.default.join(localPath, "profiles", "base.yaml");
   if (!await pathExists(baseProfile)) {
     await writeYamlFile(baseProfile, {
       profile: "base",
@@ -18780,7 +19125,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/base.yaml");
   }
-  const homeProfile = import_node_path16.default.join(localPath, "profiles", "home.yaml");
+  const homeProfile = import_node_path17.default.join(localPath, "profiles", "home.yaml");
   if (!await pathExists(homeProfile)) {
     await writeYamlFile(homeProfile, {
       profile: "home",
@@ -18795,7 +19140,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/home.yaml");
   }
-  const gitignore = import_node_path16.default.join(localPath, ".gitignore");
+  const gitignore = import_node_path17.default.join(localPath, ".gitignore");
   if (!await pathExists(gitignore)) {
     await writeText(
       gitignore,
@@ -18815,19 +19160,19 @@ async function ensureMinimalConfigRepo(localPath) {
 }
 async function installClaudePlugin(home, programRoot) {
   const actions = [];
-  const pluginSrc = import_node_path16.default.join(programRoot, "integrations", "claude-plugin");
-  if (!await pathExists(import_node_path16.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
+  const pluginSrc = import_node_path17.default.join(programRoot, "integrations", "claude-plugin");
+  if (!await pathExists(import_node_path17.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
     return actions;
   }
-  const marketplacesDir = import_node_path16.default.join(home, ".claude", "plugins", "marketplaces");
-  const dest = import_node_path16.default.join(marketplacesDir, "ai-config-sync");
+  const marketplacesDir = import_node_path17.default.join(home, ".claude", "plugins", "marketplaces");
+  const dest = import_node_path17.default.join(marketplacesDir, "ai-config-sync");
   await ensureDir(marketplacesDir);
-  const destPluginJson = import_node_path16.default.join(dest, ".claude-plugin", "plugin.json");
+  const destPluginJson = import_node_path17.default.join(dest, ".claude-plugin", "plugin.json");
   let needCopy = true;
   if (await pathExists(destPluginJson)) {
     try {
       const a = await readJsonFile(
-        import_node_path16.default.join(pluginSrc, ".claude-plugin", "plugin.json")
+        import_node_path17.default.join(pluginSrc, ".claude-plugin", "plugin.json")
       );
       const b = await readJsonFile(destPluginJson);
       if (a.version && a.version === b.version) needCopy = false;
@@ -18836,11 +19181,11 @@ async function installClaudePlugin(home, programRoot) {
     }
   }
   if (needCopy) {
-    await import_promises6.default.rm(dest, { recursive: true, force: true });
-    await import_promises6.default.cp(pluginSrc, dest, { recursive: true });
+    await import_promises7.default.rm(dest, { recursive: true, force: true });
+    await import_promises7.default.cp(pluginSrc, dest, { recursive: true });
     actions.push(`INSTALL Claude marketplace copy \u2192 ${dest}`);
   }
-  const knownPath = import_node_path16.default.join(
+  const knownPath = import_node_path17.default.join(
     home,
     ".claude",
     "plugins",
@@ -18917,7 +19262,7 @@ async function installClaudePlugin(home, programRoot) {
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
     } else {
-      const settingsPath = import_node_path16.default.join(home, ".claude", "settings.json");
+      const settingsPath = import_node_path17.default.join(home, ".claude", "settings.json");
       let settings = {};
       if (await pathExists(settingsPath)) {
         try {
@@ -18947,16 +19292,16 @@ async function installClaudePlugin(home, programRoot) {
     (a) => /plugin enable|already enabled|already installed/i.test(a) || a.includes("claude plugin install")
   );
   if (!pluginEnabled) {
-    const skillSrc = import_node_path16.default.join(pluginSrc, "skills", "config-sync");
-    const skillDest = import_node_path16.default.join(home, ".claude", "skills", "config-sync");
-    const skillMd = import_node_path16.default.join(skillDest, "SKILL.md");
+    const skillSrc = import_node_path17.default.join(pluginSrc, "skills", "config-sync");
+    const skillDest = import_node_path17.default.join(home, ".claude", "skills", "config-sync");
+    const skillMd = import_node_path17.default.join(skillDest, "SKILL.md");
     if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-      await ensureDir(import_node_path16.default.dirname(skillDest));
-      await import_promises6.default.cp(skillSrc, skillDest, { recursive: true });
+      await ensureDir(import_node_path17.default.dirname(skillDest));
+      await import_promises7.default.cp(skillSrc, skillDest, { recursive: true });
       actions.push("INSTALL Claude user skill: config-sync (fallback)");
     }
   } else {
-    const skillMd = import_node_path16.default.join(
+    const skillMd = import_node_path17.default.join(
       home,
       ".claude",
       "skills",
@@ -18965,9 +19310,9 @@ async function installClaudePlugin(home, programRoot) {
     );
     if (await pathExists(skillMd)) {
       try {
-        const text = await import_promises6.default.readFile(skillMd, "utf8");
+        const text = await import_promises7.default.readFile(skillMd, "utf8");
         if (text.includes("ai-config-sync") && text.includes("\u8DE8\u7535\u8111\u540C\u6B65")) {
-          await import_promises6.default.rm(import_node_path16.default.dirname(skillMd), { recursive: true, force: true });
+          await import_promises7.default.rm(import_node_path17.default.dirname(skillMd), { recursive: true, force: true });
           actions.push("REMOVE Claude fallback skill (plugin is active)");
         }
       } catch {
@@ -18981,10 +19326,10 @@ function messagesPushSafe(actions, line) {
 }
 async function installCodexIntegration(home, programRoot) {
   const actions = [];
-  const skillDest = import_node_path16.default.join(agentsSkillsDir(home), "config-sync");
+  const skillDest = import_node_path17.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
-    const p = import_node_path16.default.join(
+    const p = import_node_path17.default.join(
       programRoot,
       "integrations",
       "codex",
@@ -18993,11 +19338,11 @@ async function installCodexIntegration(home, programRoot) {
     );
     if (await pathExists(p)) skillSrc = p;
   }
-  const skillMd = import_node_path16.default.join(skillDest, "SKILL.md");
+  const skillMd = import_node_path17.default.join(skillDest, "SKILL.md");
   if (!await pathExists(skillMd)) {
     await ensureDir(skillDest);
     if (skillSrc) {
-      await import_promises6.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises7.default.cp(skillSrc, skillDest, { recursive: true });
     } else {
       await writeText(
         skillMd,
@@ -19028,14 +19373,14 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      await import_promises6.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      await import_promises7.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
     }
   }
   const { next, changed } = mergeManagedCodexSessionStart(base);
   if (changed || !hasManagedCodexSessionStart(base)) {
-    await ensureDir(import_node_path16.default.dirname(hooksPath));
+    await ensureDir(import_node_path17.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push("MERGE Codex hooks.json SessionStart (event-map format)");
   }
@@ -19045,7 +19390,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     toml = mergeTomlText(toml, [
       { section: "features", key: "hooks", value: true }
     ]);
-    await ensureDir(import_node_path16.default.dirname(cfgPath));
+    await ensureDir(import_node_path17.default.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
   }
@@ -19077,10 +19422,10 @@ async function runSetup(options = {}) {
     };
   }
   if (detected.existingLink && mode !== "reconfigure" && options.configPath) {
-    const existingPath = import_node_path16.default.resolve(
+    const existingPath = import_node_path17.default.resolve(
       detected.existingLink.configRepository.localPath
     );
-    const requested = import_node_path16.default.resolve(expandHome(options.configPath, home));
+    const requested = import_node_path17.default.resolve(expandHome(options.configPath, home));
     if (existingPath !== requested) {
       return {
         status: "planned",
@@ -19179,7 +19524,7 @@ async function runSetup(options = {}) {
   if (await pathExists(cfgPath) && mode !== "reconfigure") {
     try {
       const prev = await loadLocalConfig(cfgPath);
-      const samePath = import_node_path16.default.resolve(prev.configRepository.localPath) === import_node_path16.default.resolve(localPath);
+      const samePath = import_node_path17.default.resolve(prev.configRepository.localPath) === import_node_path17.default.resolve(localPath);
       const sameProfile = prev.profile === profile;
       if (samePath && sameProfile && mode === "default") {
         status = "no-changes";
@@ -19197,7 +19542,7 @@ async function runSetup(options = {}) {
     if (await pathExists(cfgPath) && mode !== "reconfigure") {
       try {
         const prev = await loadLocalConfig(cfgPath);
-        if (import_node_path16.default.resolve(prev.configRepository.localPath) === import_node_path16.default.resolve(localPath) && prev.profile === profile) {
+        if (import_node_path17.default.resolve(prev.configRepository.localPath) === import_node_path17.default.resolve(localPath) && prev.profile === profile) {
           shouldWrite = false;
         }
       } catch {
@@ -19229,8 +19574,8 @@ async function runSetup(options = {}) {
         if (status === "no-changes") status = "repaired";
       }
     } else {
-      const skillDir = import_node_path16.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path16.default.join(skillDir, "SKILL.md");
+      const skillDir = import_node_path17.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path17.default.join(skillDir, "SKILL.md");
       if (!await pathExists(skillMd)) {
         await ensureDir(skillDir);
         await writeText(
@@ -19279,12 +19624,12 @@ user-invocable: true
 }
 
 // packages/cli/src/index.ts
-var import_node_path17 = __toESM(require("node:path"), 1);
+var import_node_path18 = __toESM(require("node:path"), 1);
 init_dist();
 var program2 = new Command();
 program2.name("ai-config-sync").description(
   "AI Agent config sync \u2014 private config repo + Claude Code / Codex integrations"
-).version("0.3.0");
+).version("0.4.0");
 function homeOpt(cmd) {
   return expandHome(cmd.opts().home ?? import_node_os3.default.homedir());
 }
@@ -19610,9 +19955,9 @@ program2.command("update").description("Fetch sources per versionPolicy and re-a
   if (!requireLinked(ctx, "update")) return;
   const { localConfig, configRepoPath } = ctx;
   const resources = await loadResources(
-    import_node_path17.default.join(configRepoPath, "resources.yaml")
+    import_node_path18.default.join(configRepoPath, "resources.yaml")
   );
-  const lock = await loadLock(import_node_path17.default.join(configRepoPath, "lock.yaml"));
+  const lock = await loadLock(import_node_path18.default.join(configRepoPath, "lock.yaml"));
   for (const r of resources.resources) {
     const locked = lock.entries.find((e) => e.resourceId === r.id);
     const check = await checkVersionPolicy({
@@ -19736,7 +20081,7 @@ program2.command("secret").description("Check or document secretRef resolution (
     }
     if (ctx.configRepoPath && (action === "scan" || !ref)) {
       const resources = await loadResources(
-        import_node_path17.default.join(ctx.configRepoPath, "resources.yaml")
+        import_node_path18.default.join(ctx.configRepoPath, "resources.yaml")
       );
       const refs = collectSecretRefs(resources);
       if (refs.length === 0) {
