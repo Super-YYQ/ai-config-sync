@@ -315,11 +315,34 @@ async function installClaudePlugin(
     actions.push("UPDATE known_marketplaces.json: ai-config-sync");
   }
 
-  // Official CLI: install + enable (creates cache entry that powers slash commands)
+  // Prefer GitHub-style online marketplace when possible (same as other plugins).
+  // Fall back to local directory copy for offline/dev.
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
   const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+
+  let usedOnlineMarketplace = false;
+  try {
+    // Add marketplace from GitHub if not already present
+    try {
+      await execFileAsync(
+        claudeBin,
+        ["plugin", "marketplace", "add", "Super-YYQ/ai-config-sync"],
+        { windowsHide: true, timeout: 120000, maxBuffer: 4 * 1024 * 1024 },
+      );
+      actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
+      usedOnlineMarketplace = true;
+    } catch (e) {
+      const msg = (e as Error).message || String(e);
+      if (/already|exists/i.test(msg)) {
+        usedOnlineMarketplace = true;
+        actions.push("claude marketplace already has ai-config-sync");
+      }
+    }
+  } catch {
+    /* claude missing — use directory copy already done */
+  }
 
   try {
     await execFileAsync(
@@ -371,6 +394,12 @@ async function installClaudePlugin(
       }
       messagesPushSafe(actions, `WARN claude plugin enable: ${msg.slice(0, 160)}`);
     }
+  }
+
+  if (!usedOnlineMarketplace) {
+    actions.push(
+      "NOTE: online marketplace add unavailable; using local directory marketplace",
+    );
   }
 
   // User-level skill backup (works even if plugin slash cmds lag)

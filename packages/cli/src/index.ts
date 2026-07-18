@@ -50,7 +50,7 @@ program
   .description(
     "AI Agent config sync — private config repo + Claude Code / Codex integrations",
   )
-  .version("0.2.0");
+  .version("0.2.1");
 
 function homeOpt(cmd: { opts: () => { home?: string } }): string {
   return expandHome(cmd.opts().home ?? os.homedir());
@@ -59,15 +59,61 @@ function homeOpt(cmd: { opts: () => { home?: string } }): string {
 async function loadCtx(home: string): Promise<{
   localConfig?: LocalConfig;
   configRepoPath?: string;
+  linked: boolean;
 }> {
   const cfgPath = localConfigPath(home);
-  if (!(await pathExists(cfgPath))) return {};
-  const localConfig = await loadLocalConfig(cfgPath);
-  return {
-    localConfig,
-    configRepoPath: localConfig.configRepository.localPath,
-  };
+  if (!(await pathExists(cfgPath))) return { linked: false };
+  try {
+    const localConfig = await loadLocalConfig(cfgPath);
+    return {
+      localConfig,
+      configRepoPath: localConfig.configRepository.localPath,
+      linked: true,
+    };
+  } catch (e) {
+    return { linked: false };
+  }
 }
+
+/** Friendly guidance when private config repo is not linked yet. */
+function printNotLinkedHelp(command: string): void {
+  console.log(`还没有关联「私有配置仓库」，所以暂时不能执行：${command}`);
+  console.log("");
+  console.log("私有配置仓库 = 只属于你的 Git 仓库，用来保存「装了哪些 Skill/Plugin」。");
+  console.log("它和本程序仓库（ai-config-sync）是分开的。");
+  console.log("");
+  console.log("在 Claude 对话里可以直接说：");
+  console.log('  「帮我初始化配置同步」');
+  console.log('  「用模板创建私有配置仓库」');
+  console.log("");
+  console.log("或让助手执行下面其中一种（路径请改成你的）：");
+  console.log("");
+  console.log("  # A) 本机已有空目录 / 想用内置模板：");
+  console.log("  ai-config-sync setup --config-path ~/ai-config/my-ai-config --profile home");
+  console.log("");
+  console.log("  # B) 已有远程私有仓库：");
+  console.log("  ai-config-sync setup --repo git@github.com:你/my-ai-config.git --profile home");
+  console.log("");
+  console.log("说明：scan（只读扫描本机）不强制需要私有仓库；");
+  console.log("      capture / restore / plan 才需要先 setup 关联。");
+}
+
+function requireLinked(
+  ctx: { linked: boolean; localConfig?: LocalConfig; configRepoPath?: string },
+  command: string,
+): ctx is {
+  linked: true;
+  localConfig: LocalConfig;
+  configRepoPath: string;
+} {
+  if (!ctx.linked || !ctx.localConfig || !ctx.configRepoPath) {
+    printNotLinkedHelp(command);
+    process.exitCode = 1;
+    return false;
+  }
+  return true;
+}
+
 
 program
   .command("setup")
@@ -118,13 +164,13 @@ program
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
     await ensureStateDirs(home);
-    const { localConfig, configRepoPath } = await loadCtx(home);
+    const ctx = await loadCtx(home);
     const state = await getState(home);
     const pending = await loadPending(home);
     const payload = {
-      linked: !!localConfig,
-      localConfig,
-      configRepoPath,
+      linked: ctx.linked,
+      localConfig: ctx.localConfig,
+      configRepoPath: ctx.configRepoPath,
       stateSummary: {
         profile: state.profile,
         lastAppliedCommit: state.lastAppliedCommit,
@@ -138,22 +184,22 @@ program
       console.log(JSON.stringify(payload, null, 2));
       return;
     }
-    if (!localConfig) {
-      console.log("Not initialized. Run: ai-config-sync setup");
+    if (!ctx.linked || !ctx.localConfig) {
+      printNotLinkedHelp("status");
       return;
     }
-    console.log(`Profile: ${localConfig.profile}`);
-    console.log(`Config repository: ${localConfig.configRepository.localPath}`);
-    if (localConfig.configRepository.remote) {
-      console.log(`Remote: ${localConfig.configRepository.remote}`);
+    console.log(`Profile: ${ctx.localConfig.profile}`);
+    console.log(`Config repository: ${ctx.localConfig.configRepository.localPath}`);
+    if (ctx.localConfig.configRepository.remote) {
+      console.log(`Remote: ${ctx.localConfig.configRepository.remote}`);
     }
     console.log(
-      `Targets: claude=${localConfig.targets.claude} codex=${localConfig.targets.codex}`,
+      `Targets: claude=${ctx.localConfig.targets.claude} codex=${ctx.localConfig.targets.codex}`,
     );
     console.log(`Installed resources: ${payload.stateSummary.installedCount}`);
     console.log(`Pending batches: ${payload.pendingBatches}`);
-    if (configRepoPath) {
-      const git = await inspectGitSafety(configRepoPath);
+    if (ctx.configRepoPath) {
+      const git = await inspectGitSafety(ctx.configRepoPath);
       if (git.messages.length) {
         console.log("Git:");
         for (const m of git.messages) console.log(`  - ${m}`);
@@ -170,14 +216,14 @@ program
   .option("--write-pending", "Write unmanaged findings to pending events")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig } = await loadCtx(home);
+    const ctx = await loadCtx(home);
     const state = await getState(home);
     const managedIds = new Set(Object.keys(state.installed));
     const result = await scanLocal({
       home,
       light: !!opts.light,
       managedIds,
-      targets: localConfig?.targets,
+      targets: ctx.localConfig?.targets,
     });
     if (opts.writePending) {
       const unmanaged = inventryDiff(result, managedIds);
@@ -196,8 +242,30 @@ program
       }
     }
     if (opts.json) {
-      console.log(JSON.stringify(result, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            ...result,
+            linked: ctx.linked,
+            configRepoPath: ctx.configRepoPath ?? null,
+            hint: ctx.linked
+              ? null
+              : "Private config repo not linked. scan still works (read-only). Run setup before capture/restore.",
+          },
+          null,
+          2,
+        ),
+      );
       return;
+    }
+    if (!ctx.linked) {
+      console.log(
+        "提示：尚未关联私有配置仓库。本次只是只读扫描本机，不会写入任何仓库。",
+      );
+      console.log(
+        "若要把结果备份起来，请先 setup（对话里说「初始化配置同步」）。",
+      );
+      console.log("");
     }
     console.log(`Scanned at ${result.scannedAt}`);
     console.log(`Resources: ${result.resources.length}`);
@@ -208,6 +276,10 @@ program
       );
     }
     for (const w of result.warnings) console.log(`WARN: ${w}`);
+    if (!ctx.linked) {
+      console.log("");
+      console.log("下一步：关联私有配置仓库后，可用 capture 把未纳管资源写入清单。");
+    }
   });
 
 program
@@ -221,12 +293,9 @@ program
   .option("--ai", "Enable analyze-only AI/heuristic recipe assistant for non-standard sources")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig, configRepoPath } = await loadCtx(home);
-    if (!localConfig || !configRepoPath) {
-      console.error("Not initialized. Run setup first.");
-      process.exitCode = 1;
-      return;
-    }
+    const ctx = await loadCtx(home);
+    if (!requireLinked(ctx, "capture")) return;
+    const { localConfig, configRepoPath } = ctx;
     const state = await getState(home);
     const managedIds = new Set(Object.keys(state.installed));
     const scan = await scanLocal({
@@ -312,12 +381,9 @@ program
   .option("--json", "JSON output")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig, configRepoPath } = await loadCtx(home);
-    if (!localConfig || !configRepoPath) {
-      console.error("Not initialized. Run setup first.");
-      process.exitCode = 1;
-      return;
-    }
+    const ctx = await loadCtx(home);
+    if (!requireLinked(ctx, "plan")) return;
+    const { localConfig, configRepoPath } = ctx;
     const plan = await buildPlan({
       home,
       configRepoPath,
@@ -345,12 +411,9 @@ async function runApplyLike(
   label: string,
 ) {
   const home = homeOpt({ opts: () => opts });
-  const { localConfig, configRepoPath } = await loadCtx(home);
-  if (!localConfig || !configRepoPath) {
-    console.error("Not initialized. Run setup first.");
-    process.exitCode = 1;
-    return;
-  }
+  const ctx = await loadCtx(home);
+  if (!requireLinked(ctx, label.toLowerCase())) return;
+  const { localConfig, configRepoPath } = ctx;
   // Safety: pull only when clean
   const git = await inspectGitSafety(configRepoPath);
   if (git.canPull) {
@@ -430,12 +493,9 @@ program
   .option("--json", "JSON output")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig, configRepoPath } = await loadCtx(home);
-    if (!localConfig || !configRepoPath) {
-      console.error("Not initialized. Run setup first.");
-      process.exitCode = 1;
-      return;
-    }
+    const ctx = await loadCtx(home);
+    if (!requireLinked(ctx, "update")) return;
+    const { localConfig, configRepoPath } = ctx;
     // Report version policies before apply
     const resources = await loadResources(
       path.join(configRepoPath, "resources.yaml"),
@@ -461,11 +521,19 @@ program
   .option("--json", "JSON output")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig, configRepoPath } = await loadCtx(home);
-    const report = await runDoctor({ home, localConfig, configRepoPath });
+    const ctx = await loadCtx(home);
+    const report = await runDoctor({
+      home,
+      localConfig: ctx.localConfig,
+      configRepoPath: ctx.configRepoPath,
+    });
     if (opts.json) {
-      console.log(JSON.stringify(report, null, 2));
+      console.log(JSON.stringify({ ...report, linked: ctx.linked }, null, 2));
       return;
+    }
+    if (!ctx.linked) {
+      console.log("提示：尚未关联私有配置仓库。Doctor 仍可检查本机依赖。");
+      console.log("");
     }
     console.log(formatDoctor(report));
     if (!report.ok) process.exitCode = 1;
@@ -478,12 +546,9 @@ program
   .option("--json", "JSON output")
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
-    const { localConfig, configRepoPath } = await loadCtx(home);
-    if (!localConfig || !configRepoPath) {
-      console.error("Not initialized. Run setup first.");
-      process.exitCode = 1;
-      return;
-    }
+    const ctx = await loadCtx(home);
+    if (!requireLinked(ctx, "drift")) return;
+    const { localConfig, configRepoPath } = ctx;
     const report = await buildDriftReport({
       home,
       configRepoPath,
@@ -579,18 +644,18 @@ program
       return;
     }
     if (action === "scan" || (!ref && action === "check")) {
-      const { configRepoPath } = await loadCtx(home);
-      if (!configRepoPath) {
-        console.log("Not initialized; provide a ref or run setup.");
+      const ctx = await loadCtx(home);
+      if (!ctx.configRepoPath) {
+        console.log("尚未关联私有配置仓库；可先检查单个 ref，或先 setup。");
         if (ref) {
           /* fallthrough */
         } else {
           return;
         }
       }
-      if (configRepoPath && (action === "scan" || !ref)) {
+      if (ctx.configRepoPath && (action === "scan" || !ref)) {
         const resources = await loadResources(
-          path.join(configRepoPath, "resources.yaml"),
+          path.join(ctx.configRepoPath, "resources.yaml"),
         );
         const refs = collectSecretRefs(resources);
         if (refs.length === 0) {

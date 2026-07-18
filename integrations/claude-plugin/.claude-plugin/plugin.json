@@ -1,6 +1,6 @@
 {
   "name": "ai-config-sync",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI Agent 配置同步：scan / capture / restore / doctor。在 Claude Code 对话中用斜杠命令或直接说「扫描配置」「同步配置」。",
   "author": {
     "name": "Super-YYQ",
