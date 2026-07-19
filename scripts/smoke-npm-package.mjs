@@ -72,14 +72,23 @@ if (!fs.existsSync(template)) {
     "installed package missing examples/private-config-template — packaging incomplete",
   );
 }
-// integrations must also ship
+// integrations + root marketplace manifest must also ship
 for (const rel of [
   "integrations/claude-plugin/.claude-plugin/plugin.json",
   "integrations/codex/skills/config-sync/SKILL.md",
+  ".claude-plugin/marketplace.json",
 ]) {
   if (!fs.existsSync(path.join(pkgRoot, rel))) {
     throw new Error(`installed package missing ${rel}`);
   }
+}
+// marketplace.json source must point at the bundled plugin
+const mkt = JSON.parse(
+  fs.readFileSync(path.join(pkgRoot, ".claude-plugin", "marketplace.json"), "utf8"),
+);
+const mktPlugin = Array.isArray(mkt.plugins) ? mkt.plugins[0] : null;
+if (!mktPlugin || !String(mktPlugin.source || "").includes("integrations/claude-plugin")) {
+  throw new Error("marketplace.json missing plugin source ./integrations/claude-plugin");
 }
 
 fs.cpSync(template, repo, { recursive: true });

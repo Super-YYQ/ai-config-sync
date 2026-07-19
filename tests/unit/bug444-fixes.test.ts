@@ -112,16 +112,42 @@ describe("P0 Windows-safe runClaude / runCommand", () => {
 });
 
 describe("P1 storage keys", () => {
-  it("sanitizes hooks:SessionStart and path traversal", () => {
+  it("sanitizes hooks:SessionStart and path traversal; always appends hash", () => {
     const k = toStorageKey("hooks:SessionStart");
     expect(k).not.toContain(":");
-    expect(k).toMatch(/^hooks_SessionStart-/);
+    expect(k).toMatch(/^hooks_SessionStart-[0-9a-f]{6}$/);
     expect(recipeRelPath("hooks:SessionStart")).toBe(`recipes/${k}.yaml`);
 
     const evil = toStorageKey("../evil");
     expect(evil).not.toContain("..");
     expect(evil).not.toMatch(/[\/\\]/);
-    expect(vendorSkillRelPath("my-skill")).toBe("sources/skills/my-skill");
+    expect(evil).toMatch(/-[0-9a-f]{6}$/);
+
+    // Always hashed for cross-platform uniqueness
+    const skillKey = toStorageKey("my-skill");
+    expect(skillKey).toMatch(/^my-skill-[0-9a-f]{6}$/);
+    expect(vendorSkillRelPath("my-skill")).toBe(`sources/skills/${skillKey}`);
+
+    // Reserved Windows names
+    const con = toStorageKey("CON");
+    expect(con.toUpperCase()).not.toBe("CON");
+    expect(con.startsWith("_") || con.includes("_CON") || con.startsWith("_")).toBe(true);
+  });
+
+  it("safeJoin rejects traversal and absolute paths", async () => {
+    const { safeJoin, assertSafeRelPath } = await import("@ai-config-sync/core");
+    const root = await makeTemp("acs-safe-");
+    try {
+      await ensureDir(root);
+      expect(() => safeJoin(root, "../outside")).toThrow(/traversal|escape|absolute/i);
+      expect(() => safeJoin(root, "/abs")).toThrow();
+      expect(() => assertSafeRelPath("../x")).toThrow();
+      expect(assertSafeRelPath("recipes/ok.yaml")).toBe("recipes/ok.yaml");
+      const joined = safeJoin(root, "recipes", "a.yaml");
+      expect(joined.startsWith(path.resolve(root))).toBe(true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -821,7 +821,20 @@ export async function installStableCliShim(
     }
   }
   if (needCopy) {
-    await fs.writeFile(destCjs, srcBuf);
+    // Atomic refresh: temp + fsync + rename so a crash never leaves a truncated CJS
+    const tmp = `${destCjs}.${process.pid}.${Date.now()}.tmp`;
+    const fh = await fs.open(tmp, "w");
+    try {
+      await fh.writeFile(srcBuf);
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+    await fs.rename(tmp, destCjs).catch(async () => {
+      // Windows: rename over existing may fail — unlink then rename
+      await fs.rm(destCjs, { force: true }).catch(() => {});
+      await fs.rename(tmp, destCjs);
+    });
     actions.push(`INSTALL stable CLI shim → ${destCjs}`);
     changed = true;
   }

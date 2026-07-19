@@ -12,6 +12,9 @@ import {
   loadResources,
   saveResources,
   saveRecipe,
+  toStorageKey,
+  recipeRelPath,
+  vendorSkillRelPath,
 } from "@ai-config-sync/core";
 import {
   commitCaptureItems,
@@ -193,17 +196,18 @@ describe("P0-2 precise capture rollback", () => {
         "test",
         {
           home,
-          injectFailureAfter: ["recipes/new-skill.yaml"],
+          injectFailureAfter: [recipeRelPath("new-skill")],
         },
       ),
     ).rejects.toThrow(/injectFailureAfter/);
 
     // Newly created recipe and vendor must be gone; resources unchanged
+    const newKey = toStorageKey("new-skill");
     expect(
-      await pathExists(path.join(configRepo, "recipes", "new-skill.yaml")),
+      await pathExists(path.join(configRepo, "recipes", `${newKey}.yaml`)),
     ).toBe(false);
     expect(
-      await pathExists(path.join(configRepo, "sources", "skills", "new-skill")),
+      await pathExists(path.join(configRepo, "sources", "skills", newKey)),
     ).toBe(false);
     const res = await loadResources(path.join(configRepo, "resources.yaml"));
     expect(res.resources).toEqual([]);
@@ -213,8 +217,8 @@ describe("P0-2 precise capture rollback", () => {
   });
 
   it("restores pre-existing vendor dir without leftover new files", async () => {
-    // Pre-seed vendor with only a.txt
-    const vendorRel = path.posix.join("sources", "skills", "my-skill");
+    // Pre-seed vendor with only a.txt (using storage key path)
+    const vendorRel = vendorSkillRelPath("my-skill");
     await ensureDir(path.join(configRepo, vendorRel));
     await writeText(path.join(configRepo, vendorRel, "SKILL.md"), "# old\n");
     await writeText(path.join(configRepo, vendorRel, "a.txt"), "old-a\n");
@@ -228,7 +232,7 @@ describe("P0-2 precise capture rollback", () => {
           targets: {
             claude: {
               enabled: true,
-              recipeRef: "recipes/my-skill.yaml#claude",
+              recipeRef: `${recipeRelPath("my-skill")}#claude`,
             },
           },
           profiles: ["home"],
@@ -236,7 +240,7 @@ describe("P0-2 precise capture rollback", () => {
         },
       ],
     });
-    await saveRecipe(path.join(configRepo, "recipes", "my-skill.yaml"), {
+    await saveRecipe(path.join(configRepo, recipeRelPath("my-skill")), {
       id: "my-skill",
       schemaVersion: 1,
       targets: {

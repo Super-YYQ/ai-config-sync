@@ -12,6 +12,7 @@
     "integrations/claude-plugin",
     "integrations/codex",
     "examples/private-config-template",
+    ".claude-plugin",
     "README.md",
     "docs/USER_GUIDE.md",
     "LICENSE",
@@ -30,7 +31,9 @@
     "pack:check": "npm pack --dry-run",
     "smoke:npm": "node scripts/smoke-npm-package.mjs",
     "validate:plugin": "node scripts/validate-plugin.mjs",
-    "check:version": "node scripts/check-version-consistency.mjs"
+    "check:version": "node scripts/check-version-consistency.mjs",
+    "version:set": "node scripts/sync-version.mjs",
+    "release:check": "npm run build && node scripts/check-version-consistency.mjs && npm test"
   },
   "workspaces": [
     "packages/*",

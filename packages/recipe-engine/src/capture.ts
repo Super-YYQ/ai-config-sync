@@ -15,6 +15,8 @@ import {
   recipeRelPath,
   vendorSkillRelPath,
   toStorageKey,
+  safeJoin,
+  assertSafeRelPath,
   type Resource,
   type Recipe,
   type TargetTool,
@@ -633,9 +635,93 @@ export async function commitCaptureItems(
     home?: string;
     /** Test hook: throw after replace of these relative paths. */
     injectFailureAfter?: string[];
+    /** Test hook: delay after lock acquired, before reading resources. */
+    injectDelayMs?: number;
   } = {},
 ): Promise<{ resourcesPath: string; recipePaths: string[] }> {
+  // Stage/backup outside the private git repo
+  const home = options.home ?? os.homedir();
+  const txBase = captureTransactionsDir(home);
+  await ensureDir(txBase);
+
+  // Repo-level mutex — acquire BEFORE reading resources.yaml so concurrent
+  // captures re-read and merge under the lock (no lost updates).
+  const repoHash = crypto
+    .createHash("sha256")
+    .update(path.resolve(configRepoPath))
+    .digest("hex")
+    .slice(0, 16);
+  const lockPath = path.join(txBase, `capture-${repoHash}.lock`);
+  const lockPayload = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+    configRepository: path.resolve(configRepoPath),
+    command: "commitCaptureItems",
+  };
+
+  const acquireLock = async () => {
+    for (let attempt = 0; attempt < 50; attempt++) {
+      try {
+        // wx: fail if exists
+        const fh = await fs.open(lockPath, "wx");
+        await fh.writeFile(JSON.stringify(lockPayload, null, 2), "utf8");
+        await fh.close();
+        return;
+      } catch (e) {
+        const err = e as NodeJS.ErrnoException;
+        if (err.code !== "EEXIST") throw e;
+        // Stale lock: owner dead or older than 30 minutes
+        try {
+          const raw = await fs.readFile(lockPath, "utf8");
+          const existingLock = JSON.parse(raw) as {
+            pid?: number;
+            startedAt?: string;
+          };
+          let stale = false;
+          if (existingLock.startedAt) {
+            const age = Date.now() - Date.parse(existingLock.startedAt);
+            if (Number.isFinite(age) && age > 30 * 60 * 1000) stale = true;
+          }
+          if (existingLock.pid && existingLock.pid !== process.pid) {
+            try {
+              process.kill(existingLock.pid, 0);
+            } catch {
+              stale = true; // process does not exist
+            }
+          }
+          if (stale) {
+            await fs.rm(lockPath, { force: true });
+            continue;
+          }
+        } catch {
+          // unreadable lock — remove and retry
+          await fs.rm(lockPath, { force: true }).catch(() => {});
+          continue;
+        }
+        await new Promise((r) => setTimeout(r, 50 + attempt * 30));
+      }
+    }
+    throw new Error(
+      `Capture lock busy for ${configRepoPath} (lock: ${lockPath})`,
+    );
+  };
+
+  await acquireLock();
+
+  const releaseLock = async () => {
+    try {
+      await fs.rm(lockPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (options.injectDelayMs && options.injectDelayMs > 0) {
+    await new Promise((r) => setTimeout(r, options.injectDelayMs));
+  }
+
   const resourcesPath = path.join(configRepoPath, "resources.yaml");
+  // Re-read under lock so concurrent captures see each other's commits
   const existing = await loadResources(resourcesPath);
   const byId = new Map(existing.resources.map((r) => [r.id, r]));
   const recipePaths: string[] = [];
@@ -678,88 +764,12 @@ export async function commitCaptureItems(
     });
   }
 
-  // Stage/backup outside the private git repo
-  const home = options.home ?? os.homedir();
-  const txBase = captureTransactionsDir(home);
-  await ensureDir(txBase);
-
-  // Repo-level mutex to prevent concurrent capture races
-  const repoHash = crypto
-    .createHash("sha256")
-    .update(path.resolve(configRepoPath))
-    .digest("hex")
-    .slice(0, 16);
-  const lockPath = path.join(txBase, `capture-${repoHash}.lock`);
-  const lockPayload = {
-    pid: process.pid,
-    startedAt: new Date().toISOString(),
-    configRepository: path.resolve(configRepoPath),
-    command: "commitCaptureItems",
-  };
-
-  const acquireLock = async () => {
-    for (let attempt = 0; attempt < 30; attempt++) {
-      try {
-        // wx: fail if exists
-        const fh = await fs.open(lockPath, "wx");
-        await fh.writeFile(JSON.stringify(lockPayload, null, 2), "utf8");
-        await fh.close();
-        return;
-      } catch (e) {
-        const err = e as NodeJS.ErrnoException;
-        if (err.code !== "EEXIST") throw e;
-        // Stale lock: owner dead or older than 30 minutes
-        try {
-          const raw = await fs.readFile(lockPath, "utf8");
-          const existing = JSON.parse(raw) as {
-            pid?: number;
-            startedAt?: string;
-          };
-          let stale = false;
-          if (existing.startedAt) {
-            const age = Date.now() - Date.parse(existing.startedAt);
-            if (Number.isFinite(age) && age > 30 * 60 * 1000) stale = true;
-          }
-          if (existing.pid && existing.pid !== process.pid) {
-            try {
-              process.kill(existing.pid, 0);
-            } catch {
-              stale = true; // process does not exist
-            }
-          }
-          if (stale) {
-            await fs.rm(lockPath, { force: true });
-            continue;
-          }
-        } catch {
-          // unreadable lock — remove and retry
-          await fs.rm(lockPath, { force: true }).catch(() => {});
-          continue;
-        }
-        await new Promise((r) => setTimeout(r, 100 + attempt * 20));
-      }
-    }
-    throw new Error(
-      `Capture lock busy for ${configRepoPath} (lock: ${lockPath})`,
-    );
-  };
-
-  await acquireLock();
-
   const txId = crypto.randomUUID();
   const stagingRoot = path.join(txBase, `${txId}-staging`);
   const backupRoot = path.join(txBase, `${txId}-backup`);
   const stagedRecipeRels: string[] = [];
   const stagedVendorRels: string[] = [];
   const txEntries: CaptureTxEntry[] = [];
-
-  const releaseLock = async () => {
-    try {
-      await fs.rm(lockPath, { force: true });
-    } catch {
-      /* ignore */
-    }
-  };
 
   const trackPath = async (rel: string) => {
     if (txEntries.some((e) => e.path === rel)) return;
@@ -857,9 +867,11 @@ export async function commitCaptureItems(
       }
 
       if (item.suggestedRecipe) {
-        const recipeRel = recipeRelPath(item.suggestedResource.id);
-        const recipeFileLive = path.join(configRepoPath, recipeRel);
-        const recipeFileStage = path.join(stagingRoot, recipeRel);
+        const recipeRel = assertSafeRelPath(
+          recipeRelPath(item.suggestedResource.id),
+        );
+        const recipeFileLive = safeJoin(configRepoPath, recipeRel);
+        const recipeFileStage = safeJoin(stagingRoot, recipeRel);
         let baseTargets = item.suggestedRecipe.targets;
         if (await pathExists(recipeFileLive)) {
           try {

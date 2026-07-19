@@ -126,7 +126,10 @@ describe("P0 review fixes", () => {
       configRepo,
       "test",
     );
-    const recipe = await loadRecipe(path.join(configRepo, "recipes", "demo.yaml"));
+    const { toStorageKey } = await import("@ai-config-sync/core");
+    const recipe = await loadRecipe(
+      path.join(configRepo, "recipes", `${toStorageKey("demo")}.yaml`),
+    );
     expect(recipe.targets.claude?.driver).toBe("generic-skill");
     expect(recipe.targets.codex?.driver).toBe("generic-skill");
     const resources = await loadResources(path.join(configRepo, "resources.yaml"));

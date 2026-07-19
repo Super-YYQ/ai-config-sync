@@ -1,10 +1,14 @@
 /**
  * One-shot version bump across package manifests and plugin files.
  * Usage: node scripts/sync-version.mjs 0.4.0
+ *
+ * Also refreshes package-lock.json so `npm ci` stays consistent.
+ * After running: npm run release:check
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
@@ -56,7 +60,6 @@ updateJson("integrations/claude-plugin/.claude-plugin/plugin.json", (j) => {
   j.version = version;
 });
 
-// README version line
 const readme = path.join(root, "README.md");
 if (fs.existsSync(readme)) {
   let t = fs.readFileSync(readme, "utf8");
@@ -66,4 +69,19 @@ if (fs.existsSync(readme)) {
   console.log("updated README.md version refs");
 }
 
+console.log("Refreshing package-lock.json…");
+const lock = spawnSync("npm", ["install", "--package-lock-only"], {
+  cwd: root,
+  encoding: "utf8",
+  shell: process.platform === "win32",
+});
+if (lock.status !== 0) {
+  console.error(lock.stdout || "");
+  console.error(lock.stderr || "");
+  console.error("Failed to refresh package-lock.json");
+  process.exit(1);
+}
+console.log("updated package-lock.json");
+
 console.log("Synced version →", version);
+console.log("Next: npm run release:check  (build + version check + tests)");

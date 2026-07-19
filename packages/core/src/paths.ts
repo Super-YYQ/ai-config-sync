@@ -148,13 +148,24 @@ export function codexConfigPath(home = os.homedir()): string {
   return path.join(codexHome(home), "config.toml");
 }
 
-/** Safe relative path under a root; throws on traversal. */
+/** Safe relative path under a root; throws on absolute segments, traversal, escape. */
 export function safeJoin(root: string, ...segments: string[]): string {
-  const joined = path.resolve(root, ...segments);
-  const normalizedRoot = path.resolve(root);
-  const rel = path.relative(normalizedRoot, joined);
+  const rootAbs = path.resolve(root);
+  for (const seg of segments) {
+    if (seg === undefined || seg === null) continue;
+    if (path.isAbsolute(seg)) {
+      throw new Error(`safeJoin: absolute path rejected: ${seg}`);
+    }
+    if (String(seg).split(/[\/\\]/).some((p) => p === "..")) {
+      throw new Error(`safeJoin: path traversal rejected: ${seg}`);
+    }
+  }
+  const joined = path.resolve(rootAbs, ...segments);
+  const rel = path.relative(rootAbs, joined);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error(`Path traversal blocked: ${segments.join("/")}`);
+    throw new Error(
+      `safeJoin: result escapes root (${rootAbs}): ${segments.join("/")}`,
+    );
   }
   return joined;
 }

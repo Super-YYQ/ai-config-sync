@@ -18,6 +18,7 @@ import {
   pathExists,
   loadResources,
   loadRecipe,
+  toStorageKey,
 } from "@ai-config-sync/core";
 import type { ScannedResource } from "@ai-config-sync/scanner";
 
@@ -207,11 +208,16 @@ describe("P1-1 transactional capture commit", () => {
     expect(await pathExists(result.resourcesPath)).toBe(true);
     const res = await loadResources(result.resourcesPath);
     expect(res.resources.some((r) => r.id === "my-skill")).toBe(true);
-    const recipe = await loadRecipe(path.join(configRepo, "recipes", "my-skill.yaml"));
-    expect(recipe.id).toBe("my-skill");
-    expect(await pathExists(path.join(configRepo, "sources", "skills", "my-skill", "SKILL.md"))).toBe(
-      true,
+    const key = toStorageKey("my-skill");
+    const recipe = await loadRecipe(
+      path.join(configRepo, "recipes", `${key}.yaml`),
     );
+    expect(recipe.id).toBe("my-skill");
+    expect(
+      await pathExists(
+        path.join(configRepo, "sources", "skills", key, "SKILL.md"),
+      ),
+    ).toBe(true);
 
     const leftovers = (await fs.readdir(configRepo)).filter((n) =>
       n.startsWith(".ai-config-sync-staging") || n.startsWith(".ai-config-sync-backup"),

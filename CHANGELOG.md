@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1+review — Beta Gate (Stage A)
+
+### P0
+- Capture lock is acquired **before** reading `resources.yaml`; re-read/merge/write under lock (concurrent A+B no lost updates)
+
+### P1
+- Windows `npx`/npm shims via generic `.cmd` detection in `runCommand`
+- Ship root `.claude-plugin/marketplace.json` in npm package; smoke verifies it
+- Storage keys always append short hash; NFKC + reserved-name hardening
+- `safeJoin` / `assertSafeRelPath` for recipe/vendor path boundaries
+- Stable CLI shim atomic refresh (temp + fsync + rename)
+- `version:set` refreshes lock; `release:check` = build + version check + tests
+
 ## 0.4.1+bug444 — Beta Compatibility (bug444)
 
 ### P0

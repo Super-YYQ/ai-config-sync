@@ -13,6 +13,8 @@ import {
   listFilesRecursive,
   readText,
   vendorSkillRelPath,
+  safeJoin,
+  assertSafeRelPath,
 } from "@ai-config-sync/core";
 
 const SKIP_DIR_NAMES = new Set([
@@ -65,9 +67,9 @@ export async function vendorSkillDirectory(
   resourceId: string,
   options: { stagingRoot?: string } = {},
 ): Promise<VendorResult> {
-  const destRel = vendorSkillRelPath(resourceId);
+  const destRel = assertSafeRelPath(vendorSkillRelPath(resourceId));
   const baseRoot = options.stagingRoot ?? configRepoPath;
-  const destAbs = path.join(baseRoot, destRel);
+  const destAbs = safeJoin(baseRoot, destRel);
 
   if (!(await pathExists(sourceDir))) {
     return {
