@@ -125,11 +125,22 @@ export async function listFilesRecursive(
 export async function copyDirectory(
   src: string,
   dest: string,
-  options: { overwrite?: boolean } = {},
+  options: { overwrite?: boolean; rejectSymlinks?: boolean } = {},
 ): Promise<void> {
   const overwrite = options.overwrite ?? true;
+  const rejectSymlinks = options.rejectSymlinks ?? true;
   if (!(await pathExists(src))) {
     throw new Error(`Source directory does not exist: ${src}`);
+  }
+  if (rejectSymlinks) {
+    try {
+      const st = await fs.lstat(src);
+      if (st.isSymbolicLink()) {
+        throw new Error(`Symlink rejected as copy source: ${src}`);
+      }
+    } catch (e) {
+      if ((e as Error).message?.startsWith("Symlink rejected")) throw e;
+    }
   }
   if ((await pathExists(dest)) && !overwrite) {
     throw new Error(`Destination already exists: ${dest}`);
@@ -138,6 +149,8 @@ export async function copyDirectory(
     recursive: true,
     force: overwrite,
     errorOnExist: !overwrite,
+    // Node 18+: do not follow symlinks when copying
+    // (dereference false is default for fs.cp in recent Node)
   });
 }
 

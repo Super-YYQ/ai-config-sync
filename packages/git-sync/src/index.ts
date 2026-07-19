@@ -175,8 +175,12 @@ export async function commitAll(
   options: { allowEmpty?: boolean } = {},
 ): Promise<GitResult | null> {
   // Secret scan staged-ish content: scan working tree text files for secrets first
-  const status = await runGit(dir, ["status", "--porcelain"]);
-  if (!status.stdout.trim() && !options.allowEmpty) return null;
+  const status = await runGit(dir, ["status", "--porcelain=v1", "-z"], {
+    allowFail: true,
+  });
+  if ((!status.stdout || !status.stdout.replace(/\0/g, "").trim()) && !options.allowEmpty) {
+    return null;
+  }
 
   const findings = await scanWorkingTreeSecrets(dir);
   if (findings.length > 0) {
@@ -195,6 +199,66 @@ export async function commitAll(
   });
 }
 
+/**
+ * Stage and commit only the given relative paths (never git add -A).
+ * Leaves other dirty files unstaged/uncommitted.
+ */
+export async function commitPaths(
+  dir: string,
+  message: string,
+  relPaths: string[],
+  options: { allowEmpty?: boolean } = {},
+): Promise<GitResult | null> {
+  if (!relPaths.length) {
+    if (options.allowEmpty) {
+      return runGit(dir, ["commit", "--allow-empty", "-m", message], {
+        allowFail: true,
+      });
+    }
+    return null;
+  }
+
+  // Normalize to forward-slash relative paths under dir
+  const unique = [
+    ...new Set(
+      relPaths
+        .map((p) => p.replace(/\\/g, "/").replace(/^\.?\//, ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  // Secret scan ONLY the files we intend to commit
+  const findings = await scanPathsForSecrets(dir, unique);
+  if (findings.length > 0) {
+    const summary = findings
+      .slice(0, 5)
+      .map((f) => `${f.path}:${f.line} ${f.rule} ${f.preview}`)
+      .join("; ");
+    throw new GitError(
+      `Secret scan blocked commit (${findings.length} finding(s)): ${summary}`,
+    );
+  }
+
+  // Stage only these paths (pathspec). Use -- to stop option parsing.
+  await runGit(dir, ["add", "--", ...unique]);
+
+  // If nothing staged, skip commit unless allowEmpty
+  const staged = await runGit(dir, ["diff", "--cached", "--name-only", "-z"], {
+    allowFail: true,
+  });
+  const stagedNames = (staged.stdout || "")
+    .split("\0")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (stagedNames.length === 0 && !options.allowEmpty) {
+    return null;
+  }
+
+  return runGit(dir, ["commit", "-m", message], {
+    allowFail: options.allowEmpty,
+  });
+}
+
 export async function pushRepo(dir: string): Promise<GitResult> {
   const safety = await inspectGitSafety(dir);
   if (safety.diverged) {
@@ -206,20 +270,41 @@ export async function pushRepo(dir: string): Promise<GitResult> {
   return runGit(dir, ["push"]);
 }
 
-export async function scanWorkingTreeSecrets(
-  dir: string,
-): Promise<SecretFinding[]> {
-  const status = await runGit(dir, ["status", "--porcelain"], {
-    allowFail: true,
-  });
-  if (status.code !== 0 || !status.stdout.trim()) return [];
+/** Parse `git status --porcelain=v1 -z` into path list (handles rename, quotes, unicode). */
+export function parsePorcelainZ(stdout: string): string[] {
+  if (!stdout) return [];
+  const paths: string[] = [];
+  const parts = stdout.split("\0").filter((p) => p.length > 0);
+  for (let i = 0; i < parts.length; i++) {
+    const entry = parts[i]!;
+    // Format: XY <path> or XY <old>\0<new> for renames (R/C)
+    if (entry.length < 3) continue;
+    const xy = entry.slice(0, 2);
+    const rest = entry.slice(3);
+    if (xy[0] === "R" || xy[0] === "C" || xy[1] === "R" || xy[1] === "C") {
+      // next null-separated field is the new path
+      const next = parts[i + 1];
+      if (next) {
+        paths.push(next);
+        i++;
+      } else if (rest) {
+        paths.push(rest.split(" -> ").pop()!.trim());
+      }
+    } else {
+      // strip optional quotes
+      const p = rest.replace(/^"|"$/g, "").trim();
+      if (p) paths.push(p);
+    }
+  }
+  return paths;
+}
 
+export async function scanPathsForSecrets(
+  dir: string,
+  relPaths: string[],
+): Promise<SecretFinding[]> {
   const findings: SecretFinding[] = [];
-  const lines = status.stdout.split("\n").filter(Boolean);
-  for (const line of lines) {
-    // XY path or rename
-    const filePath = line.slice(3).split(" -> ").pop()!.trim().replace(/^"|"$/g, "");
-    if (!filePath) continue;
+  for (const filePath of relPaths) {
     if (
       filePath.endsWith(".png") ||
       filePath.endsWith(".jpg") ||
@@ -231,6 +316,24 @@ export async function scanWorkingTreeSecrets(
     const full = path.join(dir, filePath);
     if (!(await pathExists(full))) continue;
     try {
+      const st = await (await import("node:fs/promises")).stat(full);
+      if (st.isDirectory()) {
+        // Scan files under vendor dirs
+        const { listFilesRecursive, readText } = await import(
+          "@ai-config-sync/core"
+        );
+        const files = await listFilesRecursive(full, { maxDepth: 6 });
+        for (const f of files) {
+          const rel = path.relative(dir, f).replace(/\\/g, "/");
+          try {
+            const text = await readText(f);
+            findings.push(...scanTextForSecrets(text, rel));
+          } catch {
+            /* binary */
+          }
+        }
+        continue;
+      }
       const { readText } = await import("@ai-config-sync/core");
       const text = await readText(full);
       findings.push(...scanTextForSecrets(text, filePath));
@@ -239,6 +342,17 @@ export async function scanWorkingTreeSecrets(
     }
   }
   return findings;
+}
+
+export async function scanWorkingTreeSecrets(
+  dir: string,
+): Promise<SecretFinding[]> {
+  const status = await runGit(dir, ["status", "--porcelain=v1", "-z"], {
+    allowFail: true,
+  });
+  if (status.code !== 0 || !status.stdout) return [];
+  const paths = parsePorcelainZ(status.stdout);
+  return scanPathsForSecrets(dir, paths);
 }
 
 /** Normalize remote URLs for comparison. */

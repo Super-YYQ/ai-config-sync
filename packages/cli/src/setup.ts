@@ -53,6 +53,16 @@ export interface SetupOptions {
   mode?: SetupMode;
   claude?: boolean;
   codex?: boolean;
+  /**
+   * Explicitly install Codex SessionStart hook + features.hooks.
+   * Required for Codex hooks even when codex target is enabled.
+   */
+  enableCodexHook?: boolean;
+  /**
+   * When true, print planned file creates/modifies before applying.
+   * Default true for CLI; tests may set false.
+   */
+  preview?: boolean;
   /** Absolute path to program repo (ai-config-sync). Auto-detected when possible. */
   programRoot?: string;
   /**
@@ -885,11 +895,13 @@ async function installCodexIntegration(
   home: string,
   programRoot?: string,
   pluginRoot?: string,
+  options: { enableCodexHook?: boolean } = {},
 ): Promise<IntegrationInstallResult> {
   const actions: string[] = [];
   const warnings: string[] = [];
   const errors: string[] = [];
   let changed = false;
+  const enableHook = !!options.enableCodexHook;
 
   // Stable CLI shim first — Codex skill + hooks both reference it
   const shim = await installStableCliShim(home, { programRoot, pluginRoot });
@@ -973,7 +985,19 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
     changed = true;
   }
 
-  // Codex hooks.json — official event-map shape; always prefer stable shim
+  // Codex hooks.json + features.hooks — only with explicit --enable-codex-hook
+  if (!enableHook) {
+    actions.push(
+      "SKIP Codex SessionStart hook (pass --enable-codex-hook to install hooks.json + features.hooks)",
+    );
+    if (stableCjs) {
+      actions.push(
+        `NOTE: Codex CLI entry is stable shim ${stableCjs} (refresh via setup after plugin update).`,
+      );
+    }
+    return { ok: true, changed, warnings, errors, actions };
+  }
+
   const hooksPath = codexHooksManifestPath(home);
   let base: unknown = {};
   if (await pathExists(hooksPath)) {
@@ -1144,11 +1168,32 @@ export async function runSetup(
     actions.push(`LINK ~/.ai-config-sync -> ${localPath}`);
     actions.push(`PROFILE ${options.profile ?? "home"}`);
     actions.push("INSTALL Claude plugin ai-config-sync (skill + slash commands)");
-    actions.push("INSTALL Codex skill config-sync");
+    if (options.codex === true) {
+      actions.push("INSTALL Codex skill config-sync");
+      if (options.enableCodexHook) {
+        actions.push("MERGE Codex hooks.json + features.hooks");
+      } else {
+        actions.push("SKIP Codex hooks (need --enable-codex-hook)");
+      }
+    }
     return { status: "planned", messages, actions };
   }
 
   actions.push(...(await ensureMinimalConfigRepo(localPath)));
+
+  // Detect plugin early so defaults can prefer Claude-only inside plugin
+  const packageRootEarly = await detectPackageRoot(options.programRoot);
+  const pluginRootEarly = await detectPluginRoot();
+  const insideSelfEarly =
+    !!options.skipSelfPluginInstall ||
+    (await isRunningInsideSelfPlugin(pluginRootEarly));
+
+  // Defaults: inside Claude plugin → Claude only; otherwise both unless overridden.
+  // Explicit options.claude / options.codex always win.
+  const defaultClaude = true;
+  const defaultCodex = insideSelfEarly ? false : true;
+  const wantClaude = options.claude ?? defaultClaude;
+  const wantCodex = options.codex ?? defaultCodex;
 
   const profile = options.profile ?? "home";
   const localConfig: LocalConfig = {
@@ -1159,11 +1204,38 @@ export async function runSetup(
     },
     profile,
     targets: {
-      claude: options.claude ?? true,
-      codex: options.codex ?? true,
+      claude: wantClaude,
+      codex: wantCodex,
     },
     ai: { enabled: false, mode: "off" },
   };
+
+  // Preview planned writes before applying
+  if (options.preview !== false) {
+    messages.push("Setup will create/modify:");
+    messages.push(`  · link ${localConfigPath(home)} → ${localPath}`);
+    messages.push(`  · profile ${profile}`);
+    if (wantClaude) {
+      messages.push("  · Claude: plugin install/enable (or skip if already self)");
+    } else {
+      messages.push("  · Claude: skipped");
+    }
+    if (wantCodex) {
+      messages.push("  · Codex: agents skill config-sync");
+      if (options.enableCodexHook) {
+        messages.push("  · Codex: hooks.json SessionStart + config.toml features.hooks");
+      } else {
+        messages.push(
+          "  · Codex: hooks skipped (pass --enable-codex-hook to enable)",
+        );
+      }
+    } else {
+      messages.push(
+        "  · Codex: skipped (use --target codex|all or omit plugin-only default)",
+      );
+    }
+    messages.push("");
+  }
 
   const cfgPath = localConfigPath(home);
   let status: SetupResult["status"] = "initialized";
@@ -1218,9 +1290,10 @@ export async function runSetup(
     }
   }
 
-  const packageRoot = await detectPackageRoot(options.programRoot);
-  const pluginRoot = await detectPluginRoot();
+  const packageRoot = packageRootEarly ?? (await detectPackageRoot(options.programRoot));
+  const pluginRoot = pluginRootEarly ?? (await detectPluginRoot());
   const insideSelf =
+    insideSelfEarly ||
     !!options.skipSelfPluginInstall ||
     (await isRunningInsideSelfPlugin(pluginRoot));
 
@@ -1232,6 +1305,11 @@ export async function runSetup(
   }
   if (insideSelf) {
     messages.push("Running inside ai-config-sync Claude plugin — skip self install");
+    if (options.codex === undefined && !wantCodex) {
+      messages.push(
+        "Default: Claude-only (inside plugin). Pass --target all or --target codex for Codex.",
+      );
+    }
   }
   if (!packageRoot && !pluginRoot) {
     messages.push(
@@ -1292,6 +1370,7 @@ user-invocable: true
       home,
       packageRoot,
       pluginRoot,
+      { enableCodexHook: !!options.enableCodexHook },
     );
     if (codexResult.actions.length) {
       actions.push(...codexResult.actions);

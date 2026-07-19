@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.1+safe-beta — Safe personal Beta gate
+
+### Capture
+- Lock release always in `finally` (corrupt resources.yaml no longer leaves lock busy)
+- `commitCaptureItems` returns `changedRelPaths`
+- `capture --commit` uses `commitPaths` (no `git add -A`); user dirty files stay uncommitted
+- Secret scan scoped to staged capture paths; porcelain v1 -z parsing
+
+### Restore security
+- Central `path-security`: recipeRef under recipes/, vendored under sources/
+- Reject abs/`..` in sourcePaths/requiredPaths; managed write roots; no source symlinks
+- Engine recomputes operation risk (does not trust recipe.risk alone)
+
+### Setup defaults
+- Inside Claude plugin: Claude-only by default (no Codex skill/hooks)
+- `--target claude|codex|all`, `--enable-codex-hook` for SessionStart hooks
+- Preview of files to create/modify before apply
+
 ## 0.4.1+review — Beta Gate (Stage A)
 
 ### P0

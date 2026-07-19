@@ -11,3 +11,4 @@ export * from "./config-io.js";
 export * from "./codex-hooks.js";
 export * from "./claude-cli.js";
 export * from "./storage-key.js";
+export * from "./path-security.js";

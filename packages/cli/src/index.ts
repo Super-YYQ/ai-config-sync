@@ -23,6 +23,7 @@ import {
 } from "@ai-config-sync/state-manager";
 import {
   commitAll,
+  commitPaths,
   inspectGitSafety,
   listCachedSources,
   pullRepo,
@@ -132,8 +133,16 @@ program
   .option("--repair", "Repair missing integrations only")
   .option("--reconfigure", "Rewrite local link and profile")
   .option("--home <path>", "Override home directory (testing)")
+  .option(
+    "--target <name>",
+    "Integration target: claude | codex | all (default: claude inside plugin, else all)",
+  )
   .option("--no-claude", "Skip Claude integration")
   .option("--no-codex", "Skip Codex integration")
+  .option(
+    "--enable-codex-hook",
+    "Explicitly install Codex SessionStart hook + features.hooks",
+  )
   .option("--program-root <path>", "Path to ai-config-sync program repo")
   .option(
     "--allow-local-plugin-install",
@@ -151,17 +160,35 @@ program
         : opts.repair
           ? "repair"
           : "default";
+
+    let claude = opts.claude;
+    let codex = opts.codex;
+    const targetOpt =
+      typeof opts.target === "string" ? opts.target.toLowerCase() : undefined;
+    if (targetOpt === "claude") {
+      claude = true;
+      codex = false;
+    } else if (targetOpt === "codex") {
+      claude = false;
+      codex = true;
+    } else if (targetOpt === "all") {
+      claude = true;
+      codex = true;
+    }
+
     const result = await runSetup({
       home: opts.home,
       configPath: opts.configPath,
       repo: opts.repo,
       profile: opts.profile,
       mode,
-      claude: opts.claude,
-      codex: opts.codex,
+      claude,
+      codex,
+      enableCodexHook: !!opts.enableCodexHook,
       programRoot: opts.programRoot,
       allowLocalPluginInstall: !!opts.allowLocalPluginInstall,
       skipSelfPluginInstall: !!opts.skipSelfPluginInstall,
+      preview: true,
     });
     for (const m of result.messages) console.log(m);
     if (result.actions.length) {
@@ -417,9 +444,11 @@ program
       console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
     }
     if (opts.commit) {
-      const result = await commitAll(
+      // Stage ONLY capture-produced paths — never git add -A
+      const result = await commitPaths(
         configRepoPath,
         `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
+        written.changedRelPaths,
       );
       console.log(result ? "Committed." : "Nothing to commit.");
       if (opts.push && result) {

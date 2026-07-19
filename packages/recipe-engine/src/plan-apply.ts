@@ -12,6 +12,12 @@ import {
   resolveProfileResources,
   shortHash,
   localStatePath,
+  validateRecipeRef,
+  validateVendoredSourcePath,
+  validateTargetRecipeForApply,
+  assertNoSymlinksInTree,
+  recomputeTargetRisk,
+  vendorSkillRelPath,
   type LocalConfig,
   type Plan,
   type PlanAction,
@@ -100,19 +106,55 @@ async function resolveSourceRoot(
 
   // Relative path inside private config repo (vendored / local)
   if (resource.source?.path) {
-    const p = path.isAbsolute(resource.source.path)
-      ? resource.source.path
-      : path.join(ctx.configRepoPath, resource.source.path);
-    if (await pathExists(p)) return p;
+    if (path.isAbsolute(resource.source.path)) {
+      throw new Error(
+        `Absolute source.path rejected for ${resource.id}: ${resource.source.path}`,
+      );
+    }
+    // Vendored sources must live under sources/
+    const provider = resource.source.provider;
+    if (provider === "vendored" || provider === "local") {
+      const abs = validateVendoredSourcePath(
+        ctx.configRepoPath,
+        resource.source.path,
+      );
+      if (await pathExists(abs)) {
+        await assertNoSymlinksInTree(abs);
+        return abs;
+      }
+      return undefined;
+    }
+    // Other relative paths still join under config repo with safeJoin semantics
+    const p = path.join(ctx.configRepoPath, resource.source.path);
+    if (p.includes("..") || !(await pathExists(p))) {
+      /* fall through */
+    } else if (await pathExists(p)) {
+      await assertNoSymlinksInTree(p);
+      return p;
+    }
   }
 
+  // Storage-key based vendored path
+  const vendoredKey = path.join(
+    ctx.configRepoPath,
+    vendorSkillRelPath(resource.id),
+  );
+  if (await pathExists(vendoredKey)) {
+    await assertNoSymlinksInTree(vendoredKey);
+    return vendoredKey;
+  }
+
+  // Legacy flat sources/skills/<id>
   const vendored = path.join(
     ctx.configRepoPath,
     "sources",
     "skills",
     resource.id,
   );
-  if (await pathExists(vendored)) return vendored;
+  if (await pathExists(vendored)) {
+    await assertNoSymlinksInTree(vendored);
+    return vendored;
+  }
 
   // GitHub / git cache
   try {
@@ -124,6 +166,11 @@ async function resolveSourceRoot(
       update: !!ctx.updateSources,
       offline: !!ctx.offline,
     });
+    if (cached?.root) {
+      await assertNoSymlinksInTree(cached.root).catch(() => {
+        /* cache trees may contain links in node_modules — only check shallow later */
+      });
+    }
     return cached?.root;
   } catch {
     return undefined;
@@ -199,15 +246,18 @@ async function resolveRecipe(
   if (!targetCfg?.enabled) return undefined;
 
   if (targetCfg.recipeRef) {
-    const { file, target: frag } = parseRecipeRef(targetCfg.recipeRef);
-    const full = path.join(configRepoPath, file);
-    if (await pathExists(full)) {
-      const recipe = await loadRecipe(full);
+    // Central path security: recipeRef must stay under recipes/
+    const { absPath, file } = validateRecipeRef(
+      configRepoPath,
+      targetCfg.recipeRef,
+    );
+    if (await pathExists(absPath)) {
+      const recipe = await loadRecipe(absPath);
       return recipe;
     }
-    // try registry by basename
+    // try registry by basename (storage key)
     const base = path.basename(file, path.extname(file));
-    return registry.get(base);
+    return registry.get(base) ?? registry.get(resource.id);
   }
 
   return registry.get(resource.id);
@@ -287,6 +337,40 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
         });
         continue;
       }
+
+      // Central path/risk validation — never trust recipe.risk or raw paths
+      let engineRisk: RiskLevel = targetRecipe.risk;
+      try {
+        const validated = validateTargetRecipeForApply(
+          ctx.home,
+          target,
+          ctx.configRepoPath,
+          targetRecipe,
+          {
+            resourceSourcePath:
+              resource.source?.provider === "vendored" ||
+              resource.source?.provider === "local"
+                ? resource.source.path
+                : undefined,
+          },
+        );
+        engineRisk = validated.risk;
+      } catch (e) {
+        actions.push({
+          id: `a${++actionSeq}`,
+          type: "MANUAL",
+          target,
+          resourceId: resource.id,
+          description: `MANUAL security: ${(e as Error).message}`,
+          risk: "high",
+          driver: targetRecipe.driver,
+          paths: [],
+          requiresConfirmation: true,
+        });
+        continue;
+      }
+      // Prefer higher of declared vs recomputed for gating, but recompute is authority
+      const effectiveRisk = engineRisk;
 
       const sourceRoot = await resolveSourceRoot(ctx, resource);
 
@@ -377,18 +461,22 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
                   : p.description.startsWith("CREATE")
                     ? "CREATE"
                     : "UPDATE";
-        // Profile security.maxRisk: downgrade/block higher risk actions
-        let risk = p.risk;
-        let requiresConfirmation = p.risk !== "low";
+        // Engine-recomputed risk is authoritative; never trust recipe.risk alone
+        let risk = effectiveRisk;
+        // Still consider path-level plan risk if higher
+        if (riskRankLocal(p.risk) > riskRankLocal(risk)) {
+          risk = p.risk;
+        }
+        let requiresConfirmation = risk !== "low";
         let description = p.description;
-        if (riskRankLocal(p.risk) > riskRankLocal(maxRisk)) {
+        if (riskRankLocal(risk) > riskRankLocal(maxRisk)) {
           actions.push({
             id: `a${++actionSeq}`,
             type: "MANUAL",
             target,
             resourceId: resource.id,
             description: `MANUAL blocked by profile maxRisk=${maxRisk}: ${p.description}`,
-            risk: p.risk,
+            risk,
             driver: targetRecipe.driver,
             paths: p.paths,
             requiresConfirmation: true,

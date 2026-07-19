@@ -74,7 +74,13 @@ describe("setup + empty template", () => {
   });
 
   it("installs Codex event-map hooks and features.hooks", async () => {
-    await runSetup({ home, configPath: configRepo, profile: "home" });
+    await runSetup({
+      home,
+      configPath: configRepo,
+      profile: "home",
+      codex: true,
+      enableCodexHook: true,
+    });
     const hooksPath = path.join(home, ".codex", "hooks.json");
     expect(await pathExists(hooksPath)).toBe(true);
     const hooks = await readJsonFile(hooksPath);

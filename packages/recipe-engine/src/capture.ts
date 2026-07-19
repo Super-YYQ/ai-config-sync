@@ -638,7 +638,12 @@ export async function commitCaptureItems(
     /** Test hook: delay after lock acquired, before reading resources. */
     injectDelayMs?: number;
   } = {},
-): Promise<{ resourcesPath: string; recipePaths: string[] }> {
+): Promise<{
+  resourcesPath: string;
+  recipePaths: string[];
+  /** Relative paths under config repo that this capture created or modified. */
+  changedRelPaths: string[];
+}> {
   // Stage/backup outside the private git repo
   const home = options.home ?? os.homedir();
   const txBase = captureTransactionsDir(home);
@@ -716,80 +721,83 @@ export async function commitCaptureItems(
     }
   };
 
-  if (options.injectDelayMs && options.injectDelayMs > 0) {
-    await new Promise((r) => setTimeout(r, options.injectDelayMs));
-  }
-
-  const resourcesPath = path.join(configRepoPath, "resources.yaml");
-  // Re-read under lock so concurrent captures see each other's commits
-  const existing = await loadResources(resourcesPath);
-  const byId = new Map(existing.resources.map((r) => [r.id, r]));
-  const recipePaths: string[] = [];
-  const now = new Date().toISOString();
-
-  // Also merge items that share the same id within this batch
-  const batchById = new Map<string, CaptureItem>();
-  for (const item of items) {
-    if (isSelfManagedResourceId(item.suggestedResource.id)) continue;
-    const prev = batchById.get(item.suggestedResource.id);
-    if (!prev) {
-      batchById.set(item.suggestedResource.id, item);
-      continue;
+  // ALL post-lock work is under try/finally so corrupt resources.yaml,
+  // permission errors, or inject failures always release the lock.
+  try {
+    if (options.injectDelayMs && options.injectDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, options.injectDelayMs));
     }
-    // merge targets
-    const mergedResource: Resource = {
-      ...prev.suggestedResource,
-      ...item.suggestedResource,
-      targets: {
-        ...prev.suggestedResource.targets,
-        ...item.suggestedResource.targets,
-      },
-    };
-    let mergedRecipe = prev.suggestedRecipe;
-    if (item.suggestedRecipe) {
-      mergedRecipe = RecipeSchema.parse({
-        ...item.suggestedRecipe,
+
+    const resourcesPath = path.join(configRepoPath, "resources.yaml");
+    // Re-read under lock so concurrent captures see each other's commits
+    const existing = await loadResources(resourcesPath);
+    const byId = new Map(existing.resources.map((r) => [r.id, r]));
+    const recipePaths: string[] = [];
+    const now = new Date().toISOString();
+
+    // Also merge items that share the same id within this batch
+    const batchById = new Map<string, CaptureItem>();
+    for (const item of items) {
+      if (isSelfManagedResourceId(item.suggestedResource.id)) continue;
+      const prev = batchById.get(item.suggestedResource.id);
+      if (!prev) {
+        batchById.set(item.suggestedResource.id, item);
+        continue;
+      }
+      // merge targets
+      const mergedResource: Resource = {
+        ...prev.suggestedResource,
+        ...item.suggestedResource,
         targets: {
-          ...(prev.suggestedRecipe?.targets ?? {}),
-          ...item.suggestedRecipe.targets,
+          ...prev.suggestedResource.targets,
+          ...item.suggestedResource.targets,
         },
+      };
+      let mergedRecipe = prev.suggestedRecipe;
+      if (item.suggestedRecipe) {
+        mergedRecipe = RecipeSchema.parse({
+          ...item.suggestedRecipe,
+          targets: {
+            ...(prev.suggestedRecipe?.targets ?? {}),
+            ...item.suggestedRecipe.targets,
+          },
+        });
+      }
+      batchById.set(item.suggestedResource.id, {
+        ...item,
+        suggestedResource: mergedResource,
+        suggestedRecipe: mergedRecipe,
+        needsAi: prev.needsAi && item.needsAi,
+        usedAi: prev.usedAi || item.usedAi,
       });
     }
-    batchById.set(item.suggestedResource.id, {
-      ...item,
-      suggestedResource: mergedResource,
-      suggestedRecipe: mergedRecipe,
-      needsAi: prev.needsAi && item.needsAi,
-      usedAi: prev.usedAi || item.usedAi,
-    });
-  }
 
-  const txId = crypto.randomUUID();
-  const stagingRoot = path.join(txBase, `${txId}-staging`);
-  const backupRoot = path.join(txBase, `${txId}-backup`);
-  const stagedRecipeRels: string[] = [];
-  const stagedVendorRels: string[] = [];
-  const txEntries: CaptureTxEntry[] = [];
+    const txId = crypto.randomUUID();
+    const stagingRoot = path.join(txBase, `${txId}-staging`);
+    const backupRoot = path.join(txBase, `${txId}-backup`);
+    const stagedRecipeRels: string[] = [];
+    const stagedVendorRels: string[] = [];
+    const txEntries: CaptureTxEntry[] = [];
 
-  const trackPath = async (rel: string) => {
-    if (txEntries.some((e) => e.path === rel)) return;
-    const live = path.join(configRepoPath, rel);
-    const existedBefore = await pathExists(live);
-    const type = existedBefore ? await entryType(live) : "file";
-    let backupPath: string | undefined;
-    if (existedBefore) {
-      backupPath = path.join(backupRoot, rel);
-      await ensureDir(path.dirname(backupPath));
-      await fs.cp(live, backupPath, { recursive: true });
-    }
-    txEntries.push({ path: rel, existedBefore, backupPath, type });
-  };
+    const trackPath = async (rel: string) => {
+      if (txEntries.some((e) => e.path === rel)) return;
+      const live = path.join(configRepoPath, rel);
+      const existedBefore = await pathExists(live);
+      const type = existedBefore ? await entryType(live) : "file";
+      let backupPath: string | undefined;
+      if (existedBefore) {
+        backupPath = path.join(backupRoot, rel);
+        await ensureDir(path.dirname(backupPath));
+        await fs.cp(live, backupPath, { recursive: true });
+      }
+      txEntries.push({ path: rel, existedBefore, backupPath, type });
+    };
 
-  try {
-    await fs.mkdir(path.join(stagingRoot, "recipes"), { recursive: true });
-    await fs.mkdir(backupRoot, { recursive: true });
+    try {
+      await fs.mkdir(path.join(stagingRoot, "recipes"), { recursive: true });
+      await fs.mkdir(backupRoot, { recursive: true });
 
-    for (const item of batchById.values()) {
+      for (const item of batchById.values()) {
       if (item.status === "blocked" || item.status === "system-excluded") {
         continue;
       }
@@ -959,29 +967,43 @@ export async function commitCaptureItems(
     }
 
     // Success — drop backup and staging
-    await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
-    await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
-    await releaseLock();
-  } catch (e) {
-    // Precise restore: delete new paths; restore pre-existing from backup
-    try {
-      await rollbackCaptureTransaction(
-        {
-          id: txId,
-          stagingRoot,
-          backupRoot,
-          entries: txEntries,
-        },
-        configRepoPath,
-      );
-    } catch {
-      /* best effort */
-    }
-    await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
-    await releaseLock();
-    // keep backup on failure for manual recovery (outside git repo)
-    throw e;
-  }
+      await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
 
-  return { resourcesPath, recipePaths };
+      const changedRelPaths = [
+        "resources.yaml",
+        ...stagedRecipeRels,
+        ...stagedVendorRels,
+      ];
+      // Deduplicate while preserving order
+      const seen = new Set<string>();
+      const uniqueChanged = changedRelPaths.filter((p) => {
+        if (seen.has(p)) return false;
+        seen.add(p);
+        return true;
+      });
+
+      return { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+    } catch (e) {
+      // Precise restore: delete new paths; restore pre-existing from backup
+      try {
+        await rollbackCaptureTransaction(
+          {
+            id: txId,
+            stagingRoot,
+            backupRoot,
+            entries: txEntries,
+          },
+          configRepoPath,
+        );
+      } catch {
+        /* best effort */
+      }
+      await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+      // keep backup on failure for manual recovery (outside git repo)
+      throw e;
+    }
+  } finally {
+    await releaseLock();
+  }
 }
