@@ -97,8 +97,11 @@ export function mergeManagedCodexSessionStart(
   changed: boolean;
 } {
   if (hasManagedCodexSessionStart(doc)) {
-    // Optionally refresh commandWindows if absolute path provided and missing
+    // Refresh commandWindows whenever the desired absolute path differs (upgrade / move / node path change)
     if (options?.cliAbsoluteCommand && isPlainObject(doc) && isPlainObject(doc.hooks)) {
+      const desired = options.cliAbsoluteCommand.includes("scan")
+        ? options.cliAbsoluteCommand
+        : `${options.cliAbsoluteCommand} scan --light --write-pending`;
       const hooks = { ...(doc.hooks as Record<string, unknown>) };
       const session = Array.isArray(hooks.SessionStart)
         ? [...(hooks.SessionStart as unknown[])]
@@ -111,13 +114,13 @@ export function mergeManagedCodexSessionStart(
             isPlainObject(h) &&
             (h.id === MANAGED_ID || isManagedHookCommand(h.command))
           ) {
-            if (!h.commandWindows) {
+            const existing =
+              typeof h.commandWindows === "string" ? h.commandWindows : undefined;
+            if (existing !== desired) {
               refreshed = true;
               return {
                 ...h,
-                commandWindows: options.cliAbsoluteCommand!.includes("scan")
-                  ? options.cliAbsoluteCommand
-                  : `${options.cliAbsoluteCommand} scan --light --write-pending`,
+                commandWindows: desired,
               };
             }
           }

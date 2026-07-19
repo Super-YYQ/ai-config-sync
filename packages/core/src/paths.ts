@@ -60,6 +60,11 @@ export function logsDir(home = os.homedir()): string {
   return path.join(defaultStateRoot(home), "logs");
 }
 
+/** Capture staging/backup transactions — outside private git repos. */
+export function captureTransactionsDir(home = os.homedir()): string {
+  return path.join(defaultStateRoot(home), "capture-transactions");
+}
+
 /** Claude Code user dirs (best-effort defaults). */
 export function claudeHome(home = os.homedir()): string {
   return path.join(home, ".claude");

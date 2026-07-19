@@ -9,7 +9,6 @@ import {
   isConfigRepository,
   loadLocalConfig,
   localConfigPath,
-  mergeJson,
   mergeManagedCodexSessionStart,
   hasManagedCodexSessionStart,
   pathExists,
@@ -24,6 +23,7 @@ import {
   agentsSkillsDir,
   codexConfigPath,
   codexHooksManifestPath,
+  claudeExecutable,
   type LocalConfig,
 } from "@ai-config-sync/core";
 import {
@@ -65,67 +65,158 @@ export interface SetupOptions {
   skipSelfPluginInstall?: boolean;
 }
 
+export type SetupStatus =
+  | "initialized"
+  | "linked"
+  | "repaired"
+  | "no-changes"
+  | "planned"
+  | "partial"
+  | "failed";
+
+export interface IntegrationInstallResult {
+  ok: boolean;
+  changed: boolean;
+  warnings: string[];
+  errors: string[];
+  actions: string[];
+}
+
 export interface SetupResult {
-  status: "initialized" | "linked" | "repaired" | "no-changes" | "planned";
+  status: SetupStatus;
   messages: string[];
   localConfig?: LocalConfig;
   actions: string[];
 }
 
-function packageRootFromHere(): string | undefined {
+const SELF_PLUGIN_NAMES = new Set(["ai-config-sync", "config-sync"]);
+
+async function looksLikePackageRoot(dir: string): Promise<boolean> {
+  return pathExists(
+    path.join(
+      dir,
+      "integrations",
+      "claude-plugin",
+      ".claude-plugin",
+      "plugin.json",
+    ),
+  );
+}
+
+async function readPluginManifestName(
+  pluginRoot: string,
+): Promise<string | undefined> {
+  const manifest = path.join(pluginRoot, ".claude-plugin", "plugin.json");
+  if (!(await pathExists(manifest))) return undefined;
   try {
-    // Source: packages/cli/src|dist -> packages/cli -> packages -> repo root
-    // Bundled CJS: dist/ai-config-sync.cjs -> dist -> package root
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const candidates = [
-      path.resolve(here, "../../.."), // monorepo from packages/cli/{src,dist}
-      path.resolve(here, ".."), // npm package from dist/
-      here,
-    ];
-    return candidates[0];
+    const raw = await readJsonFile<{ name?: string }>(manifest);
+    return typeof raw.name === "string" ? raw.name : undefined;
   } catch {
     return undefined;
   }
 }
 
-async function looksLikeProgramRoot(dir: string): Promise<boolean> {
-  return pathExists(
-    path.join(dir, "integrations", "claude-plugin", ".claude-plugin", "plugin.json"),
-  );
+/**
+ * Detect Claude Plugin root (installed plugin layout, not monorepo).
+ * Recognizes CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json and bin layout.
+ */
+export async function detectPluginRoot(
+  explicit?: string,
+): Promise<string | undefined> {
+  const candidates: string[] = [];
+  if (explicit) candidates.push(path.resolve(explicit));
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    candidates.push(path.resolve(process.env.CLAUDE_PLUGIN_ROOT));
+  }
+  try {
+    const argv1 = process.argv[1];
+    if (argv1) {
+      const binDir = path.dirname(path.resolve(argv1));
+      // plugin/bin/ai-config-sync.cjs → plugin root
+      candidates.push(path.resolve(binDir, ".."));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  for (const c of candidates) {
+    if (!(await pathExists(c))) continue;
+    const name = await readPluginManifestName(c);
+    if (name && SELF_PLUGIN_NAMES.has(name)) return c;
+    // Manifest present but name unknown — still treat as plugin root if bin exists
+    if (
+      (await pathExists(path.join(c, ".claude-plugin", "plugin.json"))) &&
+      ((await pathExists(path.join(c, "bin", "ai-config-sync.cjs"))) ||
+        (await pathExists(path.join(c, "bin", "ai-config-sync"))))
+    ) {
+      return c;
+    }
+  }
+  return undefined;
 }
 
 /**
- * Locate the installed ai-config-sync package root (contains integrations/).
- * Works from monorepo checkout, npm package install, and CLAUDE_PLUGIN_ROOT.
+ * True when this process is already running as the Claude plugin itself.
+ * Prefer plugin.json name over directory basename.
  */
-async function detectProgramRoot(
+export async function isRunningInsideSelfPlugin(
+  pluginRoot?: string,
+): Promise<boolean> {
+  const root =
+    pluginRoot ??
+    (process.env.CLAUDE_PLUGIN_ROOT
+      ? path.resolve(process.env.CLAUDE_PLUGIN_ROOT)
+      : undefined);
+  if (!root) return false;
+  const name = await readPluginManifestName(root);
+  if (name && SELF_PLUGIN_NAMES.has(name)) return true;
+  // Fallback: plugin root with our bin + manifest
+  if (
+    (await pathExists(path.join(root, ".claude-plugin", "plugin.json"))) &&
+    ((await pathExists(path.join(root, "bin", "ai-config-sync.cjs"))) ||
+      (await pathExists(path.join(root, "bin", "ai-config-sync"))))
+  ) {
+    // Only claim self when name is known or env is set to this root
+    if (name) return SELF_PLUGIN_NAMES.has(name);
+    if (
+      process.env.CLAUDE_PLUGIN_ROOT &&
+      path.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root
+    ) {
+      // Env points here — still check name if readable; if unreadable, be conservative
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Locate the monorepo / npm package root (contains integrations/claude-plugin).
+ */
+export async function detectPackageRoot(
   explicit?: string,
 ): Promise<string | undefined> {
   if (explicit && (await pathExists(explicit))) {
     const resolved = path.resolve(explicit);
-    if (await looksLikeProgramRoot(resolved)) return resolved;
+    if (await looksLikePackageRoot(resolved)) return resolved;
     // allow explicit even if incomplete — caller decides
     return resolved;
   }
 
-  // Prefer Claude plugin root when session is already inside the plugin
+  // From monorepo checkout or npm package install, package root may be
+  // parent of CLAUDE_PLUGIN_ROOT when plugin is nested under integrations/
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
-    // Plugin layout: integrations/claude-plugin is the plugin itself;
-    // package root is parent of integrations when installed via npm,
-    // or marketplace checkout root.
     const candidates = [
-      pluginRoot,
       path.resolve(pluginRoot, ".."),
       path.resolve(pluginRoot, "../.."),
       path.resolve(pluginRoot, "../../.."),
+      pluginRoot,
     ];
     for (const c of candidates) {
-      if (await looksLikeProgramRoot(c)) return c;
+      if (await looksLikePackageRoot(c)) return c;
     }
   }
 
-  // From this module location (source or bundled)
   try {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const candidates = [
@@ -134,13 +225,12 @@ async function detectProgramRoot(
       path.resolve(here, "../.."),
     ];
     for (const c of candidates) {
-      if (await looksLikeProgramRoot(c)) return c;
+      if (await looksLikePackageRoot(c)) return c;
     }
   } catch {
     /* ignore */
   }
 
-  // From require.resolve / process.argv[1] when running bundled bin
   try {
     const argv1 = process.argv[1];
     if (argv1) {
@@ -149,19 +239,19 @@ async function detectProgramRoot(
         path.resolve(binDir, ".."), // package root from dist/ai-config-sync.cjs
         path.resolve(binDir, "../.."),
         path.resolve(binDir, "../../.."),
+        path.resolve(binDir, "../../../.."),
       ];
       for (const c of candidates) {
-        if (await looksLikeProgramRoot(c)) return c;
+        if (await looksLikePackageRoot(c)) return c;
       }
     }
   } catch {
     /* ignore */
   }
 
-  // cwd walk
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    if (await looksLikeProgramRoot(dir)) return dir;
+    if (await looksLikePackageRoot(dir)) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -169,17 +259,11 @@ async function detectProgramRoot(
   return undefined;
 }
 
-/** True when this process is already running as the Claude plugin itself. */
-function isRunningInsideSelfPlugin(): boolean {
-  const root = process.env.CLAUDE_PLUGIN_ROOT;
-  if (!root) return false;
-  const base = path.basename(root).toLowerCase();
-  // marketplace installs often use the plugin name as directory
-  if (base.includes("ai-config-sync") || base.includes("config-sync")) {
-    return true;
-  }
-  // Also check plugin.json name when present (sync best-effort)
-  return false;
+/** @deprecated Use detectPackageRoot — kept for call sites during transition. */
+async function detectProgramRoot(
+  explicit?: string,
+): Promise<string | undefined> {
+  return detectPackageRoot(explicit);
 }
 
 async function detectConfigRepo(
@@ -363,6 +447,10 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
     actions.push("CREATE profiles/home.yaml");
   }
   const gitignore = path.join(localPath, ".gitignore");
+  const requiredIgnore = [
+    ".ai-config-sync-staging-*",
+    ".ai-config-sync-backup-*",
+  ];
   if (!(await pathExists(gitignore))) {
     await writeText(
       gitignore,
@@ -373,10 +461,23 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
         "auth.json",
         "local.yaml",
         ".ai-config-sync/",
+        ...requiredIgnore,
         "",
       ].join("\n"),
     );
     actions.push("CREATE .gitignore");
+  } else {
+    const existing = await readText(gitignore);
+    const missing = requiredIgnore.filter((line) => !existing.includes(line));
+    if (missing.length) {
+      const next =
+        existing.trimEnd() +
+        "\n" +
+        missing.join("\n") +
+        "\n";
+      await writeText(gitignore, next);
+      actions.push("UPDATE .gitignore (capture transaction patterns)");
+    }
   }
   return actions;
 }
@@ -393,32 +494,56 @@ async function ensureMinimalConfigRepo(localPath: string): Promise<string[]> {
  */
 async function installClaudePlugin(
   home: string,
-  programRoot: string,
+  programRoot: string | undefined,
   options: {
     allowLocalPluginInstall?: boolean;
     skipSelfPluginInstall?: boolean;
+    /** When true, never create ~/.claude/skills/config-sync fallback. */
+    forbidSkillFallback?: boolean;
   } = {},
-): Promise<string[]> {
+): Promise<IntegrationInstallResult> {
   const actions: string[] = [];
-  const pluginSrc = path.join(programRoot, "integrations", "claude-plugin");
-  if (!(await pathExists(path.join(pluginSrc, ".claude-plugin", "plugin.json")))) {
-    return actions;
-  }
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  let changed = false;
 
-  if (
-    options.skipSelfPluginInstall ||
-    isRunningInsideSelfPlugin()
-  ) {
+  const insideSelf =
+    options.skipSelfPluginInstall || (await isRunningInsideSelfPlugin());
+  if (insideSelf) {
     actions.push(
       "SKIP Claude plugin install (already running inside ai-config-sync plugin)",
     );
-    return actions;
+    return { ok: true, changed: false, warnings, errors, actions };
+  }
+
+  // Resolve plugin source: monorepo integrations/ or the plugin root itself
+  let pluginSrc: string | undefined;
+  if (programRoot) {
+    const nested = path.join(programRoot, "integrations", "claude-plugin");
+    if (
+      await pathExists(path.join(nested, ".claude-plugin", "plugin.json"))
+    ) {
+      pluginSrc = nested;
+    } else if (
+      await pathExists(path.join(programRoot, ".claude-plugin", "plugin.json"))
+    ) {
+      pluginSrc = programRoot;
+    }
+  }
+  if (!pluginSrc) {
+    warnings.push(
+      "Claude plugin source not found — skipped marketplace plugin install",
+    );
+    actions.push(
+      "WARN Claude plugin source not found — skipped marketplace plugin install",
+    );
+    return { ok: true, changed: false, warnings, errors, actions };
   }
 
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
-  const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+  const claudeBin = claudeExecutable();
 
   const runClaude = async (args: string[], timeout = 120000) => {
     await execFileAsync(claudeBin, args, {
@@ -436,21 +561,28 @@ async function installClaudePlugin(
   }
 
   if (!claudeAvailable) {
-    actions.push(
-      "WARN claude CLI not found — skipped marketplace plugin install. " +
-        "Install Claude Code CLI, or install the plugin manually: " +
-        "`claude plugin marketplace add Super-YYQ/ai-config-sync`.",
-    );
-    // Optional skill fallback only — never touch marketplace internals
-    const skillSrc = path.join(pluginSrc, "skills", "config-sync");
-    const skillDest = path.join(home, ".claude", "skills", "config-sync");
-    const skillMd = path.join(skillDest, "SKILL.md");
-    if ((await pathExists(skillSrc)) && !(await pathExists(skillMd))) {
-      await ensureDir(path.dirname(skillDest));
-      await fs.cp(skillSrc, skillDest, { recursive: true });
-      actions.push("INSTALL Claude user skill: config-sync (fallback, no claude CLI)");
+    const msg =
+      "claude CLI not found — skipped marketplace plugin install. " +
+      "Install Claude Code CLI, or install the plugin manually: " +
+      "`claude plugin marketplace add Super-YYQ/ai-config-sync`.";
+    warnings.push(msg);
+    actions.push(`WARN ${msg}`);
+    // Optional skill fallback only when not inside self plugin
+    if (!options.forbidSkillFallback) {
+      const skillSrc = path.join(pluginSrc, "skills", "config-sync");
+      const skillDest = path.join(home, ".claude", "skills", "config-sync");
+      const skillMd = path.join(skillDest, "SKILL.md");
+      if ((await pathExists(skillSrc)) && !(await pathExists(skillMd))) {
+        await ensureDir(path.dirname(skillDest));
+        await fs.cp(skillSrc, skillDest, { recursive: true });
+        actions.push(
+          "INSTALL Claude user skill: config-sync (fallback, no claude CLI)",
+        );
+        changed = true;
+      }
     }
-    return actions;
+    // Without claude CLI we cannot verify install — not a hard failure
+    return { ok: true, changed, warnings, errors, actions };
   }
 
   // 1) Prefer GitHub marketplace registration
@@ -464,87 +596,179 @@ async function installClaudePlugin(
     ]);
     actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
     marketplaceReady = true;
+    changed = true;
   } catch (e) {
     const msg = (e as Error).message || String(e);
     if (/already|exists/i.test(msg)) {
       marketplaceReady = true;
       actions.push("claude marketplace already has ai-config-sync");
     } else if (options.allowLocalPluginInstall) {
-      // 2) Explicit offline/dev: register local directory via official CLI only
       try {
         await runClaude(["plugin", "marketplace", "add", pluginSrc]);
         actions.push(
           `claude plugin marketplace add ${pluginSrc} (local/dev)`,
         );
         marketplaceReady = true;
+        changed = true;
       } catch (e2) {
         const msg2 = (e2 as Error).message || String(e2);
         if (/already|exists/i.test(msg2)) {
           marketplaceReady = true;
           actions.push("claude local marketplace already registered");
         } else {
-          actions.push(
-            `WARN claude marketplace add failed: ${msg2.slice(0, 200)}`,
-          );
+          const w = `claude marketplace add failed: ${msg2.slice(0, 200)}`;
+          warnings.push(w);
+          errors.push(w);
+          actions.push(`WARN ${w}`);
         }
       }
     } else {
-      actions.push(
-        `WARN claude marketplace add failed: ${msg.slice(0, 200)}. ` +
-          "Pass --allow-local-plugin-install for offline/dev directory marketplace.",
-      );
+      const w =
+        `claude marketplace add failed: ${msg.slice(0, 200)}. ` +
+        "Pass --allow-local-plugin-install for offline/dev directory marketplace.";
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
 
-  // 3) Install + enable via official CLI only (no settings.json writes)
+  // 2) Install + enable via official CLI only
+  let installOk = false;
   try {
     await runClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
       60000,
     );
     actions.push("claude plugin install ai-config-sync@ai-config-sync");
+    installOk = true;
+    changed = true;
   } catch (e) {
     const msg = (e as Error).message || String(e);
     if (/already installed/i.test(msg)) {
       actions.push("claude plugin already installed");
+      installOk = true;
     } else {
-      actions.push(`WARN claude plugin install: ${msg.slice(0, 200)}`);
+      const w = `claude plugin install: ${msg.slice(0, 200)}`;
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
 
+  let enableOk = false;
   try {
     await runClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
       30000,
     );
     actions.push("claude plugin enable ai-config-sync@ai-config-sync");
+    enableOk = true;
+    changed = true;
   } catch (e) {
     const msg = (e as Error).message || String(e);
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
+      enableOk = true;
     } else {
-      // Do NOT rewrite settings.json — leave enable to the user / Claude CLI
-      actions.push(
-        `WARN claude plugin enable: ${msg.slice(0, 160)}. ` +
-          "Run: claude plugin enable ai-config-sync@ai-config-sync",
-      );
+      const w =
+        `claude plugin enable: ${msg.slice(0, 160)}. ` +
+        "Run: claude plugin enable ai-config-sync@ai-config-sync";
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
 
   if (!marketplaceReady) {
-    actions.push(
-      "NOTE: marketplace not registered; plugin install may be incomplete",
-    );
+    const note =
+      "marketplace not registered; plugin install may be incomplete";
+    warnings.push(note);
+    actions.push(`NOTE: ${note}`);
   }
 
-  return actions;
+  // 3) Verify via claude plugin list --json when possible
+  let verified = false;
+  try {
+    const listOut = await execFileAsync(
+      claudeBin,
+      ["plugin", "list", "--json"],
+      {
+        windowsHide: true,
+        timeout: 30000,
+        maxBuffer: 4 * 1024 * 1024,
+        encoding: "utf8",
+      },
+    );
+    const text = `${listOut.stdout ?? ""}`.trim();
+    if (text) {
+      const parsed = JSON.parse(text) as unknown;
+      const list = Array.isArray(parsed)
+        ? parsed
+        : typeof parsed === "object" &&
+            parsed !== null &&
+            Array.isArray((parsed as { plugins?: unknown }).plugins)
+          ? (parsed as { plugins: unknown[] }).plugins
+          : typeof parsed === "object" &&
+              parsed !== null &&
+              Array.isArray((parsed as { installed?: unknown }).installed)
+            ? (parsed as { installed: unknown[] }).installed
+            : [];
+      for (const item of list) {
+        if (typeof item !== "object" || item === null) continue;
+        const id = String(
+          (item as { id?: string; name?: string }).id ??
+            (item as { name?: string }).name ??
+            "",
+        ).toLowerCase();
+        if (
+          id === "ai-config-sync@ai-config-sync" ||
+          id.startsWith("ai-config-sync@")
+        ) {
+          verified = true;
+          const enabled = (item as { enabled?: boolean }).enabled;
+          if (enabled === false) {
+            enableOk = false;
+            errors.push("plugin listed but not enabled");
+          } else {
+            installOk = true;
+            enableOk = true;
+          }
+          break;
+        }
+      }
+    }
+  } catch {
+    /* verification optional when list fails */
+  }
+
+  const ok =
+    errors.length === 0 ||
+    (installOk && enableOk) ||
+    verified;
+
+  if (!ok && errors.length === 0 && !installOk) {
+    errors.push("Claude plugin install could not be confirmed");
+  }
+
+  return {
+    ok: errors.length === 0 || (installOk && enableOk),
+    changed,
+    warnings,
+    errors,
+    actions,
+  };
 }
 
 async function installCodexIntegration(
   home: string,
   programRoot?: string,
-): Promise<string[]> {
+  pluginRoot?: string,
+): Promise<IntegrationInstallResult> {
   const actions: string[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  let changed = false;
+
   // Prefer ~/.agents/skills (modern); still works if only legacy exists
   const skillDest = path.join(agentsSkillsDir(home), "config-sync");
   let skillSrc: string | undefined;
@@ -558,6 +782,7 @@ async function installCodexIntegration(
     );
     if (await pathExists(p)) skillSrc = p;
   }
+  // Plugin layout may only ship Claude skills; still allow template skill
 
   const skillMd = path.join(skillDest, "SKILL.md");
   if (!(await pathExists(skillMd))) {
@@ -587,13 +812,19 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
       );
     }
     actions.push(`INSTALL agents skill: config-sync → ${skillDest}`);
+    changed = true;
   }
 
   // Codex hooks.json — official event-map shape
   // Prefer absolute CLI path on Windows for commandWindows
   let cliAbsoluteCommand: string | undefined;
   try {
-    // Resolve from programRoot bundled bin when available
+    if (pluginRoot) {
+      const cjs = path.join(pluginRoot, "bin", "ai-config-sync.cjs");
+      if (await pathExists(cjs)) {
+        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
+      }
+    }
     if (programRoot) {
       const cjs = path.join(
         programRoot,
@@ -602,7 +833,7 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
         "bin",
         "ai-config-sync.cjs",
       );
-      if (await pathExists(cjs)) {
+      if (!cliAbsoluteCommand && (await pathExists(cjs))) {
         cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
       }
       const distCjs = path.join(programRoot, "dist", "ai-config-sync.cjs");
@@ -611,7 +842,6 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
       }
     }
     if (!cliAbsoluteCommand) {
-      // try argv[1] (current running CLI)
       const argv1 = process.argv[1];
       if (argv1 && (await pathExists(argv1))) {
         if (argv1.endsWith(".cjs") || argv1.endsWith(".js")) {
@@ -631,16 +861,16 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      // backup broken file
       await fs.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json → ${hooksPath}.bak-*`);
+      changed = true;
     }
   }
-  const { next, changed } = mergeManagedCodexSessionStart(base, {
+  const { next, changed: hooksChanged } = mergeManagedCodexSessionStart(base, {
     cliAbsoluteCommand,
   });
-  if (changed || !hasManagedCodexSessionStart(base)) {
+  if (hooksChanged || !hasManagedCodexSessionStart(base)) {
     await ensureDir(path.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push(
@@ -648,6 +878,7 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
         ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)"
         : "MERGE Codex hooks.json SessionStart (event-map format)",
     );
+    changed = true;
   }
 
   // Ensure features.hooks = true
@@ -660,13 +891,14 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
     await ensureDir(path.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
+    changed = true;
   }
 
   actions.push(
     "NOTE: Codex may prompt to trust the SessionStart hook on first run.",
   );
 
-  return actions;
+  return { ok: true, changed, warnings, errors, actions };
 }
 
 export async function runSetup(
@@ -862,28 +1094,52 @@ export async function runSetup(
     }
   }
 
-  const programRoot = await detectProgramRoot(options.programRoot);
-  if (programRoot) {
-    messages.push(`Program root: ${programRoot}`);
-  } else {
+  const packageRoot = await detectPackageRoot(options.programRoot);
+  const pluginRoot = await detectPluginRoot();
+  const insideSelf =
+    !!options.skipSelfPluginInstall ||
+    (await isRunningInsideSelfPlugin(pluginRoot));
+
+  if (packageRoot) {
+    messages.push(`Package root: ${packageRoot}`);
+  }
+  if (pluginRoot) {
+    messages.push(`Plugin root: ${pluginRoot}`);
+  }
+  if (insideSelf) {
+    messages.push("Running inside ai-config-sync Claude plugin — skip self install");
+  }
+  if (!packageRoot && !pluginRoot) {
     messages.push(
-      "Program root not found — Claude plugin files may be incomplete. Run setup from ai-config-sync repo or pass --program-root.",
+      "Package/plugin root not found — Claude plugin files may be incomplete. Run setup from ai-config-sync repo, plugin session, or pass --program-root.",
     );
   }
 
+  // programRoot for integrations: prefer package (has integrations/), else plugin root
+  const programRoot = packageRoot ?? pluginRoot;
+
+  let integrationFailed = false;
+
   // Integrations
   if (localConfig.targets.claude) {
-    if (programRoot) {
-      const pluginActions = await installClaudePlugin(home, programRoot, {
+    if (programRoot || insideSelf) {
+      const pluginResult = await installClaudePlugin(home, programRoot, {
         allowLocalPluginInstall: !!options.allowLocalPluginInstall,
-        skipSelfPluginInstall: !!options.skipSelfPluginInstall,
+        skipSelfPluginInstall: insideSelf,
+        forbidSkillFallback: insideSelf,
       });
-      if (pluginActions.length) {
-        actions.push(...pluginActions);
-        if (status === "no-changes") status = "repaired";
+      if (pluginResult.actions.length) {
+        actions.push(...pluginResult.actions);
+        if (pluginResult.changed && status === "no-changes") status = "repaired";
       }
-    } else {
-      // Minimal skill fallback without plugin
+      if (!pluginResult.ok) {
+        integrationFailed = true;
+        messages.push(
+          ...pluginResult.errors.map((e) => `Claude integration error: ${e}`),
+        );
+      }
+    } else if (!insideSelf) {
+      // Minimal skill fallback only when not inside self plugin and no roots
       const skillDir = path.join(home, ".claude", "skills", "config-sync");
       const skillMd = path.join(skillDir, "SKILL.md");
       if (!(await pathExists(skillMd))) {
@@ -908,11 +1164,25 @@ user-invocable: true
   }
 
   if (localConfig.targets.codex) {
-    const codexActions = await installCodexIntegration(home, programRoot);
-    if (codexActions.length) {
-      actions.push(...codexActions);
-      if (status === "no-changes") status = "repaired";
+    const codexResult = await installCodexIntegration(
+      home,
+      packageRoot,
+      pluginRoot,
+    );
+    if (codexResult.actions.length) {
+      actions.push(...codexResult.actions);
+      if (codexResult.changed && status === "no-changes") status = "repaired";
     }
+    if (!codexResult.ok) {
+      integrationFailed = true;
+      messages.push(
+        ...codexResult.errors.map((e) => `Codex integration error: ${e}`),
+      );
+    }
+  }
+
+  if (integrationFailed) {
+    status = "partial";
   }
 
   if (actions.length === 0) {

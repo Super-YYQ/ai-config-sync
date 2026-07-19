@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import os from "node:os";
 import {
   RecipeSchema,
   saveRecipe,
@@ -8,6 +9,8 @@ import {
   loadRecipe,
   pathExists,
   isSelfManagedResourceId,
+  captureTransactionsDir,
+  ensureDir,
   type Resource,
   type Recipe,
   type TargetTool,
@@ -540,16 +543,93 @@ export async function buildCaptureProposals(
   return items;
 }
 
+// ---------------------------------------------------------------------------
+// Capture transaction — precise path-level rollback
+// ---------------------------------------------------------------------------
+
+export interface CaptureTxEntry {
+  /** Relative path under config repo */
+  path: string;
+  existedBefore: boolean;
+  backupPath?: string;
+  type: "file" | "directory";
+}
+
+export interface CaptureTransaction {
+  id: string;
+  stagingRoot: string;
+  backupRoot: string;
+  entries: CaptureTxEntry[];
+}
+
+/**
+ * Whether a capture proposal is auto-confirmable with --yes.
+ * Strict READY only; legacy items without status require recipe + !needsAi.
+ * `usedAi` never bypasses the status machine.
+ */
+export function isReadyForAutoCapture(p: CaptureItem): boolean {
+  if (!p.suggestedRecipe) return false;
+  if (p.status === "blocked" || p.status === "system-excluded") return false;
+  if (p.status === "ready") return true;
+  // Legacy / undefined status: only when not needing AI review
+  if (p.status === undefined && !p.needsAi) return true;
+  return false;
+}
+
+async function entryType(abs: string): Promise<"file" | "directory"> {
+  try {
+    const st = await fs.stat(abs);
+    return st.isDirectory() ? "directory" : "file";
+  } catch {
+    return "file";
+  }
+}
+
+/**
+ * Precise rollback: delete newly created paths; for pre-existing paths,
+ * remove current content then restore full backup.
+ */
+export async function rollbackCaptureTransaction(
+  tx: CaptureTransaction,
+  configRepoPath: string,
+): Promise<void> {
+  for (const entry of tx.entries) {
+    const live = path.join(configRepoPath, entry.path);
+    try {
+      if (!entry.existedBefore) {
+        if (await pathExists(live)) {
+          await fs.rm(live, { recursive: true, force: true });
+        }
+        continue;
+      }
+      if (await pathExists(live)) {
+        await fs.rm(live, { recursive: true, force: true });
+      }
+      if (entry.backupPath && (await pathExists(entry.backupPath))) {
+        await ensureDir(path.dirname(live));
+        await fs.cp(entry.backupPath, live, { recursive: true });
+      }
+    } catch {
+      /* best effort per path */
+    }
+  }
+}
+
 /**
  * Persist confirmed capture items into the private config repo.
- * Transactional: stage under .ai-config-sync-staging/, validate, then
- * backup existing targets and atomically replace.
+ * Transactional: stage under ~/.ai-config-sync/capture-transactions/,
+ * backup existing targets, replace, and precisely roll back on failure.
  * Merges dual-target recipes instead of overwriting.
  */
 export async function commitCaptureItems(
   items: CaptureItem[],
   configRepoPath: string,
   confirmedBy = "user",
+  options: {
+    home?: string;
+    /** Test hook: throw after replace of these relative paths. */
+    injectFailureAfter?: string[];
+  } = {},
 ): Promise<{ resourcesPath: string; recipePaths: string[] }> {
   const resourcesPath = path.join(configRepoPath, "resources.yaml");
   const existing = await loadResources(resourcesPath);
@@ -594,20 +674,34 @@ export async function commitCaptureItems(
     });
   }
 
-  // Stage all writes under a temp dir, then swap into place
-  const stagingRoot = path.join(
-    configRepoPath,
-    `.ai-config-sync-staging-${Date.now()}`,
-  );
-  const backupRoot = path.join(
-    configRepoPath,
-    `.ai-config-sync-backup-${Date.now()}`,
-  );
+  // Stage/backup outside the private git repo
+  const home = options.home ?? os.homedir();
+  const txBase = captureTransactionsDir(home);
+  await ensureDir(txBase);
+  const txId = `tx-${Date.now()}-${process.pid}`;
+  const stagingRoot = path.join(txBase, `${txId}-staging`);
+  const backupRoot = path.join(txBase, `${txId}-backup`);
   const stagedRecipeRels: string[] = [];
   const stagedVendorRels: string[] = [];
+  const txEntries: CaptureTxEntry[] = [];
+
+  const trackPath = async (rel: string) => {
+    if (txEntries.some((e) => e.path === rel)) return;
+    const live = path.join(configRepoPath, rel);
+    const existedBefore = await pathExists(live);
+    const type = existedBefore ? await entryType(live) : "file";
+    let backupPath: string | undefined;
+    if (existedBefore) {
+      backupPath = path.join(backupRoot, rel);
+      await ensureDir(path.dirname(backupPath));
+      await fs.cp(live, backupPath, { recursive: true });
+    }
+    txEntries.push({ path: rel, existedBefore, backupPath, type });
+  };
 
   try {
     await fs.mkdir(path.join(stagingRoot, "recipes"), { recursive: true });
+    await fs.mkdir(backupRoot, { recursive: true });
 
     for (const item of batchById.values()) {
       if (item.status === "blocked" || item.status === "system-excluded") {
@@ -728,19 +822,12 @@ export async function commitCaptureItems(
     // Re-load staged resources to ensure file is valid
     await loadResources(stagedResources);
 
-    // Backup live targets that will be replaced
-    const toBackup: string[] = ["resources.yaml", ...stagedRecipeRels, ...stagedVendorRels];
-    await fs.mkdir(backupRoot, { recursive: true });
-    for (const rel of toBackup) {
-      const live = path.join(configRepoPath, rel);
-      if (await pathExists(live)) {
-        const bak = path.join(backupRoot, rel);
-        await fs.mkdir(path.dirname(bak), { recursive: true });
-        await fs.cp(live, bak, { recursive: true });
-      }
-    }
+    // Track + backup every path we will touch (existedBefore drives rollback)
+    await trackPath("resources.yaml");
+    for (const rel of stagedRecipeRels) await trackPath(rel);
+    for (const rel of stagedVendorRels) await trackPath(rel);
 
-    // Atomic-ish replace: move staged files into place
+    // Replace: vendor dirs first, then recipes, then resources
     for (const rel of stagedVendorRels) {
       const from = path.join(stagingRoot, rel);
       const to = path.join(configRepoPath, rel);
@@ -752,42 +839,60 @@ export async function commitCaptureItems(
         await fs.cp(from, to, { recursive: true });
         await fs.rm(from, { recursive: true, force: true });
       });
+      if (options.injectFailureAfter?.includes(rel)) {
+        throw new Error(`injectFailureAfter: ${rel}`);
+      }
     }
     for (const rel of stagedRecipeRels) {
       const from = path.join(stagingRoot, rel);
       const to = path.join(configRepoPath, rel);
+      if (await pathExists(to)) {
+        await fs.rm(to, { recursive: true, force: true });
+      }
       await fs.mkdir(path.dirname(to), { recursive: true });
       await fs.rename(from, to).catch(async () => {
         await fs.copyFile(from, to);
         await fs.rm(from, { force: true });
       });
+      if (options.injectFailureAfter?.includes(rel)) {
+        throw new Error(`injectFailureAfter: ${rel}`);
+      }
     }
     {
       const from = stagedResources;
       const to = resourcesPath;
+      if (await pathExists(to)) {
+        await fs.rm(to, { force: true });
+      }
       await fs.rename(from, to).catch(async () => {
         await fs.copyFile(from, to);
         await fs.rm(from, { force: true });
       });
+      if (options.injectFailureAfter?.includes("resources.yaml")) {
+        throw new Error("injectFailureAfter: resources.yaml");
+      }
     }
 
     // Success — drop backup and staging
     await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
     await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
   } catch (e) {
-    // Restore from backup if present
+    // Precise restore: delete new paths; restore pre-existing from backup
     try {
-      if (await pathExists(backupRoot)) {
-        const entries = await fs.readdir(backupRoot, { withFileTypes: true });
-        // restore top-level + nested via recursive copy
-        await fs.cp(backupRoot, configRepoPath, { recursive: true, force: true });
-        void entries;
-      }
+      await rollbackCaptureTransaction(
+        {
+          id: txId,
+          stagingRoot,
+          backupRoot,
+          entries: txEntries,
+        },
+        configRepoPath,
+      );
     } catch {
       /* best effort */
     }
     await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
-    // keep backup on failure for manual recovery
+    // keep backup on failure for manual recovery (outside git repo)
     throw e;
   }
 

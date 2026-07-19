@@ -3,6 +3,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { claudeExecutable } from "@ai-config-sync/core";
 
 const execFileAsync = promisify(execFile);
 
@@ -123,7 +124,7 @@ export async function queryClaudePluginStatus(
 ): Promise<ClaudePluginStatus> {
   try {
     const listOut = await execFileAsync(
-      process.platform === "win32" ? "claude.cmd" : "claude",
+      claudeExecutable(),
       ["plugin", "list", "--json"],
       {
         windowsHide: true,

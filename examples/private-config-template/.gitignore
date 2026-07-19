@@ -3,3 +3,6 @@ auth.json
 *.secret.*
 local.yaml
 .DS_Store
+.ai-config-sync/
+.ai-config-sync-staging-*
+.ai-config-sync-backup-*

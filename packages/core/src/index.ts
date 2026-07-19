@@ -9,3 +9,4 @@ export * from "./secrets.js";
 export * from "./secret-resolver.js";
 export * from "./config-io.js";
 export * from "./codex-hooks.js";
+export * from "./claude-cli.js";

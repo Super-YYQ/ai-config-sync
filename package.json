@@ -1,6 +1,6 @@
 {
   "name": "ai-config-sync",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "AI Agent configuration sync — Claude Code / Codex skills & plugins via private config repo",
   "type": "module",
   "bin": {

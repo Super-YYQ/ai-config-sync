@@ -381,13 +381,12 @@ program
       console.log("Note: --yes only writes READY proposals (blocked/system excluded).");
       return;
     }
-    // Auto-confirm only READY proposals (never blocked / unresolved marketplace)
+    // Auto-confirm only READY proposals (never blocked / needs-review via usedAi)
     const confirmed = proposals.filter(
       (p) =>
         p.suggestedRecipe &&
-        p.status !== "blocked" &&
-        p.status !== "system-excluded" &&
-        (p.status === "ready" || !p.needsAi || p.usedAi),
+        (p.status === "ready" ||
+          (p.status === undefined && !p.needsAi)),
     );
     const skipped = proposals.filter((p) => !confirmed.includes(p));
     if (confirmed.length === 0) {

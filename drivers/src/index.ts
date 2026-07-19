@@ -17,6 +17,7 @@ import {
   readText,
   writeJsonFile,
   writeText,
+  claudeExecutable,
   type DriverName,
   type RecipeOperation,
   type RiskLevel,
@@ -35,6 +36,11 @@ export {
 } from "./claude-plugin-status.js";
 
 const execFileAsync = promisify(execFile);
+
+/** Shared Claude CLI binary (claude.cmd on Windows). */
+function claudeBin(): string {
+  return claudeExecutable();
+}
 
 export interface DriverContext {
   home: string;
@@ -490,6 +496,11 @@ function isCommandAllowed(
     ["claude", "plugin", "enable"],
     ["claude", "plugin", "disable"],
     ["claude", "plugin", "list"],
+    ["claude.cmd", "plugin", "marketplace", "add"],
+    ["claude.cmd", "plugin", "install"],
+    ["claude.cmd", "plugin", "enable"],
+    ["claude.cmd", "plugin", "disable"],
+    ["claude.cmd", "plugin", "list"],
     ["npx", "skills", "add"],
     ["npx", "--yes", "skills", "add"],
     ["npx", "ai-config-sync"],
@@ -585,7 +596,7 @@ export const claudeMarketplaceDriver: Driver = {
       commands.push({
         kind: "marketplace",
         cmd: [
-          "claude",
+          claudeBin(),
           "plugin",
           "marketplace",
           "add",
@@ -597,7 +608,7 @@ export const claudeMarketplaceDriver: Driver = {
       commands.push({
         kind: "install",
         cmd: [
-          "claude",
+          claudeBin(),
           "plugin",
           "install",
           `${plugin}@${marketplace}`,
@@ -607,12 +618,12 @@ export const claudeMarketplaceDriver: Driver = {
       });
       commands.push({
         kind: "enable",
-        cmd: ["claude", "plugin", "enable", `${plugin}@${marketplace}`],
+        cmd: [claudeBin(), "plugin", "enable", `${plugin}@${marketplace}`],
       });
     } else if (plugin) {
       commands.push({
         kind: "install",
-        cmd: ["claude", "plugin", "install", plugin, "--scope", scope],
+        cmd: [claudeBin(), "plugin", "install", plugin, "--scope", scope],
       });
     }
 
@@ -677,7 +688,7 @@ export const claudeMarketplaceDriver: Driver = {
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
         await execFileAsync(
-          "claude",
+          claudeBin(),
           ["plugin", "disable", receipt.pluginId],
           { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
         );
@@ -693,7 +704,7 @@ export const claudeMarketplaceDriver: Driver = {
     ) {
       try {
         await execFileAsync(
-          "claude",
+          claudeBin(),
           ["plugin", "uninstall", receipt.pluginId],
           { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
         );

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1 — Beta Compatibility (bug222)
+
+### P0
+- **Plugin self-detection**: split `detectPackageRoot()` / `detectPluginRoot()`; recognize installed Claude plugin via `plugin.json` name (`ai-config-sync`), not directory basename. Setup inside the plugin skips self-install and never creates `~/.claude/skills/config-sync` fallback.
+- **Precise capture rollback**: transaction records `existedBefore` per path; failure deletes newly created recipes/vendors and fully restores pre-existing dirs (no leftover files). Staging/backup live under `~/.ai-config-sync/capture-transactions/`.
+
+### P1
+- Capture temp patterns in generated `.gitignore` and private-config template
+- Unified `claudeExecutable()` (`claude.cmd` on Windows) for status/install/enable/disable/uninstall
+- Setup returns structured `IntegrationInstallResult`; status can be `partial` on integration failure
+- Codex `commandWindows` refreshes whenever the desired absolute path changes
+- `capture --yes` only auto-confirms `status === "ready"` (legacy: undefined + recipe + !needsAi); `usedAi` no longer bypasses
+
 ## 0.4.0 — Beta Compatibility (core)
 
 ### Reliability (plan 3.8)

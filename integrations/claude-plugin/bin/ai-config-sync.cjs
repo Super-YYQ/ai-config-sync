@@ -7480,6 +7480,9 @@ function cacheDir(home = import_node_os.default.homedir()) {
 function logsDir(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(defaultStateRoot(home), "logs");
 }
+function captureTransactionsDir(home = import_node_os.default.homedir()) {
+  return import_node_path.default.join(defaultStateRoot(home), "capture-transactions");
+}
 function claudeHome(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(home, ".claude");
 }
@@ -15666,6 +15669,7 @@ function buildManagedCommand(options) {
 function mergeManagedCodexSessionStart(doc, options) {
   if (hasManagedCodexSessionStart(doc)) {
     if (options?.cliAbsoluteCommand && isPlainObject2(doc) && isPlainObject2(doc.hooks)) {
+      const desired = options.cliAbsoluteCommand.includes("scan") ? options.cliAbsoluteCommand : `${options.cliAbsoluteCommand} scan --light --write-pending`;
       const hooks = { ...doc.hooks };
       const session2 = Array.isArray(hooks.SessionStart) ? [...hooks.SessionStart] : [];
       let refreshed = false;
@@ -15674,11 +15678,12 @@ function mergeManagedCodexSessionStart(doc, options) {
           return block;
         const nextHooks = block.hooks.map((h) => {
           if (isPlainObject2(h) && (h.id === MANAGED_ID || isManagedHookCommand(h.command))) {
-            if (!h.commandWindows) {
+            const existing = typeof h.commandWindows === "string" ? h.commandWindows : void 0;
+            if (existing !== desired) {
               refreshed = true;
               return {
                 ...h,
-                commandWindows: options.cliAbsoluteCommand.includes("scan") ? options.cliAbsoluteCommand : `${options.cliAbsoluteCommand} scan --light --write-pending`
+                commandWindows: desired
               };
             }
           }
@@ -15751,6 +15756,16 @@ var init_codex_hooks = __esm({
   }
 });
 
+// packages/core/dist/claude-cli.js
+function claudeExecutable() {
+  return process.platform === "win32" ? "claude.cmd" : "claude";
+}
+var init_claude_cli = __esm({
+  "packages/core/dist/claude-cli.js"() {
+    "use strict";
+  }
+});
+
 // packages/core/dist/index.js
 var dist_exports = {};
 __export(dist_exports, {
@@ -15792,7 +15807,9 @@ __export(dist_exports, {
   agentsSkillsDir: () => agentsSkillsDir,
   backupsDir: () => backupsDir,
   cacheDir: () => cacheDir,
+  captureTransactionsDir: () => captureTransactionsDir,
   checkSecrets: () => checkSecrets,
+  claudeExecutable: () => claudeExecutable,
   claudeHome: () => claudeHome,
   claudePluginsDir: () => claudePluginsDir,
   claudeSettingsPath: () => claudeSettingsPath,
@@ -15882,6 +15899,7 @@ var init_dist = __esm({
     init_secret_resolver();
     init_config_io();
     init_codex_hooks();
+    init_claude_cli();
   }
 });
 
@@ -15903,7 +15921,7 @@ var {
 } = import_index.default;
 
 // packages/cli/src/index.ts
-var import_node_os3 = __toESM(require("node:os"), 1);
+var import_node_os4 = __toESM(require("node:os"), 1);
 init_dist();
 
 // packages/scanner/dist/index.js
@@ -17390,6 +17408,7 @@ init_dist();
 // drivers/dist/claude-plugin-status.js
 var import_node_child_process3 = require("node:child_process");
 var import_node_util3 = require("node:util");
+init_dist();
 var execFileAsync3 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 function isPlainObject4(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -17458,7 +17477,7 @@ function findPluginStatus(entries, pluginId, pluginName) {
 }
 async function queryClaudePluginStatus(pluginId, pluginName) {
   try {
-    const listOut = await execFileAsync3(process.platform === "win32" ? "claude.cmd" : "claude", ["plugin", "list", "--json"], {
+    const listOut = await execFileAsync3(claudeExecutable(), ["plugin", "list", "--json"], {
       windowsHide: true,
       maxBuffer: 5 * 1024 * 1024,
       encoding: "utf8"
@@ -17518,6 +17537,9 @@ async function queryClaudePluginStatus(pluginId, pluginName) {
 
 // drivers/dist/index.js
 var execFileAsync4 = (0, import_node_util4.promisify)(import_node_child_process4.execFile);
+function claudeBin() {
+  return claudeExecutable();
+}
 function destSkillDir(target, resourceId, home) {
   return target === "claude" ? import_node_path11.default.join(claudeSkillsDir(home), resourceId) : import_node_path11.default.join(codexSkillsDir(home), resourceId);
 }
@@ -17837,6 +17859,11 @@ function isCommandAllowed(cmd, allowlist, risk) {
     ["claude", "plugin", "enable"],
     ["claude", "plugin", "disable"],
     ["claude", "plugin", "list"],
+    ["claude.cmd", "plugin", "marketplace", "add"],
+    ["claude.cmd", "plugin", "install"],
+    ["claude.cmd", "plugin", "enable"],
+    ["claude.cmd", "plugin", "disable"],
+    ["claude.cmd", "plugin", "list"],
     ["npx", "skills", "add"],
     ["npx", "--yes", "skills", "add"],
     ["npx", "ai-config-sync"],
@@ -17914,7 +17941,7 @@ var claudeMarketplaceDriver = {
       commands.push({
         kind: "marketplace",
         cmd: [
-          "claude",
+          claudeBin(),
           "plugin",
           "marketplace",
           "add",
@@ -17926,7 +17953,7 @@ var claudeMarketplaceDriver = {
       commands.push({
         kind: "install",
         cmd: [
-          "claude",
+          claudeBin(),
           "plugin",
           "install",
           `${plugin}@${marketplace}`,
@@ -17936,12 +17963,12 @@ var claudeMarketplaceDriver = {
       });
       commands.push({
         kind: "enable",
-        cmd: ["claude", "plugin", "enable", `${plugin}@${marketplace}`]
+        cmd: [claudeBin(), "plugin", "enable", `${plugin}@${marketplace}`]
       });
     } else if (plugin) {
       commands.push({
         kind: "install",
-        cmd: ["claude", "plugin", "install", plugin, "--scope", scope]
+        cmd: [claudeBin(), "plugin", "install", plugin, "--scope", scope]
       });
     }
     const messages = [];
@@ -18005,7 +18032,7 @@ var claudeMarketplaceDriver = {
     const messages = [];
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
-        await execFileAsync4("claude", ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await execFileAsync4(claudeBin(), ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`disable failed: ${e.message}`);
@@ -18013,7 +18040,7 @@ var claudeMarketplaceDriver = {
     }
     if (receipt.pluginInstalled && !receipt.previouslyInstalled && receipt.pluginId) {
       try {
-        await execFileAsync4("claude", ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await execFileAsync4(claudeBin(), ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`uninstall failed: ${e.message}`);
@@ -18760,6 +18787,7 @@ async function buildDriftReport(ctx) {
 // packages/recipe-engine/dist/capture.js
 var import_node_path16 = __toESM(require("node:path"), 1);
 var import_promises8 = __toESM(require("node:fs/promises"), 1);
+var import_node_os2 = __toESM(require("node:os"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -19296,7 +19324,36 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
   }
   return items;
 }
-async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
+async function entryType(abs) {
+  try {
+    const st = await import_promises8.default.stat(abs);
+    return st.isDirectory() ? "directory" : "file";
+  } catch {
+    return "file";
+  }
+}
+async function rollbackCaptureTransaction(tx, configRepoPath) {
+  for (const entry of tx.entries) {
+    const live = import_node_path16.default.join(configRepoPath, entry.path);
+    try {
+      if (!entry.existedBefore) {
+        if (await pathExists(live)) {
+          await import_promises8.default.rm(live, { recursive: true, force: true });
+        }
+        continue;
+      }
+      if (await pathExists(live)) {
+        await import_promises8.default.rm(live, { recursive: true, force: true });
+      }
+      if (entry.backupPath && await pathExists(entry.backupPath)) {
+        await ensureDir(import_node_path16.default.dirname(live));
+        await import_promises8.default.cp(entry.backupPath, live, { recursive: true });
+      }
+    } catch {
+    }
+  }
+}
+async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", options = {}) {
   const resourcesPath = import_node_path16.default.join(configRepoPath, "resources.yaml");
   const existing = await loadResources(resourcesPath);
   const byId = new Map(existing.resources.map((r) => [r.id, r]));
@@ -19337,12 +19394,32 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
       usedAi: prev.usedAi || item.usedAi
     });
   }
-  const stagingRoot = import_node_path16.default.join(configRepoPath, `.ai-config-sync-staging-${Date.now()}`);
-  const backupRoot = import_node_path16.default.join(configRepoPath, `.ai-config-sync-backup-${Date.now()}`);
+  const home = options.home ?? import_node_os2.default.homedir();
+  const txBase = captureTransactionsDir(home);
+  await ensureDir(txBase);
+  const txId = `tx-${Date.now()}-${process.pid}`;
+  const stagingRoot = import_node_path16.default.join(txBase, `${txId}-staging`);
+  const backupRoot = import_node_path16.default.join(txBase, `${txId}-backup`);
   const stagedRecipeRels = [];
   const stagedVendorRels = [];
+  const txEntries = [];
+  const trackPath = async (rel) => {
+    if (txEntries.some((e) => e.path === rel))
+      return;
+    const live = import_node_path16.default.join(configRepoPath, rel);
+    const existedBefore = await pathExists(live);
+    const type = existedBefore ? await entryType(live) : "file";
+    let backupPath;
+    if (existedBefore) {
+      backupPath = import_node_path16.default.join(backupRoot, rel);
+      await ensureDir(import_node_path16.default.dirname(backupPath));
+      await import_promises8.default.cp(live, backupPath, { recursive: true });
+    }
+    txEntries.push({ path: rel, existedBefore, backupPath, type });
+  };
   try {
     await import_promises8.default.mkdir(import_node_path16.default.join(stagingRoot, "recipes"), { recursive: true });
+    await import_promises8.default.mkdir(backupRoot, { recursive: true });
     for (const item of batchById.values()) {
       if (item.status === "blocked" || item.status === "system-excluded") {
         continue;
@@ -19428,16 +19505,11 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
       resources: [...byId.values()]
     });
     await loadResources(stagedResources);
-    const toBackup = ["resources.yaml", ...stagedRecipeRels, ...stagedVendorRels];
-    await import_promises8.default.mkdir(backupRoot, { recursive: true });
-    for (const rel of toBackup) {
-      const live = import_node_path16.default.join(configRepoPath, rel);
-      if (await pathExists(live)) {
-        const bak = import_node_path16.default.join(backupRoot, rel);
-        await import_promises8.default.mkdir(import_node_path16.default.dirname(bak), { recursive: true });
-        await import_promises8.default.cp(live, bak, { recursive: true });
-      }
-    }
+    await trackPath("resources.yaml");
+    for (const rel of stagedRecipeRels)
+      await trackPath(rel);
+    for (const rel of stagedVendorRels)
+      await trackPath(rel);
     for (const rel of stagedVendorRels) {
       const from = import_node_path16.default.join(stagingRoot, rel);
       const to = import_node_path16.default.join(configRepoPath, rel);
@@ -19449,23 +19521,38 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
         await import_promises8.default.cp(from, to, { recursive: true });
         await import_promises8.default.rm(from, { recursive: true, force: true });
       });
+      if (options.injectFailureAfter?.includes(rel)) {
+        throw new Error(`injectFailureAfter: ${rel}`);
+      }
     }
     for (const rel of stagedRecipeRels) {
       const from = import_node_path16.default.join(stagingRoot, rel);
       const to = import_node_path16.default.join(configRepoPath, rel);
+      if (await pathExists(to)) {
+        await import_promises8.default.rm(to, { recursive: true, force: true });
+      }
       await import_promises8.default.mkdir(import_node_path16.default.dirname(to), { recursive: true });
       await import_promises8.default.rename(from, to).catch(async () => {
         await import_promises8.default.copyFile(from, to);
         await import_promises8.default.rm(from, { force: true });
       });
+      if (options.injectFailureAfter?.includes(rel)) {
+        throw new Error(`injectFailureAfter: ${rel}`);
+      }
     }
     {
       const from = stagedResources;
       const to = resourcesPath;
+      if (await pathExists(to)) {
+        await import_promises8.default.rm(to, { force: true });
+      }
       await import_promises8.default.rename(from, to).catch(async () => {
         await import_promises8.default.copyFile(from, to);
         await import_promises8.default.rm(from, { force: true });
       });
+      if (options.injectFailureAfter?.includes("resources.yaml")) {
+        throw new Error("injectFailureAfter: resources.yaml");
+      }
     }
     await import_promises8.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
     });
@@ -19473,11 +19560,12 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user") {
     });
   } catch (e) {
     try {
-      if (await pathExists(backupRoot)) {
-        const entries = await import_promises8.default.readdir(backupRoot, { withFileTypes: true });
-        await import_promises8.default.cp(backupRoot, configRepoPath, { recursive: true, force: true });
-        void entries;
-      }
+      await rollbackCaptureTransaction({
+        id: txId,
+        stagingRoot,
+        backupRoot,
+        entries: txEntries
+      }, configRepoPath);
     } catch {
     }
     await import_promises8.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
@@ -19736,31 +19824,85 @@ function formatDoctor(report) {
 // packages/cli/src/setup.ts
 var import_node_path18 = __toESM(require("node:path"), 1);
 var import_promises9 = __toESM(require("node:fs/promises"), 1);
-var import_node_os2 = __toESM(require("node:os"), 1);
+var import_node_os3 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
-async function looksLikeProgramRoot(dir) {
+var SELF_PLUGIN_NAMES = /* @__PURE__ */ new Set(["ai-config-sync", "config-sync"]);
+async function looksLikePackageRoot(dir) {
   return pathExists(
-    import_node_path18.default.join(dir, "integrations", "claude-plugin", ".claude-plugin", "plugin.json")
+    import_node_path18.default.join(
+      dir,
+      "integrations",
+      "claude-plugin",
+      ".claude-plugin",
+      "plugin.json"
+    )
   );
 }
-async function detectProgramRoot(explicit) {
+async function readPluginManifestName(pluginRoot) {
+  const manifest = import_node_path18.default.join(pluginRoot, ".claude-plugin", "plugin.json");
+  if (!await pathExists(manifest)) return void 0;
+  try {
+    const raw = await readJsonFile(manifest);
+    return typeof raw.name === "string" ? raw.name : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function detectPluginRoot(explicit) {
+  const candidates = [];
+  if (explicit) candidates.push(import_node_path18.default.resolve(explicit));
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    candidates.push(import_node_path18.default.resolve(process.env.CLAUDE_PLUGIN_ROOT));
+  }
+  try {
+    const argv1 = process.argv[1];
+    if (argv1) {
+      const binDir = import_node_path18.default.dirname(import_node_path18.default.resolve(argv1));
+      candidates.push(import_node_path18.default.resolve(binDir, ".."));
+    }
+  } catch {
+  }
+  for (const c of candidates) {
+    if (!await pathExists(c)) continue;
+    const name = await readPluginManifestName(c);
+    if (name && SELF_PLUGIN_NAMES.has(name)) return c;
+    if (await pathExists(import_node_path18.default.join(c, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path18.default.join(c, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path18.default.join(c, "bin", "ai-config-sync")))) {
+      return c;
+    }
+  }
+  return void 0;
+}
+async function isRunningInsideSelfPlugin(pluginRoot) {
+  const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT ? import_node_path18.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) : void 0);
+  if (!root) return false;
+  const name = await readPluginManifestName(root);
+  if (name && SELF_PLUGIN_NAMES.has(name)) return true;
+  if (await pathExists(import_node_path18.default.join(root, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path18.default.join(root, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path18.default.join(root, "bin", "ai-config-sync")))) {
+    if (name) return SELF_PLUGIN_NAMES.has(name);
+    if (process.env.CLAUDE_PLUGIN_ROOT && import_node_path18.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root) {
+      return false;
+    }
+  }
+  return false;
+}
+async function detectPackageRoot(explicit) {
   if (explicit && await pathExists(explicit)) {
     const resolved = import_node_path18.default.resolve(explicit);
-    if (await looksLikeProgramRoot(resolved)) return resolved;
+    if (await looksLikePackageRoot(resolved)) return resolved;
     return resolved;
   }
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
     const candidates = [
-      pluginRoot,
       import_node_path18.default.resolve(pluginRoot, ".."),
       import_node_path18.default.resolve(pluginRoot, "../.."),
-      import_node_path18.default.resolve(pluginRoot, "../../..")
+      import_node_path18.default.resolve(pluginRoot, "../../.."),
+      pluginRoot
     ];
     for (const c of candidates) {
-      if (await looksLikeProgramRoot(c)) return c;
+      if (await looksLikePackageRoot(c)) return c;
     }
   }
   try {
@@ -19773,7 +19915,7 @@ async function detectProgramRoot(explicit) {
       import_node_path18.default.resolve(here, "../..")
     ];
     for (const c of candidates) {
-      if (await looksLikeProgramRoot(c)) return c;
+      if (await looksLikePackageRoot(c)) return c;
     }
   } catch {
   }
@@ -19785,31 +19927,23 @@ async function detectProgramRoot(explicit) {
         import_node_path18.default.resolve(binDir, ".."),
         // package root from dist/ai-config-sync.cjs
         import_node_path18.default.resolve(binDir, "../.."),
-        import_node_path18.default.resolve(binDir, "../../..")
+        import_node_path18.default.resolve(binDir, "../../.."),
+        import_node_path18.default.resolve(binDir, "../../../..")
       ];
       for (const c of candidates) {
-        if (await looksLikeProgramRoot(c)) return c;
+        if (await looksLikePackageRoot(c)) return c;
       }
     }
   } catch {
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    if (await looksLikeProgramRoot(dir)) return dir;
+    if (await looksLikePackageRoot(dir)) return dir;
     const parent = import_node_path18.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   return void 0;
-}
-function isRunningInsideSelfPlugin() {
-  const root = process.env.CLAUDE_PLUGIN_ROOT;
-  if (!root) return false;
-  const base = import_node_path18.default.basename(root).toLowerCase();
-  if (base.includes("ai-config-sync") || base.includes("config-sync")) {
-    return true;
-  }
-  return false;
 }
 async function detectConfigRepo(options, home) {
   let existingLink;
@@ -19966,6 +20100,10 @@ async function ensureMinimalConfigRepo(localPath) {
     actions.push("CREATE profiles/home.yaml");
   }
   const gitignore = import_node_path18.default.join(localPath, ".gitignore");
+  const requiredIgnore = [
+    ".ai-config-sync-staging-*",
+    ".ai-config-sync-backup-*"
+  ];
   if (!await pathExists(gitignore)) {
     await writeText(
       gitignore,
@@ -19976,31 +20114,58 @@ async function ensureMinimalConfigRepo(localPath) {
         "auth.json",
         "local.yaml",
         ".ai-config-sync/",
+        ...requiredIgnore,
         ""
       ].join("\n")
     );
     actions.push("CREATE .gitignore");
+  } else {
+    const existing = await readText(gitignore);
+    const missing = requiredIgnore.filter((line) => !existing.includes(line));
+    if (missing.length) {
+      const next = existing.trimEnd() + "\n" + missing.join("\n") + "\n";
+      await writeText(gitignore, next);
+      actions.push("UPDATE .gitignore (capture transaction patterns)");
+    }
   }
   return actions;
 }
 async function installClaudePlugin(home, programRoot, options = {}) {
   const actions = [];
-  const pluginSrc = import_node_path18.default.join(programRoot, "integrations", "claude-plugin");
-  if (!await pathExists(import_node_path18.default.join(pluginSrc, ".claude-plugin", "plugin.json"))) {
-    return actions;
-  }
-  if (options.skipSelfPluginInstall || isRunningInsideSelfPlugin()) {
+  const warnings = [];
+  const errors = [];
+  let changed = false;
+  const insideSelf = options.skipSelfPluginInstall || await isRunningInsideSelfPlugin();
+  if (insideSelf) {
     actions.push(
       "SKIP Claude plugin install (already running inside ai-config-sync plugin)"
     );
-    return actions;
+    return { ok: true, changed: false, warnings, errors, actions };
+  }
+  let pluginSrc;
+  if (programRoot) {
+    const nested = import_node_path18.default.join(programRoot, "integrations", "claude-plugin");
+    if (await pathExists(import_node_path18.default.join(nested, ".claude-plugin", "plugin.json"))) {
+      pluginSrc = nested;
+    } else if (await pathExists(import_node_path18.default.join(programRoot, ".claude-plugin", "plugin.json"))) {
+      pluginSrc = programRoot;
+    }
+  }
+  if (!pluginSrc) {
+    warnings.push(
+      "Claude plugin source not found \u2014 skipped marketplace plugin install"
+    );
+    actions.push(
+      "WARN Claude plugin source not found \u2014 skipped marketplace plugin install"
+    );
+    return { ok: true, changed: false, warnings, errors, actions };
   }
   const { execFile: execFile5 } = await import("node:child_process");
   const { promisify: promisify5 } = await import("node:util");
   const execFileAsync5 = promisify5(execFile5);
-  const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+  const claudeBin2 = claudeExecutable();
   const runClaude = async (args, timeout = 12e4) => {
-    await execFileAsync5(claudeBin, args, {
+    await execFileAsync5(claudeBin2, args, {
       windowsHide: true,
       timeout,
       maxBuffer: 4 * 1024 * 1024
@@ -20013,18 +20178,23 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     claudeAvailable = false;
   }
   if (!claudeAvailable) {
-    actions.push(
-      "WARN claude CLI not found \u2014 skipped marketplace plugin install. Install Claude Code CLI, or install the plugin manually: `claude plugin marketplace add Super-YYQ/ai-config-sync`."
-    );
-    const skillSrc = import_node_path18.default.join(pluginSrc, "skills", "config-sync");
-    const skillDest = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
-    const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
-    if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-      await ensureDir(import_node_path18.default.dirname(skillDest));
-      await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
-      actions.push("INSTALL Claude user skill: config-sync (fallback, no claude CLI)");
+    const msg = "claude CLI not found \u2014 skipped marketplace plugin install. Install Claude Code CLI, or install the plugin manually: `claude plugin marketplace add Super-YYQ/ai-config-sync`.";
+    warnings.push(msg);
+    actions.push(`WARN ${msg}`);
+    if (!options.forbidSkillFallback) {
+      const skillSrc = import_node_path18.default.join(pluginSrc, "skills", "config-sync");
+      const skillDest = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
+      if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
+        await ensureDir(import_node_path18.default.dirname(skillDest));
+        await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
+        actions.push(
+          "INSTALL Claude user skill: config-sync (fallback, no claude CLI)"
+        );
+        changed = true;
+      }
     }
-    return actions;
+    return { ok: true, changed, warnings, errors, actions };
   }
   let marketplaceReady = false;
   try {
@@ -20036,6 +20206,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     ]);
     actions.push("claude plugin marketplace add Super-YYQ/ai-config-sync");
     marketplaceReady = true;
+    changed = true;
   } catch (e) {
     const msg = e.message || String(e);
     if (/already|exists/i.test(msg)) {
@@ -20048,62 +20219,127 @@ async function installClaudePlugin(home, programRoot, options = {}) {
           `claude plugin marketplace add ${pluginSrc} (local/dev)`
         );
         marketplaceReady = true;
+        changed = true;
       } catch (e2) {
         const msg2 = e2.message || String(e2);
         if (/already|exists/i.test(msg2)) {
           marketplaceReady = true;
           actions.push("claude local marketplace already registered");
         } else {
-          actions.push(
-            `WARN claude marketplace add failed: ${msg2.slice(0, 200)}`
-          );
+          const w = `claude marketplace add failed: ${msg2.slice(0, 200)}`;
+          warnings.push(w);
+          errors.push(w);
+          actions.push(`WARN ${w}`);
         }
       }
     } else {
-      actions.push(
-        `WARN claude marketplace add failed: ${msg.slice(0, 200)}. Pass --allow-local-plugin-install for offline/dev directory marketplace.`
-      );
+      const w = `claude marketplace add failed: ${msg.slice(0, 200)}. Pass --allow-local-plugin-install for offline/dev directory marketplace.`;
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
+  let installOk = false;
   try {
     await runClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
       6e4
     );
     actions.push("claude plugin install ai-config-sync@ai-config-sync");
+    installOk = true;
+    changed = true;
   } catch (e) {
     const msg = e.message || String(e);
     if (/already installed/i.test(msg)) {
       actions.push("claude plugin already installed");
+      installOk = true;
     } else {
-      actions.push(`WARN claude plugin install: ${msg.slice(0, 200)}`);
+      const w = `claude plugin install: ${msg.slice(0, 200)}`;
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
+  let enableOk = false;
   try {
     await runClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
       3e4
     );
     actions.push("claude plugin enable ai-config-sync@ai-config-sync");
+    enableOk = true;
+    changed = true;
   } catch (e) {
     const msg = e.message || String(e);
     if (/already enabled/i.test(msg)) {
       actions.push("claude plugin already enabled");
+      enableOk = true;
     } else {
-      actions.push(
-        `WARN claude plugin enable: ${msg.slice(0, 160)}. Run: claude plugin enable ai-config-sync@ai-config-sync`
-      );
+      const w = `claude plugin enable: ${msg.slice(0, 160)}. Run: claude plugin enable ai-config-sync@ai-config-sync`;
+      warnings.push(w);
+      errors.push(w);
+      actions.push(`WARN ${w}`);
     }
   }
   if (!marketplaceReady) {
-    actions.push(
-      "NOTE: marketplace not registered; plugin install may be incomplete"
-    );
+    const note = "marketplace not registered; plugin install may be incomplete";
+    warnings.push(note);
+    actions.push(`NOTE: ${note}`);
   }
-  return actions;
+  let verified = false;
+  try {
+    const listOut = await execFileAsync5(
+      claudeBin2,
+      ["plugin", "list", "--json"],
+      {
+        windowsHide: true,
+        timeout: 3e4,
+        maxBuffer: 4 * 1024 * 1024,
+        encoding: "utf8"
+      }
+    );
+    const text = `${listOut.stdout ?? ""}`.trim();
+    if (text) {
+      const parsed = JSON.parse(text);
+      const list = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed !== null && Array.isArray(parsed.plugins) ? parsed.plugins : typeof parsed === "object" && parsed !== null && Array.isArray(parsed.installed) ? parsed.installed : [];
+      for (const item of list) {
+        if (typeof item !== "object" || item === null) continue;
+        const id = String(
+          item.id ?? item.name ?? ""
+        ).toLowerCase();
+        if (id === "ai-config-sync@ai-config-sync" || id.startsWith("ai-config-sync@")) {
+          verified = true;
+          const enabled = item.enabled;
+          if (enabled === false) {
+            enableOk = false;
+            errors.push("plugin listed but not enabled");
+          } else {
+            installOk = true;
+            enableOk = true;
+          }
+          break;
+        }
+      }
+    }
+  } catch {
+  }
+  const ok = errors.length === 0 || installOk && enableOk || verified;
+  if (!ok && errors.length === 0 && !installOk) {
+    errors.push("Claude plugin install could not be confirmed");
+  }
+  return {
+    ok: errors.length === 0 || installOk && enableOk,
+    changed,
+    warnings,
+    errors,
+    actions
+  };
 }
-async function installCodexIntegration(home, programRoot) {
+async function installCodexIntegration(home, programRoot, pluginRoot) {
   const actions = [];
+  const warnings = [];
+  const errors = [];
+  let changed = false;
   const skillDest = import_node_path18.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
@@ -20144,9 +20380,16 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
       );
     }
     actions.push(`INSTALL agents skill: config-sync \u2192 ${skillDest}`);
+    changed = true;
   }
   let cliAbsoluteCommand;
   try {
+    if (pluginRoot) {
+      const cjs = import_node_path18.default.join(pluginRoot, "bin", "ai-config-sync.cjs");
+      if (await pathExists(cjs)) {
+        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
+      }
+    }
     if (programRoot) {
       const cjs = import_node_path18.default.join(
         programRoot,
@@ -20155,7 +20398,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
         "bin",
         "ai-config-sync.cjs"
       );
-      if (await pathExists(cjs)) {
+      if (!cliAbsoluteCommand && await pathExists(cjs)) {
         cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
       }
       const distCjs = import_node_path18.default.join(programRoot, "dist", "ai-config-sync.cjs");
@@ -20184,17 +20427,19 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
       await import_promises9.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
+      changed = true;
     }
   }
-  const { next, changed } = mergeManagedCodexSessionStart(base, {
+  const { next, changed: hooksChanged } = mergeManagedCodexSessionStart(base, {
     cliAbsoluteCommand
   });
-  if (changed || !hasManagedCodexSessionStart(base)) {
+  if (hooksChanged || !hasManagedCodexSessionStart(base)) {
     await ensureDir(import_node_path18.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push(
       cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
     );
+    changed = true;
   }
   const cfgPath = codexConfigPath(home);
   let toml = await pathExists(cfgPath) ? await readText(cfgPath) : "";
@@ -20205,14 +20450,15 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     await ensureDir(import_node_path18.default.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
+    changed = true;
   }
   actions.push(
     "NOTE: Codex may prompt to trust the SessionStart hook on first run."
   );
-  return actions;
+  return { ok: true, changed, warnings, errors, actions };
 }
 async function runSetup(options = {}) {
-  const home = options.home ?? import_node_os2.default.homedir();
+  const home = options.home ?? import_node_os3.default.homedir();
   const mode = options.mode ?? "default";
   const messages = [];
   const actions = [];
@@ -20370,25 +20616,43 @@ async function runSetup(options = {}) {
       }
     }
   }
-  const programRoot = await detectProgramRoot(options.programRoot);
-  if (programRoot) {
-    messages.push(`Program root: ${programRoot}`);
-  } else {
+  const packageRoot = await detectPackageRoot(options.programRoot);
+  const pluginRoot = await detectPluginRoot();
+  const insideSelf = !!options.skipSelfPluginInstall || await isRunningInsideSelfPlugin(pluginRoot);
+  if (packageRoot) {
+    messages.push(`Package root: ${packageRoot}`);
+  }
+  if (pluginRoot) {
+    messages.push(`Plugin root: ${pluginRoot}`);
+  }
+  if (insideSelf) {
+    messages.push("Running inside ai-config-sync Claude plugin \u2014 skip self install");
+  }
+  if (!packageRoot && !pluginRoot) {
     messages.push(
-      "Program root not found \u2014 Claude plugin files may be incomplete. Run setup from ai-config-sync repo or pass --program-root."
+      "Package/plugin root not found \u2014 Claude plugin files may be incomplete. Run setup from ai-config-sync repo, plugin session, or pass --program-root."
     );
   }
+  const programRoot = packageRoot ?? pluginRoot;
+  let integrationFailed = false;
   if (localConfig.targets.claude) {
-    if (programRoot) {
-      const pluginActions = await installClaudePlugin(home, programRoot, {
+    if (programRoot || insideSelf) {
+      const pluginResult = await installClaudePlugin(home, programRoot, {
         allowLocalPluginInstall: !!options.allowLocalPluginInstall,
-        skipSelfPluginInstall: !!options.skipSelfPluginInstall
+        skipSelfPluginInstall: insideSelf,
+        forbidSkillFallback: insideSelf
       });
-      if (pluginActions.length) {
-        actions.push(...pluginActions);
-        if (status === "no-changes") status = "repaired";
+      if (pluginResult.actions.length) {
+        actions.push(...pluginResult.actions);
+        if (pluginResult.changed && status === "no-changes") status = "repaired";
       }
-    } else {
+      if (!pluginResult.ok) {
+        integrationFailed = true;
+        messages.push(
+          ...pluginResult.errors.map((e) => `Claude integration error: ${e}`)
+        );
+      }
+    } else if (!insideSelf) {
       const skillDir = import_node_path18.default.join(home, ".claude", "skills", "config-sync");
       const skillMd = import_node_path18.default.join(skillDir, "SKILL.md");
       if (!await pathExists(skillMd)) {
@@ -20412,11 +20676,24 @@ user-invocable: true
     }
   }
   if (localConfig.targets.codex) {
-    const codexActions = await installCodexIntegration(home, programRoot);
-    if (codexActions.length) {
-      actions.push(...codexActions);
-      if (status === "no-changes") status = "repaired";
+    const codexResult = await installCodexIntegration(
+      home,
+      packageRoot,
+      pluginRoot
+    );
+    if (codexResult.actions.length) {
+      actions.push(...codexResult.actions);
+      if (codexResult.changed && status === "no-changes") status = "repaired";
     }
+    if (!codexResult.ok) {
+      integrationFailed = true;
+      messages.push(
+        ...codexResult.errors.map((e) => `Codex integration error: ${e}`)
+      );
+    }
+  }
+  if (integrationFailed) {
+    status = "partial";
   }
   if (actions.length === 0) {
     status = "no-changes";
@@ -20446,7 +20723,7 @@ program2.name("ai-config-sync").description(
   "AI Agent config sync \u2014 private config repo + Claude Code / Codex integrations"
 ).version("0.4.0");
 function homeOpt(cmd) {
-  return expandHome(cmd.opts().home ?? import_node_os3.default.homedir());
+  return expandHome(cmd.opts().home ?? import_node_os4.default.homedir());
 }
 async function loadCtx(home) {
   const cfgPath = localConfigPath(home);
@@ -20694,7 +20971,7 @@ program2.command("capture").description("Propose managing local resources into t
     return;
   }
   const confirmed = proposals.filter(
-    (p) => p.suggestedRecipe && p.status !== "blocked" && p.status !== "system-excluded" && (p.status === "ready" || !p.needsAi || p.usedAi)
+    (p) => p.suggestedRecipe && (p.status === "ready" || p.status === void 0 && !p.needsAi)
   );
   const skipped = proposals.filter((p) => !confirmed.includes(p));
   if (confirmed.length === 0) {
@@ -20709,7 +20986,7 @@ program2.command("capture").description("Propose managing local resources into t
   const written = await commitCaptureItems(
     confirmed,
     configRepoPath,
-    import_node_os3.default.userInfo().username
+    import_node_os4.default.userInfo().username
   );
   console.log(`Updated ${written.resourcesPath}`);
   for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
