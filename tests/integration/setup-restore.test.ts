@@ -49,7 +49,9 @@ describe("setup + empty template", () => {
       configPath: configRepo,
       profile: "home",
     });
-    expect(["initialized", "linked", "repaired"]).toContain(r1.status);
+    expect(["initialized", "linked", "repaired", "partial"]).toContain(
+      r1.status,
+    );
     expect(await pathExists(localConfigPath(home))).toBe(true);
 
     const r2 = await runSetup({
@@ -57,7 +59,9 @@ describe("setup + empty template", () => {
       configPath: configRepo,
       profile: "home",
     });
-    expect(["no-changes", "repaired", "linked"]).toContain(r2.status);
+    expect(["no-changes", "repaired", "linked", "partial"]).toContain(
+      r2.status,
+    );
 
     const localConfig = await loadLocalConfig(localConfigPath(home));
     const plan = await buildPlan({

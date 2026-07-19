@@ -1,11 +1,7 @@
 /**
  * Precise Claude plugin install/enable status from `claude plugin list --json`.
  */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { claudeExecutable } from "@ai-config-sync/core";
-
-const execFileAsync = promisify(execFile);
+import { runClaude } from "@ai-config-sync/core";
 
 export interface ClaudePluginListEntry {
   id: string;
@@ -117,21 +113,17 @@ export function findPluginStatus(
 
 /**
  * Query local Claude CLI for plugin status. Prefers --json; falls back carefully.
+ * Always uses runClaude (Windows-safe .cmd execution).
  */
 export async function queryClaudePluginStatus(
   pluginId: string,
   pluginName?: string,
 ): Promise<ClaudePluginStatus> {
   try {
-    const listOut = await execFileAsync(
-      claudeExecutable(),
-      ["plugin", "list", "--json"],
-      {
-        windowsHide: true,
-        maxBuffer: 5 * 1024 * 1024,
-        encoding: "utf8",
-      },
-    );
+    const listOut = await runClaude(["plugin", "list", "--json"], {
+      timeout: 30_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
       try {
@@ -143,41 +135,21 @@ export async function queryClaudePluginStatus(
       }
     }
   } catch {
-    /* try without .cmd / json */
-  }
-
-  // Retry plain `claude` on windows if .cmd path failed
-  try {
-    const listOut = await execFileAsync("claude", ["plugin", "list", "--json"], {
-      windowsHide: true,
-      maxBuffer: 5 * 1024 * 1024,
-      encoding: "utf8",
-      shell: process.platform === "win32",
-    });
-    const text = `${listOut.stdout ?? ""}`.trim();
-    const parsed = JSON.parse(text) as unknown;
-    const entries = parseClaudePluginListJson(parsed);
-    return findPluginStatus(entries, pluginId, pluginName);
-  } catch {
-    /* unavailable */
+    /* try non-json */
   }
 
   // Last resort: non-json list — require full pluginId as a standalone token
   try {
-    const listOut = await execFileAsync("claude", ["plugin", "list"], {
-      windowsHide: true,
+    const listOut = await runClaude(["plugin", "list"], {
+      timeout: 30_000,
       maxBuffer: 5 * 1024 * 1024,
-      encoding: "utf8",
-      shell: process.platform === "win32",
     });
     const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-    // Line-oriented match for full id to avoid "code" matching "code-review"
     const lines = text.split(/\r?\n/);
     const idLower = pluginId.toLowerCase();
     for (const line of lines) {
       const lower = line.toLowerCase();
       if (lower.includes(idLower)) {
-        // require word-ish boundaries around full id
         const re = new RegExp(
           `(^|[^A-Za-z0-9_@.-])${pluginId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^A-Za-z0-9_@.-]|$)`,
           "i",

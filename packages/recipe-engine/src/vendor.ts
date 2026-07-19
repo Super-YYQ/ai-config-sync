@@ -12,6 +12,7 @@ import {
   shortHash,
   listFilesRecursive,
   readText,
+  vendorSkillRelPath,
 } from "@ai-config-sync/core";
 
 const SKIP_DIR_NAMES = new Set([
@@ -54,7 +55,7 @@ function shouldSkipFile(name: string): boolean {
 }
 
 /**
- * Copy skill source into configRepo/sources/skills/<id>
+ * Copy skill source into configRepo/sources/skills/<storageKey>
  * When stagingRoot is provided, write under stagingRoot instead of configRepoPath
  * (used for transactional capture).
  */
@@ -64,9 +65,9 @@ export async function vendorSkillDirectory(
   resourceId: string,
   options: { stagingRoot?: string } = {},
 ): Promise<VendorResult> {
-  const destRel = path.posix.join("sources", "skills", resourceId);
+  const destRel = vendorSkillRelPath(resourceId);
   const baseRoot = options.stagingRoot ?? configRepoPath;
-  const destAbs = path.join(baseRoot, "sources", "skills", resourceId);
+  const destAbs = path.join(baseRoot, destRel);
 
   if (!(await pathExists(sourceDir))) {
     return {

@@ -65,6 +65,23 @@ export function captureTransactionsDir(home = os.homedir()): string {
   return path.join(defaultStateRoot(home), "capture-transactions");
 }
 
+/** Stable CLI entry point (not Claude plugin cache). */
+export function stableBinDir(home = os.homedir()): string {
+  return path.join(defaultStateRoot(home), "bin");
+}
+
+export function stableCliCjs(home = os.homedir()): string {
+  return path.join(stableBinDir(home), "ai-config-sync.cjs");
+}
+
+export function stableCliCmd(home = os.homedir()): string {
+  return path.join(stableBinDir(home), "ai-config-sync.cmd");
+}
+
+export function stableCliSh(home = os.homedir()): string {
+  return path.join(stableBinDir(home), "ai-config-sync");
+}
+
 /** Claude Code user dirs (best-effort defaults). */
 export function claudeHome(home = os.homedir()): string {
   return path.join(home, ".claude");

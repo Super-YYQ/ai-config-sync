@@ -43,6 +43,9 @@ import { runSetup } from "./setup.js";
 import path from "node:path";
 import { loadLock } from "@ai-config-sync/core";
 
+/** Injected by esbuild define when bundling; falls back for tsx/dev. */
+declare const __APP_VERSION__: string | undefined;
+
 const program = new Command();
 
 program
@@ -50,7 +53,11 @@ program
   .description(
     "AI Agent config sync — private config repo + Claude Code / Codex integrations",
   )
-  .version("0.4.0");
+  .version(
+    typeof __APP_VERSION__ !== "undefined"
+      ? __APP_VERSION__
+      : process.env.npm_package_version || "0.4.1",
+  );
 
 function homeOpt(cmd: { opts: () => { home?: string } }): string {
   return expandHome(cmd.opts().home ?? os.homedir());
@@ -402,6 +409,7 @@ program
       confirmed,
       configRepoPath,
       os.userInfo().username,
+      { home },
     );
     console.log(`Updated ${written.resourcesPath}`);
     for (const r of written.recipePaths) console.log(`  recipe: ${r}`);

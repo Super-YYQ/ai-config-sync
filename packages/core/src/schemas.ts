@@ -132,8 +132,21 @@ export const TargetRecipeSchema = z.object({
 });
 export type TargetRecipe = z.output<typeof TargetRecipeSchema>;
 
+/**
+ * Logical resource/recipe id. May contain ':' (e.g. hooks:SessionStart)
+ * but must not be used directly as a filename — use toStorageKey().
+ */
+export const ResourceIdSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .refine((v) => !v.includes(".."), { message: "resource id must not contain .." })
+  .refine((v) => !/[\/\\]/.test(v), {
+    message: "resource id must not contain path separators",
+  });
+
 export const RecipeSchema = z.object({
-  id: z.string().min(1),
+  id: ResourceIdSchema,
   schemaVersion: z.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
   source: SourceSchema.optional(),
   targets: z.record(TargetToolSchema, TargetRecipeSchema).default({}),
@@ -157,7 +170,7 @@ export const ResourceTargetConfigSchema = z.object({
 export type ResourceTargetConfig = z.output<typeof ResourceTargetConfigSchema>;
 
 export const ResourceSchema = z.object({
-  id: z.string().min(1),
+  id: ResourceIdSchema,
   kind: ResourceKindSchema,
   source: SourceSchema.optional(),
   targets: z

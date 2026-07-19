@@ -29,7 +29,8 @@
     "demo:offline-pwf": "tsx scripts/demo-offline-pwf.ts",
     "pack:check": "npm pack --dry-run",
     "smoke:npm": "node scripts/smoke-npm-package.mjs",
-    "validate:plugin": "node scripts/validate-plugin.mjs"
+    "validate:plugin": "node scripts/validate-plugin.mjs",
+    "check:version": "node scripts/check-version-consistency.mjs"
   },
   "workspaces": [
     "packages/*",

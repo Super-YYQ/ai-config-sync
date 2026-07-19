@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.1+bug444 — Beta Compatibility (bug444)
+
+### P0
+- Regenerate `package-lock.json` for 0.4.1 (npm ci safe)
+- Inject `__APP_VERSION__` via esbuild; CLI `--version` matches package.json
+- `check-version-consistency.mjs` validates package/lock/plugin/README/CLI
+- Windows-safe `runClaude`/`runCommand` via `cmd.exe /d /s /c` for `.cmd` shims
+
+### P1
+- Stable CLI shim at `~/.ai-config-sync/bin` for Codex hooks/skills
+- `capture --home` passes home into capture transactions
+- Capture repo-level lock (`capture-<hash>.lock`) + UUID transaction ids
+- Offline marketplace add prefers packageRoot (marketplace.json), not pluginSrc
+- `toStorageKey()` / `recipeRelPath()` for safe filenames (hooks:SessionStart)
+- Plugin verify requires installed **and** enabled (marketplace default)
+
+### CI
+- Windows Node 20 npm smoke + plugin validate
+- Version consistency + `git diff --exit-code` after build
+
 ## 0.4.1 — Beta Compatibility (bug222)
 
 ### P0

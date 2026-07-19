@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import path from "node:path";
 import {
   claudeSkillsDir,
@@ -17,7 +15,8 @@ import {
   readText,
   writeJsonFile,
   writeText,
-  claudeExecutable,
+  runClaude,
+  runCommand,
   type DriverName,
   type RecipeOperation,
   type RiskLevel,
@@ -34,13 +33,6 @@ export {
   type ClaudePluginListEntry,
   type ClaudePluginStatus,
 } from "./claude-plugin-status.js";
-
-const execFileAsync = promisify(execFile);
-
-/** Shared Claude CLI binary (claude.cmd on Windows). */
-function claudeBin(): string {
-  return claudeExecutable();
-}
 
 export interface DriverContext {
   home: string;
@@ -446,9 +438,8 @@ async function applyOperation(
       }
       try {
         const [bin, ...args] = cmd;
-        await execFileAsync(bin!, args, {
+        await runCommand(bin!, args, {
           cwd: ctx.sourceRoot ?? ctx.home,
-          windowsHide: true,
           maxBuffer: 5 * 1024 * 1024,
         });
         return {
@@ -590,25 +581,20 @@ export const claudeMarketplaceDriver: Driver = {
       actions: [],
     };
 
-    const commands: Array<{ cmd: string[]; kind: "marketplace" | "install" | "enable" }> =
-      [];
+    const commands: Array<{
+      args: string[];
+      kind: "marketplace" | "install" | "enable";
+    }> = [];
     if (recipe.marketplaceRepository) {
       commands.push({
         kind: "marketplace",
-        cmd: [
-          claudeBin(),
-          "plugin",
-          "marketplace",
-          "add",
-          recipe.marketplaceRepository,
-        ],
+        args: ["plugin", "marketplace", "add", recipe.marketplaceRepository],
       });
     }
     if (marketplace && plugin) {
       commands.push({
         kind: "install",
-        cmd: [
-          claudeBin(),
+        args: [
           "plugin",
           "install",
           `${plugin}@${marketplace}`,
@@ -618,36 +604,34 @@ export const claudeMarketplaceDriver: Driver = {
       });
       commands.push({
         kind: "enable",
-        cmd: [claudeBin(), "plugin", "enable", `${plugin}@${marketplace}`],
+        args: ["plugin", "enable", `${plugin}@${marketplace}`],
       });
     } else if (plugin) {
       commands.push({
         kind: "install",
-        cmd: [claudeBin(), "plugin", "install", plugin, "--scope", scope],
+        args: ["plugin", "install", plugin, "--scope", scope],
       });
     }
 
     const messages: string[] = [];
-    for (const { cmd, kind } of commands) {
+    for (const { args, kind } of commands) {
+      const label = `claude ${args.join(" ")}`;
       try {
-        await execFileAsync(cmd[0]!, cmd.slice(1), {
-          windowsHide: true,
-          maxBuffer: 5 * 1024 * 1024,
-        });
-        messages.push(`ok: ${cmd.join(" ")}`);
-        receipt.actions!.push(cmd.join(" "));
+        await runClaude(args, { maxBuffer: 5 * 1024 * 1024 });
+        messages.push(`ok: ${label}`);
+        receipt.actions!.push(label);
         if (kind === "marketplace") receipt.marketplaceAdded = true;
         if (kind === "install") receipt.pluginInstalled = true;
         if (kind === "enable") receipt.pluginEnabled = true;
       } catch (e) {
         const err = (e as Error).message;
         if (/already installed|already enabled|already exists/i.test(err)) {
-          messages.push(`ok(exists): ${cmd.join(" ")}`);
+          messages.push(`ok(exists): ${label}`);
           if (kind === "install") previouslyInstalled = true;
           if (kind === "enable") previouslyEnabled = true;
           continue;
         }
-        messages.push(`fail: ${cmd.join(" ")} (${err})`);
+        messages.push(`fail: ${label} (${err})`);
         return {
           ok: false,
           message: `Claude plugin install incomplete: ${messages.join("; ")}`,
@@ -687,11 +671,9 @@ export const claudeMarketplaceDriver: Driver = {
     // Only undo what we added; never remove pre-existing installs
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
-        await execFileAsync(
-          claudeBin(),
-          ["plugin", "disable", receipt.pluginId],
-          { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
-        );
+        await runClaude(["plugin", "disable", receipt.pluginId], {
+          maxBuffer: 2 * 1024 * 1024,
+        });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`disable failed: ${(e as Error).message}`);
@@ -703,11 +685,9 @@ export const claudeMarketplaceDriver: Driver = {
       receipt.pluginId
     ) {
       try {
-        await execFileAsync(
-          claudeBin(),
-          ["plugin", "uninstall", receipt.pluginId],
-          { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
-        );
+        await runClaude(["plugin", "uninstall", receipt.pluginId], {
+          maxBuffer: 2 * 1024 * 1024,
+        });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`uninstall failed: ${(e as Error).message}`);
@@ -736,8 +716,17 @@ export const claudeMarketplaceDriver: Driver = {
         pathsTouched: [],
       };
     }
+    // Marketplace driver always enables unless recipe explicitly skips enable-plugin.
+    // For recipes that include enable-plugin (or have empty ops — our default path),
+    // require installed AND enabled. Disabled plugins fail verify.
+    const ops = recipe.operations ?? [];
+    const explicitlyNoEnable =
+      ops.length > 0 && !ops.some((op) => op.type === "enable-plugin");
+    const ok = explicitlyNoEnable
+      ? status.installed
+      : status.installed && status.enabled;
     return {
-      ok: status.installed,
+      ok,
       message: status.installed
         ? `plugin present: ${pluginId}${status.enabled ? " (enabled)" : " (disabled)"} [${status.source}]`
         : `plugin missing: ${pluginId}`,
@@ -789,8 +778,7 @@ export const npxSkillsDriver: Driver = {
       };
     }
     try {
-      await execFileAsync(cmd[0]!, cmd.slice(1), {
-        windowsHide: true,
+      await runCommand(cmd[0]!, cmd.slice(1), {
         maxBuffer: 10 * 1024 * 1024,
       });
       return {

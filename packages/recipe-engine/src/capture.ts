@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
+import crypto from "node:crypto";
 import {
   RecipeSchema,
   saveRecipe,
@@ -11,6 +12,9 @@ import {
   isSelfManagedResourceId,
   captureTransactionsDir,
   ensureDir,
+  recipeRelPath,
+  vendorSkillRelPath,
+  toStorageKey,
   type Resource,
   type Recipe,
   type TargetTool,
@@ -256,7 +260,7 @@ export async function buildCaptureProposals(
         targets: {
           claude: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#claude`,
+            recipeRef: `${recipeRelPath(id)}#claude`,
           },
         },
         profiles: ["home"],
@@ -450,14 +454,14 @@ export async function buildCaptureProposals(
           ? {
               claude: {
                 enabled: true,
-                recipeRef: `recipes/${id}.yaml#claude`,
+                recipeRef: `${recipeRelPath(id)}#claude`,
               },
             }
           : targetsPresent.has("claude")
             ? {
                 claude: {
                   enabled: true,
-                  recipeRef: `recipes/${id}.yaml#claude`,
+                  recipeRef: `${recipeRelPath(id)}#claude`,
                 },
               }
             : {}),
@@ -465,14 +469,14 @@ export async function buildCaptureProposals(
           ? {
               codex: {
                 enabled: true,
-                recipeRef: `recipes/${id}.yaml#codex`,
+                recipeRef: `${recipeRelPath(id)}#codex`,
               },
             }
           : targetsPresent.has("codex")
             ? {
                 codex: {
                   enabled: true,
-                  recipeRef: `recipes/${id}.yaml#codex`,
+                  recipeRef: `${recipeRelPath(id)}#codex`,
                 },
               }
             : {}),
@@ -485,7 +489,7 @@ export async function buildCaptureProposals(
     if (Object.keys(targetRecipes).length > 0) {
       // Merge with existing recipe file targets if present
       let existingTargets: Recipe["targets"] = {};
-      const recipeFile = path.join(configRepoPath, "recipes", `${id}.yaml`);
+      const recipeFile = path.join(configRepoPath, recipeRelPath(id));
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -678,12 +682,84 @@ export async function commitCaptureItems(
   const home = options.home ?? os.homedir();
   const txBase = captureTransactionsDir(home);
   await ensureDir(txBase);
-  const txId = `tx-${Date.now()}-${process.pid}`;
+
+  // Repo-level mutex to prevent concurrent capture races
+  const repoHash = crypto
+    .createHash("sha256")
+    .update(path.resolve(configRepoPath))
+    .digest("hex")
+    .slice(0, 16);
+  const lockPath = path.join(txBase, `capture-${repoHash}.lock`);
+  const lockPayload = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+    configRepository: path.resolve(configRepoPath),
+    command: "commitCaptureItems",
+  };
+
+  const acquireLock = async () => {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      try {
+        // wx: fail if exists
+        const fh = await fs.open(lockPath, "wx");
+        await fh.writeFile(JSON.stringify(lockPayload, null, 2), "utf8");
+        await fh.close();
+        return;
+      } catch (e) {
+        const err = e as NodeJS.ErrnoException;
+        if (err.code !== "EEXIST") throw e;
+        // Stale lock: owner dead or older than 30 minutes
+        try {
+          const raw = await fs.readFile(lockPath, "utf8");
+          const existing = JSON.parse(raw) as {
+            pid?: number;
+            startedAt?: string;
+          };
+          let stale = false;
+          if (existing.startedAt) {
+            const age = Date.now() - Date.parse(existing.startedAt);
+            if (Number.isFinite(age) && age > 30 * 60 * 1000) stale = true;
+          }
+          if (existing.pid && existing.pid !== process.pid) {
+            try {
+              process.kill(existing.pid, 0);
+            } catch {
+              stale = true; // process does not exist
+            }
+          }
+          if (stale) {
+            await fs.rm(lockPath, { force: true });
+            continue;
+          }
+        } catch {
+          // unreadable lock — remove and retry
+          await fs.rm(lockPath, { force: true }).catch(() => {});
+          continue;
+        }
+        await new Promise((r) => setTimeout(r, 100 + attempt * 20));
+      }
+    }
+    throw new Error(
+      `Capture lock busy for ${configRepoPath} (lock: ${lockPath})`,
+    );
+  };
+
+  await acquireLock();
+
+  const txId = crypto.randomUUID();
   const stagingRoot = path.join(txBase, `${txId}-staging`);
   const backupRoot = path.join(txBase, `${txId}-backup`);
   const stagedRecipeRels: string[] = [];
   const stagedVendorRels: string[] = [];
   const txEntries: CaptureTxEntry[] = [];
+
+  const releaseLock = async () => {
+    try {
+      await fs.rm(lockPath, { force: true });
+    } catch {
+      /* ignore */
+    }
+  };
 
   const trackPath = async (rel: string) => {
     if (txEntries.some((e) => e.path === rel)) return;
@@ -781,10 +857,7 @@ export async function commitCaptureItems(
       }
 
       if (item.suggestedRecipe) {
-        const recipeRel = path.posix.join(
-          "recipes",
-          `${item.suggestedResource.id}.yaml`,
-        );
+        const recipeRel = recipeRelPath(item.suggestedResource.id);
         const recipeFileLive = path.join(configRepoPath, recipeRel);
         const recipeFileStage = path.join(stagingRoot, recipeRel);
         let baseTargets = item.suggestedRecipe.targets;
@@ -876,6 +949,7 @@ export async function commitCaptureItems(
     // Success — drop backup and staging
     await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
     await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+    await releaseLock();
   } catch (e) {
     // Precise restore: delete new paths; restore pre-existing from backup
     try {
@@ -892,6 +966,7 @@ export async function commitCaptureItems(
       /* best effort */
     }
     await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
+    await releaseLock();
     // keep backup on failure for manual recovery (outside git repo)
     throw e;
   }

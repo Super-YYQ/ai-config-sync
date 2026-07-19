@@ -23,7 +23,11 @@ import {
   agentsSkillsDir,
   codexConfigPath,
   codexHooksManifestPath,
-  claudeExecutable,
+  runClaude,
+  stableBinDir,
+  stableCliCjs,
+  stableCliCmd,
+  stableCliSh,
   type LocalConfig,
 } from "@ai-config-sync/core";
 import {
@@ -540,22 +544,13 @@ async function installClaudePlugin(
     return { ok: true, changed: false, warnings, errors, actions };
   }
 
-  const { execFile } = await import("node:child_process");
-  const { promisify } = await import("node:util");
-  const execFileAsync = promisify(execFile);
-  const claudeBin = claudeExecutable();
-
-  const runClaude = async (args: string[], timeout = 120000) => {
-    await execFileAsync(claudeBin, args, {
-      windowsHide: true,
-      timeout,
-      maxBuffer: 4 * 1024 * 1024,
-    });
+  const invokeClaude = async (args: string[], timeout = 120000) => {
+    await runClaude(args, { timeout, maxBuffer: 4 * 1024 * 1024 });
   };
 
   let claudeAvailable = true;
   try {
-    await runClaude(["--version"], 15000);
+    await invokeClaude(["--version"], 15000);
   } catch {
     claudeAvailable = false;
   }
@@ -588,7 +583,7 @@ async function installClaudePlugin(
   // 1) Prefer GitHub marketplace registration
   let marketplaceReady = false;
   try {
-    await runClaude([
+    await invokeClaude([
       "plugin",
       "marketplace",
       "add",
@@ -603,10 +598,19 @@ async function installClaudePlugin(
       marketplaceReady = true;
       actions.push("claude marketplace already has ai-config-sync");
     } else if (options.allowLocalPluginInstall) {
+      // Marketplace manifest lives at packageRoot/.claude-plugin/marketplace.json
+      // Prefer packageRoot over the nested plugin directory.
+      const marketplaceSrc =
+        programRoot &&
+        (await pathExists(
+          path.join(programRoot, ".claude-plugin", "marketplace.json"),
+        ))
+          ? programRoot
+          : pluginSrc;
       try {
-        await runClaude(["plugin", "marketplace", "add", pluginSrc]);
+        await invokeClaude(["plugin", "marketplace", "add", marketplaceSrc]);
         actions.push(
-          `claude plugin marketplace add ${pluginSrc} (local/dev)`,
+          `claude plugin marketplace add ${marketplaceSrc} (local/dev)`,
         );
         marketplaceReady = true;
         changed = true;
@@ -617,8 +621,8 @@ async function installClaudePlugin(
           actions.push("claude local marketplace already registered");
         } else {
           const w = `claude marketplace add failed: ${msg2.slice(0, 200)}`;
+          // Marketplace registration failure is a warning; install/enable decide ok.
           warnings.push(w);
-          errors.push(w);
           actions.push(`WARN ${w}`);
         }
       }
@@ -627,7 +631,6 @@ async function installClaudePlugin(
         `claude marketplace add failed: ${msg.slice(0, 200)}. ` +
         "Pass --allow-local-plugin-install for offline/dev directory marketplace.";
       warnings.push(w);
-      errors.push(w);
       actions.push(`WARN ${w}`);
     }
   }
@@ -635,7 +638,7 @@ async function installClaudePlugin(
   // 2) Install + enable via official CLI only
   let installOk = false;
   try {
-    await runClaude(
+    await invokeClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
       60000,
     );
@@ -657,7 +660,7 @@ async function installClaudePlugin(
 
   let enableOk = false;
   try {
-    await runClaude(
+    await invokeClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
       30000,
     );
@@ -689,16 +692,10 @@ async function installClaudePlugin(
   // 3) Verify via claude plugin list --json when possible
   let verified = false;
   try {
-    const listOut = await execFileAsync(
-      claudeBin,
-      ["plugin", "list", "--json"],
-      {
-        windowsHide: true,
-        timeout: 30000,
-        maxBuffer: 4 * 1024 * 1024,
-        encoding: "utf8",
-      },
-    );
+    const listOut = await runClaude(["plugin", "list", "--json"], {
+      timeout: 30000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
       const parsed = JSON.parse(text) as unknown;
@@ -759,6 +756,118 @@ async function installClaudePlugin(
   };
 }
 
+/**
+ * Install a stable CLI entry under ~/.ai-config-sync/bin so Codex hooks/skills
+ * do not depend on Claude plugin cache paths that change on update.
+ */
+export async function installStableCliShim(
+  home: string,
+  sources: { programRoot?: string; pluginRoot?: string },
+): Promise<{ cjs?: string; cmd?: string; sh?: string; changed: boolean; actions: string[] }> {
+  const actions: string[] = [];
+  let changed = false;
+
+  // Resolve best source CJS
+  const candidates: string[] = [];
+  if (sources.pluginRoot) {
+    candidates.push(path.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
+  }
+  if (sources.programRoot) {
+    candidates.push(
+      path.join(
+        sources.programRoot,
+        "integrations",
+        "claude-plugin",
+        "bin",
+        "ai-config-sync.cjs",
+      ),
+    );
+    candidates.push(path.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
+  }
+  try {
+    const argv1 = process.argv[1];
+    if (argv1 && (argv1.endsWith(".cjs") || argv1.endsWith(".js"))) {
+      candidates.push(path.resolve(argv1));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  let sourceCjs: string | undefined;
+  for (const c of candidates) {
+    if (c && (await pathExists(c))) {
+      sourceCjs = c;
+      break;
+    }
+  }
+  if (!sourceCjs) {
+    return { changed: false, actions };
+  }
+
+  await ensureDir(stableBinDir(home));
+  const destCjs = stableCliCjs(home);
+  const destCmd = stableCliCmd(home);
+  const destSh = stableCliSh(home);
+
+  // Always refresh stable copy so plugin updates propagate
+  const srcBuf = await fs.readFile(sourceCjs);
+  let needCopy = true;
+  if (await pathExists(destCjs)) {
+    try {
+      const destBuf = await fs.readFile(destCjs);
+      if (srcBuf.equals(destBuf)) needCopy = false;
+    } catch {
+      needCopy = true;
+    }
+  }
+  if (needCopy) {
+    await fs.writeFile(destCjs, srcBuf);
+    actions.push(`INSTALL stable CLI shim → ${destCjs}`);
+    changed = true;
+  }
+
+  const cmdBody = `@echo off\r\n"${process.execPath}" "%~dp0ai-config-sync.cjs" %*\r\n`;
+  let needCmd = true;
+  if (await pathExists(destCmd)) {
+    try {
+      const existing = await readText(destCmd);
+      if (existing === cmdBody) needCmd = false;
+    } catch {
+      needCmd = true;
+    }
+  }
+  if (needCmd) {
+    await writeText(destCmd, cmdBody);
+    actions.push(`INSTALL stable CLI cmd → ${destCmd}`);
+    changed = true;
+  }
+
+  const shBody = `#!/usr/bin/env bash
+exec "${process.execPath}" "$(dirname "$0")/ai-config-sync.cjs" "$@"
+`;
+  let needSh = true;
+  if (await pathExists(destSh)) {
+    try {
+      const existing = await readText(destSh);
+      if (existing === shBody) needSh = false;
+    } catch {
+      needSh = true;
+    }
+  }
+  if (needSh) {
+    await writeText(destSh, shBody);
+    try {
+      await fs.chmod(destSh, 0o755);
+    } catch {
+      /* windows */
+    }
+    actions.push(`INSTALL stable CLI shell → ${destSh}`);
+    changed = true;
+  }
+
+  return { cjs: destCjs, cmd: destCmd, sh: destSh, changed, actions };
+}
+
 async function installCodexIntegration(
   home: string,
   programRoot?: string,
@@ -768,6 +877,21 @@ async function installCodexIntegration(
   const warnings: string[] = [];
   const errors: string[] = [];
   let changed = false;
+
+  // Stable CLI shim first — Codex skill + hooks both reference it
+  const shim = await installStableCliShim(home, { programRoot, pluginRoot });
+  if (shim.actions.length) {
+    actions.push(...shim.actions);
+    if (shim.changed) changed = true;
+  }
+
+  const stableCjs = shim.cjs ?? ((await pathExists(stableCliCjs(home))) ? stableCliCjs(home) : undefined);
+  const cliAbsoluteCommand = stableCjs
+    ? `"${process.execPath}" "${stableCjs}"`
+    : undefined;
+  const skillCliHint = stableCjs
+    ? `"${process.execPath}" "${stableCjs}"`
+    : "ai-config-sync";
 
   // Prefer ~/.agents/skills (modern); still works if only legacy exists
   const skillDest = path.join(agentsSkillsDir(home), "config-sync");
@@ -782,79 +906,61 @@ async function installCodexIntegration(
     );
     if (await pathExists(p)) skillSrc = p;
   }
-  // Plugin layout may only ship Claude skills; still allow template skill
 
   const skillMd = path.join(skillDest, "SKILL.md");
-  if (!(await pathExists(skillMd))) {
-    await ensureDir(skillDest);
-    if (skillSrc) {
-      await fs.cp(skillSrc, skillDest, { recursive: true });
-    } else {
-      await writeText(
-        skillMd,
-        `---
+  const skillBody = `---
 name: config-sync
 description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描技能」「恢复环境」时使用。
 ---
 
 # config-sync (Codex / agents)
 
-运行本机 CLI（Plugin 内置 bin 或 npm 全局）：
+使用稳定 CLI 入口（Setup 写入 \`~/.ai-config-sync/bin\`，不依赖 Claude Plugin 缓存路径）：
 
-- \`ai-config-sync status\`
-- \`ai-config-sync scan\`
-- \`ai-config-sync capture --yes\`
-- \`ai-config-sync restore --yes --allow-risk medium\`
-- \`ai-config-sync doctor\`
+- \`${skillCliHint} status\`
+- \`${skillCliHint} scan\`
+- \`${skillCliHint} capture --yes\`
+- \`${skillCliHint} restore --yes --allow-risk medium\`
+- \`${skillCliHint} doctor\`
+
+也可在 PATH 中有全局安装时直接用 \`ai-config-sync\`。
 
 先 plan 再 apply。不要把密钥写进 git。
-`,
-      );
+`;
+
+  let skillNeedsWrite = true;
+  if (await pathExists(skillMd)) {
+    try {
+      const existing = await readText(skillMd);
+      // Refresh if it still points at bare command without stable path while we have one
+      if (
+        stableCjs &&
+        existing.includes(stableCjs.replace(/\\/g, "\\\\")) === false &&
+        !existing.includes(stableCjs)
+      ) {
+        skillNeedsWrite = true;
+      } else if (!stableCjs) {
+        skillNeedsWrite = false;
+      } else if (existing.includes(stableCjs)) {
+        skillNeedsWrite = false;
+      }
+    } catch {
+      skillNeedsWrite = true;
     }
+  }
+
+  if (skillNeedsWrite) {
+    await ensureDir(skillDest);
+    if (skillSrc && !(await pathExists(skillMd))) {
+      await fs.cp(skillSrc, skillDest, { recursive: true });
+      // Still overwrite SKILL.md with stable-path version
+    }
+    await writeText(skillMd, skillBody);
     actions.push(`INSTALL agents skill: config-sync → ${skillDest}`);
     changed = true;
   }
 
-  // Codex hooks.json — official event-map shape
-  // Prefer absolute CLI path on Windows for commandWindows
-  let cliAbsoluteCommand: string | undefined;
-  try {
-    if (pluginRoot) {
-      const cjs = path.join(pluginRoot, "bin", "ai-config-sync.cjs");
-      if (await pathExists(cjs)) {
-        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
-      }
-    }
-    if (programRoot) {
-      const cjs = path.join(
-        programRoot,
-        "integrations",
-        "claude-plugin",
-        "bin",
-        "ai-config-sync.cjs",
-      );
-      if (!cliAbsoluteCommand && (await pathExists(cjs))) {
-        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
-      }
-      const distCjs = path.join(programRoot, "dist", "ai-config-sync.cjs");
-      if (!cliAbsoluteCommand && (await pathExists(distCjs))) {
-        cliAbsoluteCommand = `"${process.execPath}" "${distCjs}"`;
-      }
-    }
-    if (!cliAbsoluteCommand) {
-      const argv1 = process.argv[1];
-      if (argv1 && (await pathExists(argv1))) {
-        if (argv1.endsWith(".cjs") || argv1.endsWith(".js")) {
-          cliAbsoluteCommand = `"${process.execPath}" "${path.resolve(argv1)}"`;
-        } else {
-          cliAbsoluteCommand = `"${path.resolve(argv1)}"`;
-        }
-      }
-    }
-  } catch {
-    /* optional */
-  }
-
+  // Codex hooks.json — official event-map shape; always prefer stable shim
   const hooksPath = codexHooksManifestPath(home);
   let base: unknown = {};
   if (await pathExists(hooksPath)) {
@@ -875,7 +981,7 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
     await writeJsonFile(hooksPath, next);
     actions.push(
       cliAbsoluteCommand
-        ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)"
+        ? "MERGE Codex hooks.json SessionStart (event-map + stable commandWindows)"
         : "MERGE Codex hooks.json SessionStart (event-map format)",
     );
     changed = true;
@@ -897,6 +1003,11 @@ description: 同步 AI Agent Skill/Plugin。用户说「同步配置」「扫描
   actions.push(
     "NOTE: Codex may prompt to trust the SessionStart hook on first run.",
   );
+  if (stableCjs) {
+    actions.push(
+      `NOTE: Codex CLI entry is stable shim ${stableCjs} (refresh via setup after plugin update).`,
+    );
+  }
 
   return { ok: true, changed, warnings, errors, actions };
 }

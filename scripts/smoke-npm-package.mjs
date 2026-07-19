@@ -113,8 +113,20 @@ function cli(args) {
   return r.stdout || "";
 }
 
+const pkgJson = JSON.parse(
+  fs.readFileSync(path.join(root, "package.json"), "utf8"),
+);
+const expectedVersion = String(pkgJson.version);
+
 const ver = cli(["--version"]);
-if (!/\d+\.\d+\.\d+/.test(ver)) throw new Error("bad version: " + ver);
+const verMatch = ver.match(/(\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?)/);
+if (!verMatch) throw new Error("bad version output: " + ver);
+if (verMatch[1] !== expectedVersion) {
+  throw new Error(
+    `CLI version ${verMatch[1]} !== package.json ${expectedVersion}`,
+  );
+}
+console.log("CLI version OK:", verMatch[1]);
 
 // No --program-root: package must self-locate integrations/
 cli([

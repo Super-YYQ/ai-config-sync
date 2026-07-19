@@ -22,6 +22,11 @@ const outCmd = path.join(
   "integrations/claude-plugin/bin/ai-config-sync.cmd",
 );
 
+const pkg = JSON.parse(
+  fs.readFileSync(path.join(root, "package.json"), "utf8"),
+);
+const appVersion = String(pkg.version ?? "0.0.0");
+
 fs.mkdirSync(path.dirname(outPlugin), { recursive: true });
 fs.mkdirSync(path.dirname(outDist), { recursive: true });
 
@@ -37,6 +42,7 @@ const common = {
   logLevel: "info",
   define: {
     "process.env.ACS_BUNDLE": '"1"',
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
 };
 
@@ -74,10 +80,7 @@ try {
   /* windows */
 }
 
-const pkg = JSON.parse(
-  fs.readFileSync(path.join(root, "package.json"), "utf8"),
-);
-console.log(`Bundled CLI v${pkg.version}`);
+console.log(`Bundled CLI v${appVersion}`);
 console.log(`  → ${path.relative(root, outPlugin)}`);
 console.log(`  → ${path.relative(root, outDist)}`);
 console.log(`  → ${path.relative(root, outCmd)}`);

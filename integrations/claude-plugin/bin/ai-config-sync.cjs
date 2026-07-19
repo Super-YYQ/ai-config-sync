@@ -7142,7 +7142,7 @@ var init_zod = __esm({
 });
 
 // packages/core/dist/schemas.js
-var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, PlanActionSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
+var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, ResourceIdSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, PlanActionSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
 var init_schemas = __esm({
   "packages/core/dist/schemas.js"() {
     "use strict";
@@ -7245,8 +7245,11 @@ var init_schemas = __esm({
       confidence: external_exports.number().min(0).max(1).optional(),
       requiresApproval: external_exports.boolean().default(true)
     });
+    ResourceIdSchema = external_exports.string().min(1).max(160).refine((v) => !v.includes(".."), { message: "resource id must not contain .." }).refine((v) => !/[\/\\]/.test(v), {
+      message: "resource id must not contain path separators"
+    });
     RecipeSchema = external_exports.object({
-      id: external_exports.string().min(1),
+      id: ResourceIdSchema,
       schemaVersion: external_exports.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
       source: SourceSchema.optional(),
       targets: external_exports.record(TargetToolSchema, TargetRecipeSchema).default({}),
@@ -7262,7 +7265,7 @@ var init_schemas = __esm({
       scope: external_exports.enum(["user", "project", "local"]).optional()
     });
     ResourceSchema = external_exports.object({
-      id: external_exports.string().min(1),
+      id: ResourceIdSchema,
       kind: ResourceKindSchema,
       source: SourceSchema.optional(),
       targets: external_exports.object({
@@ -7482,6 +7485,18 @@ function logsDir(home = import_node_os.default.homedir()) {
 }
 function captureTransactionsDir(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(defaultStateRoot(home), "capture-transactions");
+}
+function stableBinDir(home = import_node_os.default.homedir()) {
+  return import_node_path.default.join(defaultStateRoot(home), "bin");
+}
+function stableCliCjs(home = import_node_os.default.homedir()) {
+  return import_node_path.default.join(stableBinDir(home), "ai-config-sync.cjs");
+}
+function stableCliCmd(home = import_node_os.default.homedir()) {
+  return import_node_path.default.join(stableBinDir(home), "ai-config-sync.cmd");
+}
+function stableCliSh(home = import_node_os.default.homedir()) {
+  return import_node_path.default.join(stableBinDir(home), "ai-config-sync");
 }
 function claudeHome(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(home, ".claude");
@@ -15760,9 +15775,140 @@ var init_codex_hooks = __esm({
 function claudeExecutable() {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
+function quoteCmdArg(arg) {
+  if (arg.length === 0)
+    return '""';
+  if (!/[\s"&|<>^()%!"]/.test(arg))
+    return arg;
+  return `"${arg.replace(/"/g, '""')}"`;
+}
+async function runCommand(command, args, options = {}) {
+  const timeout = options.timeout ?? 12e4;
+  const maxBuffer = options.maxBuffer ?? 5 * 1024 * 1024;
+  const encoding = options.encoding ?? "utf8";
+  const isWin = process.platform === "win32";
+  const looksLikeCmd = isWin && (/\.cmd$/i.test(command) || /\.bat$/i.test(command) || command.toLowerCase() === "claude" || command.toLowerCase() === "claude.cmd");
+  return new Promise((resolve, reject) => {
+    let child;
+    if (looksLikeCmd) {
+      const cmdline = [quoteCmdArg(command), ...args.map(quoteCmdArg)].join(" ");
+      child = (0, import_node_child_process.spawn)("cmd.exe", ["/d", "/s", "/c", cmdline], {
+        cwd: options.cwd,
+        env: options.env,
+        windowsHide: true
+        // Do not set shell:true — we already invoke cmd.exe
+      });
+    } else {
+      child = (0, import_node_child_process.spawn)(command, args, {
+        cwd: options.cwd,
+        env: options.env,
+        windowsHide: true,
+        shell: false
+      });
+    }
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill("SIGTERM");
+      } catch {
+      }
+    }, timeout);
+    child.stdout?.setEncoding(encoding);
+    child.stderr?.setEncoding(encoding);
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.length > maxBuffer) {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+        }
+      }
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
+      if (stderr.length > maxBuffer) {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+        }
+      }
+    });
+    child.on("error", (err) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
+      if (timedOut) {
+        const e = new Error(`Command timed out after ${timeout}ms: ${command} ${args.join(" ")}`);
+        e.code = "ETIMEDOUT";
+        e.stdout = stdout;
+        e.stderr = stderr;
+        reject(e);
+        return;
+      }
+      if (code !== 0) {
+        const e = new Error(`Command failed (${code}): ${command} ${args.join(" ")}
+${stderr || stdout}`);
+        e.code = code ?? "FAILED";
+        e.stdout = stdout;
+        e.stderr = stderr;
+        reject(e);
+        return;
+      }
+      resolve({ stdout, stderr, code });
+    });
+  });
+}
+async function runClaude(args, options = {}) {
+  const command = options.command ?? claudeExecutable();
+  return runCommand(command, args, options);
+}
+var import_node_child_process;
 var init_claude_cli = __esm({
   "packages/core/dist/claude-cli.js"() {
     "use strict";
+    import_node_child_process = require("node:child_process");
+  }
+});
+
+// packages/core/dist/storage-key.js
+function toStorageKey(id) {
+  const hash = import_node_crypto2.default.createHash("sha256").update(id).digest("hex").slice(0, 6);
+  let key = id.replace(/[\/\\]/g, "_").replace(/[<>:"|?*\x00-\x1f]/g, "_").replace(/\.\./g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  if (!key)
+    key = "resource";
+  const needsHash = key !== id || /[:<>"|?*\/\\]/.test(id) || id.includes("..") || id.length > 80;
+  if (key.length > 80)
+    key = key.slice(0, 80);
+  if (needsHash) {
+    if (!key.endsWith(`-${hash}`)) {
+      key = `${key}-${hash}`;
+    }
+  }
+  return key;
+}
+function recipeRelPath(id) {
+  return `recipes/${toStorageKey(id)}.yaml`;
+}
+function vendorSkillRelPath(id) {
+  return `sources/skills/${toStorageKey(id)}`;
+}
+var import_node_crypto2;
+var init_storage_key = __esm({
+  "packages/core/dist/storage-key.js"() {
+    "use strict";
+    import_node_crypto2 = __toESM(require("node:crypto"), 1);
   }
 });
 
@@ -15790,6 +15936,7 @@ __export(dist_exports, {
   RecipeEvidenceSchema: () => RecipeEvidenceSchema,
   RecipeOperationSchema: () => RecipeOperationSchema,
   RecipeSchema: () => RecipeSchema,
+  ResourceIdSchema: () => ResourceIdSchema,
   ResourceKindSchema: () => ResourceKindSchema,
   ResourceSchema: () => ResourceSchema,
   ResourceTargetConfigSchema: () => ResourceTargetConfigSchema,
@@ -15858,6 +16005,7 @@ __export(dist_exports, {
   pathExists: () => pathExists,
   pathsEqual: () => pathsEqual,
   pendingEventsPath: () => pendingEventsPath,
+  quoteCmdArg: () => quoteCmdArg,
   readDirTree: () => readDirTree,
   readJsonFile: () => readJsonFile,
   readText: () => readText,
@@ -15865,10 +16013,13 @@ __export(dist_exports, {
   readValidatedYaml: () => readValidatedYaml,
   readYamlFile: () => readYamlFile,
   recipePath: () => recipePath,
+  recipeRelPath: () => recipeRelPath,
   removePath: () => removePath,
   resolveProfileResources: () => resolveProfileResources,
   resolveSecret: () => resolveSecret,
   resolveSecretFromEnv: () => resolveSecretFromEnv,
+  runClaude: () => runClaude,
+  runCommand: () => runCommand,
   safeJoin: () => safeJoin,
   sanitizeForAi: () => sanitizeForAi,
   saveConfigRepo: () => saveConfigRepo,
@@ -15881,6 +16032,12 @@ __export(dist_exports, {
   scanTextForSecrets: () => scanTextForSecrets,
   setByPath: () => setByPath,
   shortHash: () => shortHash,
+  stableBinDir: () => stableBinDir,
+  stableCliCjs: () => stableCliCjs,
+  stableCliCmd: () => stableCliCmd,
+  stableCliSh: () => stableCliSh,
+  toStorageKey: () => toStorageKey,
+  vendorSkillRelPath: () => vendorSkillRelPath,
   writeJsonFile: () => writeJsonFile,
   writeText: () => writeText,
   writeYamlFile: () => writeYamlFile
@@ -15900,6 +16057,7 @@ var init_dist = __esm({
     init_config_io();
     init_codex_hooks();
     init_claude_cli();
+    init_storage_key();
   }
 });
 
@@ -16933,17 +17091,17 @@ function hasLocalConfig(home) {
 }
 
 // packages/git-sync/dist/index.js
-var import_node_child_process2 = require("node:child_process");
+var import_node_child_process3 = require("node:child_process");
 var import_node_util2 = require("node:util");
 var import_node_path9 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/git-sync/dist/source-cache.js
-var import_node_child_process = require("node:child_process");
+var import_node_child_process2 = require("node:child_process");
 var import_node_util = require("node:util");
 var import_node_path8 = __toESM(require("node:path"), 1);
 init_dist();
-var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+var execFileAsync = (0, import_node_util.promisify)(import_node_child_process2.execFile);
 function remotesMatch(a, b) {
   if (!a || !b)
     return false;
@@ -17059,7 +17217,7 @@ async function listCachedSources(home) {
 }
 
 // packages/git-sync/dist/index.js
-var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process2.execFile);
+var execFileAsync2 = (0, import_node_util2.promisify)(import_node_child_process3.execFile);
 var GitError = class extends Error {
   result;
   constructor(message, result) {
@@ -17400,16 +17558,11 @@ var import_node_path13 = __toESM(require("node:path"), 1);
 init_dist();
 
 // drivers/dist/index.js
-var import_node_child_process4 = require("node:child_process");
-var import_node_util4 = require("node:util");
 var import_node_path11 = __toESM(require("node:path"), 1);
 init_dist();
 
 // drivers/dist/claude-plugin-status.js
-var import_node_child_process3 = require("node:child_process");
-var import_node_util3 = require("node:util");
 init_dist();
-var execFileAsync3 = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 function isPlainObject4(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -17477,10 +17630,9 @@ function findPluginStatus(entries, pluginId, pluginName) {
 }
 async function queryClaudePluginStatus(pluginId, pluginName) {
   try {
-    const listOut = await execFileAsync3(claudeExecutable(), ["plugin", "list", "--json"], {
-      windowsHide: true,
-      maxBuffer: 5 * 1024 * 1024,
-      encoding: "utf8"
+    const listOut = await runClaude(["plugin", "list", "--json"], {
+      timeout: 3e4,
+      maxBuffer: 5 * 1024 * 1024
     });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
@@ -17494,24 +17646,9 @@ async function queryClaudePluginStatus(pluginId, pluginName) {
   } catch {
   }
   try {
-    const listOut = await execFileAsync3("claude", ["plugin", "list", "--json"], {
-      windowsHide: true,
-      maxBuffer: 5 * 1024 * 1024,
-      encoding: "utf8",
-      shell: process.platform === "win32"
-    });
-    const text = `${listOut.stdout ?? ""}`.trim();
-    const parsed = JSON.parse(text);
-    const entries = parseClaudePluginListJson(parsed);
-    return findPluginStatus(entries, pluginId, pluginName);
-  } catch {
-  }
-  try {
-    const listOut = await execFileAsync3("claude", ["plugin", "list"], {
-      windowsHide: true,
-      maxBuffer: 5 * 1024 * 1024,
-      encoding: "utf8",
-      shell: process.platform === "win32"
+    const listOut = await runClaude(["plugin", "list"], {
+      timeout: 3e4,
+      maxBuffer: 5 * 1024 * 1024
     });
     const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
     const lines = text.split(/\r?\n/);
@@ -17536,10 +17673,6 @@ async function queryClaudePluginStatus(pluginId, pluginName) {
 }
 
 // drivers/dist/index.js
-var execFileAsync4 = (0, import_node_util4.promisify)(import_node_child_process4.execFile);
-function claudeBin() {
-  return claudeExecutable();
-}
 function destSkillDir(target, resourceId, home) {
   return target === "claude" ? import_node_path11.default.join(claudeSkillsDir(home), resourceId) : import_node_path11.default.join(codexSkillsDir(home), resourceId);
 }
@@ -17818,9 +17951,8 @@ async function applyOperation(op, ctx, recipe) {
       }
       try {
         const [bin, ...args] = cmd;
-        await execFileAsync4(bin, args, {
+        await runCommand(bin, args, {
           cwd: ctx.sourceRoot ?? ctx.home,
-          windowsHide: true,
           maxBuffer: 5 * 1024 * 1024
         });
         return {
@@ -17940,20 +18072,13 @@ var claudeMarketplaceDriver = {
     if (recipe.marketplaceRepository) {
       commands.push({
         kind: "marketplace",
-        cmd: [
-          claudeBin(),
-          "plugin",
-          "marketplace",
-          "add",
-          recipe.marketplaceRepository
-        ]
+        args: ["plugin", "marketplace", "add", recipe.marketplaceRepository]
       });
     }
     if (marketplace && plugin) {
       commands.push({
         kind: "install",
-        cmd: [
-          claudeBin(),
+        args: [
           "plugin",
           "install",
           `${plugin}@${marketplace}`,
@@ -17963,23 +18088,21 @@ var claudeMarketplaceDriver = {
       });
       commands.push({
         kind: "enable",
-        cmd: [claudeBin(), "plugin", "enable", `${plugin}@${marketplace}`]
+        args: ["plugin", "enable", `${plugin}@${marketplace}`]
       });
     } else if (plugin) {
       commands.push({
         kind: "install",
-        cmd: [claudeBin(), "plugin", "install", plugin, "--scope", scope]
+        args: ["plugin", "install", plugin, "--scope", scope]
       });
     }
     const messages = [];
-    for (const { cmd, kind } of commands) {
+    for (const { args, kind } of commands) {
+      const label = `claude ${args.join(" ")}`;
       try {
-        await execFileAsync4(cmd[0], cmd.slice(1), {
-          windowsHide: true,
-          maxBuffer: 5 * 1024 * 1024
-        });
-        messages.push(`ok: ${cmd.join(" ")}`);
-        receipt.actions.push(cmd.join(" "));
+        await runClaude(args, { maxBuffer: 5 * 1024 * 1024 });
+        messages.push(`ok: ${label}`);
+        receipt.actions.push(label);
         if (kind === "marketplace")
           receipt.marketplaceAdded = true;
         if (kind === "install")
@@ -17989,14 +18112,14 @@ var claudeMarketplaceDriver = {
       } catch (e) {
         const err = e.message;
         if (/already installed|already enabled|already exists/i.test(err)) {
-          messages.push(`ok(exists): ${cmd.join(" ")}`);
+          messages.push(`ok(exists): ${label}`);
           if (kind === "install")
             previouslyInstalled = true;
           if (kind === "enable")
             previouslyEnabled = true;
           continue;
         }
-        messages.push(`fail: ${cmd.join(" ")} (${err})`);
+        messages.push(`fail: ${label} (${err})`);
         return {
           ok: false,
           message: `Claude plugin install incomplete: ${messages.join("; ")}`,
@@ -18032,7 +18155,9 @@ var claudeMarketplaceDriver = {
     const messages = [];
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
-        await execFileAsync4(claudeBin(), ["plugin", "disable", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await runClaude(["plugin", "disable", receipt.pluginId], {
+          maxBuffer: 2 * 1024 * 1024
+        });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`disable failed: ${e.message}`);
@@ -18040,7 +18165,9 @@ var claudeMarketplaceDriver = {
     }
     if (receipt.pluginInstalled && !receipt.previouslyInstalled && receipt.pluginId) {
       try {
-        await execFileAsync4(claudeBin(), ["plugin", "uninstall", receipt.pluginId], { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+        await runClaude(["plugin", "uninstall", receipt.pluginId], {
+          maxBuffer: 2 * 1024 * 1024
+        });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
         messages.push(`uninstall failed: ${e.message}`);
@@ -18063,8 +18190,11 @@ var claudeMarketplaceDriver = {
         pathsTouched: []
       };
     }
+    const ops = recipe.operations ?? [];
+    const explicitlyNoEnable = ops.length > 0 && !ops.some((op) => op.type === "enable-plugin");
+    const ok = explicitlyNoEnable ? status.installed : status.installed && status.enabled;
     return {
-      ok: status.installed,
+      ok,
       message: status.installed ? `plugin present: ${pluginId}${status.enabled ? " (enabled)" : " (disabled)"} [${status.source}]` : `plugin missing: ${pluginId}`,
       pathsTouched: []
     };
@@ -18103,8 +18233,7 @@ var npxSkillsDriver = {
       };
     }
     try {
-      await execFileAsync4(cmd[0], cmd.slice(1), {
-        windowsHide: true,
+      await runCommand(cmd[0], cmd.slice(1), {
         maxBuffer: 10 * 1024 * 1024
       });
       return {
@@ -18788,6 +18917,7 @@ async function buildDriftReport(ctx) {
 var import_node_path16 = __toESM(require("node:path"), 1);
 var import_promises8 = __toESM(require("node:fs/promises"), 1);
 var import_node_os2 = __toESM(require("node:os"), 1);
+var import_node_crypto3 = __toESM(require("node:crypto"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -18904,9 +19034,9 @@ function shouldSkipFile(name) {
   return SKIP_FILE_GLOBS.some((re) => re.test(name));
 }
 async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, options = {}) {
-  const destRel = import_node_path15.default.posix.join("sources", "skills", resourceId);
+  const destRel = vendorSkillRelPath(resourceId);
   const baseRoot = options.stagingRoot ?? configRepoPath;
-  const destAbs = import_node_path15.default.join(baseRoot, "sources", "skills", resourceId);
+  const destAbs = import_node_path15.default.join(baseRoot, destRel);
   if (!await pathExists(sourceDir)) {
     return {
       ok: false,
@@ -19105,7 +19235,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
         targets: {
           claude: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#claude`
+            recipeRef: `${recipeRelPath(id)}#claude`
           }
         },
         profiles: ["home"],
@@ -19251,23 +19381,23 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
         ...targetRecipes.claude ? {
           claude: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#claude`
+            recipeRef: `${recipeRelPath(id)}#claude`
           }
         } : targetsPresent.has("claude") ? {
           claude: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#claude`
+            recipeRef: `${recipeRelPath(id)}#claude`
           }
         } : {},
         ...targetRecipes.codex ? {
           codex: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#codex`
+            recipeRef: `${recipeRelPath(id)}#codex`
           }
         } : targetsPresent.has("codex") ? {
           codex: {
             enabled: true,
-            recipeRef: `recipes/${id}.yaml#codex`
+            recipeRef: `${recipeRelPath(id)}#codex`
           }
         } : {}
       },
@@ -19277,7 +19407,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     let suggestedRecipe;
     if (Object.keys(targetRecipes).length > 0) {
       let existingTargets = {};
-      const recipeFile = import_node_path16.default.join(configRepoPath, "recipes", `${id}.yaml`);
+      const recipeFile = import_node_path16.default.join(configRepoPath, recipeRelPath(id));
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -19397,12 +19527,68 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
   const home = options.home ?? import_node_os2.default.homedir();
   const txBase = captureTransactionsDir(home);
   await ensureDir(txBase);
-  const txId = `tx-${Date.now()}-${process.pid}`;
+  const repoHash = import_node_crypto3.default.createHash("sha256").update(import_node_path16.default.resolve(configRepoPath)).digest("hex").slice(0, 16);
+  const lockPath = import_node_path16.default.join(txBase, `capture-${repoHash}.lock`);
+  const lockPayload = {
+    pid: process.pid,
+    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    configRepository: import_node_path16.default.resolve(configRepoPath),
+    command: "commitCaptureItems"
+  };
+  const acquireLock = async () => {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      try {
+        const fh = await import_promises8.default.open(lockPath, "wx");
+        await fh.writeFile(JSON.stringify(lockPayload, null, 2), "utf8");
+        await fh.close();
+        return;
+      } catch (e) {
+        const err = e;
+        if (err.code !== "EEXIST")
+          throw e;
+        try {
+          const raw = await import_promises8.default.readFile(lockPath, "utf8");
+          const existing2 = JSON.parse(raw);
+          let stale = false;
+          if (existing2.startedAt) {
+            const age = Date.now() - Date.parse(existing2.startedAt);
+            if (Number.isFinite(age) && age > 30 * 60 * 1e3)
+              stale = true;
+          }
+          if (existing2.pid && existing2.pid !== process.pid) {
+            try {
+              process.kill(existing2.pid, 0);
+            } catch {
+              stale = true;
+            }
+          }
+          if (stale) {
+            await import_promises8.default.rm(lockPath, { force: true });
+            continue;
+          }
+        } catch {
+          await import_promises8.default.rm(lockPath, { force: true }).catch(() => {
+          });
+          continue;
+        }
+        await new Promise((r) => setTimeout(r, 100 + attempt * 20));
+      }
+    }
+    throw new Error(`Capture lock busy for ${configRepoPath} (lock: ${lockPath})`);
+  };
+  await acquireLock();
+  const txId = import_node_crypto3.default.randomUUID();
   const stagingRoot = import_node_path16.default.join(txBase, `${txId}-staging`);
   const backupRoot = import_node_path16.default.join(txBase, `${txId}-backup`);
   const stagedRecipeRels = [];
   const stagedVendorRels = [];
   const txEntries = [];
+  const releaseLock = async () => {
+    try {
+      await import_promises8.default.rm(lockPath, { force: true });
+    } catch {
+    }
+  };
   const trackPath = async (rel) => {
     if (txEntries.some((e) => e.path === rel))
       return;
@@ -19473,7 +19659,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         byId.set(item.suggestedResource.id, item.suggestedResource);
       }
       if (item.suggestedRecipe) {
-        const recipeRel = import_node_path16.default.posix.join("recipes", `${item.suggestedResource.id}.yaml`);
+        const recipeRel = recipeRelPath(item.suggestedResource.id);
         const recipeFileLive = import_node_path16.default.join(configRepoPath, recipeRel);
         const recipeFileStage = import_node_path16.default.join(stagingRoot, recipeRel);
         let baseTargets = item.suggestedRecipe.targets;
@@ -19558,6 +19744,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
     });
     await import_promises8.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
     });
+    await releaseLock();
   } catch (e) {
     try {
       await rollbackCaptureTransaction({
@@ -19570,6 +19757,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
     }
     await import_promises8.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
     });
+    await releaseLock();
     throw e;
   }
   return { resourcesPath, recipePaths };
@@ -19603,10 +19791,10 @@ async function runDoctor(options) {
   }
   for (const bin of ["git", "node"]) {
     try {
-      const { execFile: execFile5 } = await import("node:child_process");
-      const { promisify: promisify5 } = await import("node:util");
-      const execFileAsync5 = promisify5(execFile5);
-      await execFileAsync5(bin, ["--version"], { windowsHide: true });
+      const { execFile: execFile3 } = await import("node:child_process");
+      const { promisify: promisify3 } = await import("node:util");
+      const execFileAsync3 = promisify3(execFile3);
+      await execFileAsync3(bin, ["--version"], { windowsHide: true });
       findings.push({
         severity: "ok",
         code: "dep-present",
@@ -19621,10 +19809,10 @@ async function runDoctor(options) {
     }
   }
   try {
-    const { execFile: execFile5 } = await import("node:child_process");
-    const { promisify: promisify5 } = await import("node:util");
-    const execFileAsync5 = promisify5(execFile5);
-    const out = await execFileAsync5("ai-config-sync", ["--version"], {
+    const { execFile: execFile3 } = await import("node:child_process");
+    const { promisify: promisify3 } = await import("node:util");
+    const execFileAsync3 = promisify3(execFile3);
+    const out = await execFileAsync3("ai-config-sync", ["--version"], {
       windowsHide: true,
       encoding: "utf8"
     });
@@ -20160,20 +20348,12 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     );
     return { ok: true, changed: false, warnings, errors, actions };
   }
-  const { execFile: execFile5 } = await import("node:child_process");
-  const { promisify: promisify5 } = await import("node:util");
-  const execFileAsync5 = promisify5(execFile5);
-  const claudeBin2 = claudeExecutable();
-  const runClaude = async (args, timeout = 12e4) => {
-    await execFileAsync5(claudeBin2, args, {
-      windowsHide: true,
-      timeout,
-      maxBuffer: 4 * 1024 * 1024
-    });
+  const invokeClaude = async (args, timeout = 12e4) => {
+    await runClaude(args, { timeout, maxBuffer: 4 * 1024 * 1024 });
   };
   let claudeAvailable = true;
   try {
-    await runClaude(["--version"], 15e3);
+    await invokeClaude(["--version"], 15e3);
   } catch {
     claudeAvailable = false;
   }
@@ -20198,7 +20378,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   }
   let marketplaceReady = false;
   try {
-    await runClaude([
+    await invokeClaude([
       "plugin",
       "marketplace",
       "add",
@@ -20213,10 +20393,13 @@ async function installClaudePlugin(home, programRoot, options = {}) {
       marketplaceReady = true;
       actions.push("claude marketplace already has ai-config-sync");
     } else if (options.allowLocalPluginInstall) {
+      const marketplaceSrc = programRoot && await pathExists(
+        import_node_path18.default.join(programRoot, ".claude-plugin", "marketplace.json")
+      ) ? programRoot : pluginSrc;
       try {
-        await runClaude(["plugin", "marketplace", "add", pluginSrc]);
+        await invokeClaude(["plugin", "marketplace", "add", marketplaceSrc]);
         actions.push(
-          `claude plugin marketplace add ${pluginSrc} (local/dev)`
+          `claude plugin marketplace add ${marketplaceSrc} (local/dev)`
         );
         marketplaceReady = true;
         changed = true;
@@ -20228,20 +20411,18 @@ async function installClaudePlugin(home, programRoot, options = {}) {
         } else {
           const w = `claude marketplace add failed: ${msg2.slice(0, 200)}`;
           warnings.push(w);
-          errors.push(w);
           actions.push(`WARN ${w}`);
         }
       }
     } else {
       const w = `claude marketplace add failed: ${msg.slice(0, 200)}. Pass --allow-local-plugin-install for offline/dev directory marketplace.`;
       warnings.push(w);
-      errors.push(w);
       actions.push(`WARN ${w}`);
     }
   }
   let installOk = false;
   try {
-    await runClaude(
+    await invokeClaude(
       ["plugin", "install", "ai-config-sync@ai-config-sync", "--scope", "user"],
       6e4
     );
@@ -20262,7 +20443,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   }
   let enableOk = false;
   try {
-    await runClaude(
+    await invokeClaude(
       ["plugin", "enable", "ai-config-sync@ai-config-sync"],
       3e4
     );
@@ -20288,16 +20469,10 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   }
   let verified = false;
   try {
-    const listOut = await execFileAsync5(
-      claudeBin2,
-      ["plugin", "list", "--json"],
-      {
-        windowsHide: true,
-        timeout: 3e4,
-        maxBuffer: 4 * 1024 * 1024,
-        encoding: "utf8"
-      }
-    );
+    const listOut = await runClaude(["plugin", "list", "--json"], {
+      timeout: 3e4,
+      maxBuffer: 4 * 1024 * 1024
+    });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
       const parsed = JSON.parse(text);
@@ -20335,11 +20510,114 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     actions
   };
 }
+async function installStableCliShim(home, sources) {
+  const actions = [];
+  let changed = false;
+  const candidates = [];
+  if (sources.pluginRoot) {
+    candidates.push(import_node_path18.default.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
+  }
+  if (sources.programRoot) {
+    candidates.push(
+      import_node_path18.default.join(
+        sources.programRoot,
+        "integrations",
+        "claude-plugin",
+        "bin",
+        "ai-config-sync.cjs"
+      )
+    );
+    candidates.push(import_node_path18.default.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
+  }
+  try {
+    const argv1 = process.argv[1];
+    if (argv1 && (argv1.endsWith(".cjs") || argv1.endsWith(".js"))) {
+      candidates.push(import_node_path18.default.resolve(argv1));
+    }
+  } catch {
+  }
+  let sourceCjs;
+  for (const c of candidates) {
+    if (c && await pathExists(c)) {
+      sourceCjs = c;
+      break;
+    }
+  }
+  if (!sourceCjs) {
+    return { changed: false, actions };
+  }
+  await ensureDir(stableBinDir(home));
+  const destCjs = stableCliCjs(home);
+  const destCmd = stableCliCmd(home);
+  const destSh = stableCliSh(home);
+  const srcBuf = await import_promises9.default.readFile(sourceCjs);
+  let needCopy = true;
+  if (await pathExists(destCjs)) {
+    try {
+      const destBuf = await import_promises9.default.readFile(destCjs);
+      if (srcBuf.equals(destBuf)) needCopy = false;
+    } catch {
+      needCopy = true;
+    }
+  }
+  if (needCopy) {
+    await import_promises9.default.writeFile(destCjs, srcBuf);
+    actions.push(`INSTALL stable CLI shim \u2192 ${destCjs}`);
+    changed = true;
+  }
+  const cmdBody = `@echo off\r
+"${process.execPath}" "%~dp0ai-config-sync.cjs" %*\r
+`;
+  let needCmd = true;
+  if (await pathExists(destCmd)) {
+    try {
+      const existing = await readText(destCmd);
+      if (existing === cmdBody) needCmd = false;
+    } catch {
+      needCmd = true;
+    }
+  }
+  if (needCmd) {
+    await writeText(destCmd, cmdBody);
+    actions.push(`INSTALL stable CLI cmd \u2192 ${destCmd}`);
+    changed = true;
+  }
+  const shBody = `#!/usr/bin/env bash
+exec "${process.execPath}" "$(dirname "$0")/ai-config-sync.cjs" "$@"
+`;
+  let needSh = true;
+  if (await pathExists(destSh)) {
+    try {
+      const existing = await readText(destSh);
+      if (existing === shBody) needSh = false;
+    } catch {
+      needSh = true;
+    }
+  }
+  if (needSh) {
+    await writeText(destSh, shBody);
+    try {
+      await import_promises9.default.chmod(destSh, 493);
+    } catch {
+    }
+    actions.push(`INSTALL stable CLI shell \u2192 ${destSh}`);
+    changed = true;
+  }
+  return { cjs: destCjs, cmd: destCmd, sh: destSh, changed, actions };
+}
 async function installCodexIntegration(home, programRoot, pluginRoot) {
   const actions = [];
   const warnings = [];
   const errors = [];
   let changed = false;
+  const shim = await installStableCliShim(home, { programRoot, pluginRoot });
+  if (shim.actions.length) {
+    actions.push(...shim.actions);
+    if (shim.changed) changed = true;
+  }
+  const stableCjs = shim.cjs ?? (await pathExists(stableCliCjs(home)) ? stableCliCjs(home) : void 0);
+  const cliAbsoluteCommand = stableCjs ? `"${process.execPath}" "${stableCjs}"` : void 0;
+  const skillCliHint = stableCjs ? `"${process.execPath}" "${stableCjs}"` : "ai-config-sync";
   const skillDest = import_node_path18.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
@@ -20353,70 +20631,48 @@ async function installCodexIntegration(home, programRoot, pluginRoot) {
     if (await pathExists(p)) skillSrc = p;
   }
   const skillMd = import_node_path18.default.join(skillDest, "SKILL.md");
-  if (!await pathExists(skillMd)) {
-    await ensureDir(skillDest);
-    if (skillSrc) {
-      await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
-    } else {
-      await writeText(
-        skillMd,
-        `---
+  const skillBody = `---
 name: config-sync
 description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u540C\u6B65\u914D\u7F6E\u300D\u300C\u626B\u63CF\u6280\u80FD\u300D\u300C\u6062\u590D\u73AF\u5883\u300D\u65F6\u4F7F\u7528\u3002
 ---
 
 # config-sync (Codex / agents)
 
-\u8FD0\u884C\u672C\u673A CLI\uFF08Plugin \u5185\u7F6E bin \u6216 npm \u5168\u5C40\uFF09\uFF1A
+\u4F7F\u7528\u7A33\u5B9A CLI \u5165\u53E3\uFF08Setup \u5199\u5165 \`~/.ai-config-sync/bin\`\uFF0C\u4E0D\u4F9D\u8D56 Claude Plugin \u7F13\u5B58\u8DEF\u5F84\uFF09\uFF1A
 
-- \`ai-config-sync status\`
-- \`ai-config-sync scan\`
-- \`ai-config-sync capture --yes\`
-- \`ai-config-sync restore --yes --allow-risk medium\`
-- \`ai-config-sync doctor\`
+- \`${skillCliHint} status\`
+- \`${skillCliHint} scan\`
+- \`${skillCliHint} capture --yes\`
+- \`${skillCliHint} restore --yes --allow-risk medium\`
+- \`${skillCliHint} doctor\`
+
+\u4E5F\u53EF\u5728 PATH \u4E2D\u6709\u5168\u5C40\u5B89\u88C5\u65F6\u76F4\u63A5\u7528 \`ai-config-sync\`\u3002
 
 \u5148 plan \u518D apply\u3002\u4E0D\u8981\u628A\u5BC6\u94A5\u5199\u8FDB git\u3002
-`
-      );
+`;
+  let skillNeedsWrite = true;
+  if (await pathExists(skillMd)) {
+    try {
+      const existing = await readText(skillMd);
+      if (stableCjs && existing.includes(stableCjs.replace(/\\/g, "\\\\")) === false && !existing.includes(stableCjs)) {
+        skillNeedsWrite = true;
+      } else if (!stableCjs) {
+        skillNeedsWrite = false;
+      } else if (existing.includes(stableCjs)) {
+        skillNeedsWrite = false;
+      }
+    } catch {
+      skillNeedsWrite = true;
     }
+  }
+  if (skillNeedsWrite) {
+    await ensureDir(skillDest);
+    if (skillSrc && !await pathExists(skillMd)) {
+      await import_promises9.default.cp(skillSrc, skillDest, { recursive: true });
+    }
+    await writeText(skillMd, skillBody);
     actions.push(`INSTALL agents skill: config-sync \u2192 ${skillDest}`);
     changed = true;
-  }
-  let cliAbsoluteCommand;
-  try {
-    if (pluginRoot) {
-      const cjs = import_node_path18.default.join(pluginRoot, "bin", "ai-config-sync.cjs");
-      if (await pathExists(cjs)) {
-        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
-      }
-    }
-    if (programRoot) {
-      const cjs = import_node_path18.default.join(
-        programRoot,
-        "integrations",
-        "claude-plugin",
-        "bin",
-        "ai-config-sync.cjs"
-      );
-      if (!cliAbsoluteCommand && await pathExists(cjs)) {
-        cliAbsoluteCommand = `"${process.execPath}" "${cjs}"`;
-      }
-      const distCjs = import_node_path18.default.join(programRoot, "dist", "ai-config-sync.cjs");
-      if (!cliAbsoluteCommand && await pathExists(distCjs)) {
-        cliAbsoluteCommand = `"${process.execPath}" "${distCjs}"`;
-      }
-    }
-    if (!cliAbsoluteCommand) {
-      const argv1 = process.argv[1];
-      if (argv1 && await pathExists(argv1)) {
-        if (argv1.endsWith(".cjs") || argv1.endsWith(".js")) {
-          cliAbsoluteCommand = `"${process.execPath}" "${import_node_path18.default.resolve(argv1)}"`;
-        } else {
-          cliAbsoluteCommand = `"${import_node_path18.default.resolve(argv1)}"`;
-        }
-      }
-    }
-  } catch {
   }
   const hooksPath = codexHooksManifestPath(home);
   let base = {};
@@ -20437,7 +20693,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     await ensureDir(import_node_path18.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push(
-      cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
+      cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + stable commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
     );
     changed = true;
   }
@@ -20455,6 +20711,11 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
   actions.push(
     "NOTE: Codex may prompt to trust the SessionStart hook on first run."
   );
+  if (stableCjs) {
+    actions.push(
+      `NOTE: Codex CLI entry is stable shim ${stableCjs} (refresh via setup after plugin update).`
+    );
+  }
   return { ok: true, changed, warnings, errors, actions };
 }
 async function runSetup(options = {}) {
@@ -20721,7 +20982,9 @@ init_dist();
 var program2 = new Command();
 program2.name("ai-config-sync").description(
   "AI Agent config sync \u2014 private config repo + Claude Code / Codex integrations"
-).version("0.4.0");
+).version(
+  true ? "0.4.1" : process.env.npm_package_version || "0.4.1"
+);
 function homeOpt(cmd) {
   return expandHome(cmd.opts().home ?? import_node_os4.default.homedir());
 }
@@ -20986,7 +21249,8 @@ program2.command("capture").description("Propose managing local resources into t
   const written = await commitCaptureItems(
     confirmed,
     configRepoPath,
-    import_node_os4.default.userInfo().username
+    import_node_os4.default.userInfo().username,
+    { home }
   );
   console.log(`Updated ${written.resourcesPath}`);
   for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
