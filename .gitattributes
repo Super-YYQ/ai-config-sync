@@ -1,0 +1,4 @@
+# Auto line endings for plugin bin shims
+integrations/claude-plugin/bin/*.cmd text eol=crlf
+integrations/claude-plugin/bin/*.cjs text eol=lf
+dist/*.cjs text eol=lf

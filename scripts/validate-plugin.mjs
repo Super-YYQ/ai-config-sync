@@ -121,14 +121,24 @@ if (errors.length) {
 
 console.log("Plugin structural validation OK");
 
-// Prefer official claude CLI when available (hard fail if it fails)
+// Prefer official claude CLI when available.
+// When claude is not installed, structural checks above are enough for CI.
 import { spawnSync } from "node:child_process";
-const claude = spawnSync(
-  process.platform === "win32" ? "claude.cmd" : "claude",
-  ["plugin", "validate", "."],
-  { encoding: "utf8", cwd: root, shell: process.platform === "win32" },
-);
-if (claude.error && claude.error.code === "ENOENT") {
+const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
+const claude = spawnSync(claudeBin, ["plugin", "validate", "."], {
+  encoding: "utf8",
+  cwd: root,
+  shell: process.platform === "win32",
+});
+const out = `${claude.stdout ?? ""}${claude.stderr ?? ""}`;
+const missing =
+  (claude.error &&
+    (claude.error.code === "ENOENT" || /not found|ENOENT/i.test(claude.error.message))) ||
+  /not recognized as an internal or external command|command not found|is not recognized/i.test(
+    out,
+  ) ||
+  (claude.status !== 0 && !out.trim() && claude.error);
+if (missing || (claude.status !== 0 && /not recognized|command not found|ENOENT/i.test(out))) {
   console.log("(claude CLI not installed — structural checks only)");
   process.exit(0);
 }

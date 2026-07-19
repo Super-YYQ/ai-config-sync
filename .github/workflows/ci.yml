@@ -27,7 +27,9 @@ jobs:
       - name: Version consistency
         run: node scripts/check-version-consistency.mjs
       - name: Build is clean (no dirty tree)
-        run: git diff --exit-code
+        # Ignore executable-bit-only changes (chmod 755 on Unix after bundle)
+        # and CR-at-EOL for Windows .cmd shims rewritten by the build.
+        run: git -c core.fileMode=false diff --exit-code --ignore-cr-at-eol
         shell: bash
       - name: Test
         run: npm test

@@ -65,14 +65,21 @@ function withShebang(file) {
 withShebang(outPlugin);
 withShebang(outDist);
 
-// Windows cmd shim for plugin bin
-fs.writeFileSync(
-  outCmd,
-  `@echo off\r\nnode "%~dp0ai-config-sync.cjs" %*\r\n`,
-  "utf8",
-);
+// Windows cmd shim for plugin bin — write only when content changes
+// (keeps git tree clean across LF/CRLF checkouts).
+const cmdBody = `@echo off\r\nnode "%~dp0ai-config-sync.cjs" %*\r\n`;
+const normalizeEol = (s) => s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+let existingCmd = "";
+try {
+  existingCmd = fs.readFileSync(outCmd, "utf8");
+} catch {
+  /* missing */
+}
+if (normalizeEol(existingCmd) !== normalizeEol(cmdBody)) {
+  fs.writeFileSync(outCmd, cmdBody, "utf8");
+}
 
-// Ensure unix shebang executable bit is preserved conceptually (git may handle)
+// Executable bit for Unix shebang (mode-only diffs are ignored in CI).
 try {
   fs.chmodSync(outPlugin, 0o755);
   fs.chmodSync(outDist, 0o755);
