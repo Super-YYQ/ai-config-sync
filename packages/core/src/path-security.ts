@@ -10,21 +10,43 @@ import {
   expandHome,
   isUnder,
   claudeSkillsDir,
-  codexSkillsDir,
   codexConfigPath,
   codexHooksDir,
   codexHooksManifestPath,
   agentsSkillsDir,
-  claudeHome,
   codexHome,
+  normalizePath,
 } from "./paths.js";
-import type {
-  RiskLevel,
-  TargetTool,
-  TargetRecipe,
-} from "./schemas.js";
+import type { RiskLevel, TargetTool, TargetRecipe } from "./schemas.js";
 
 export { assertSafeRelPath };
+
+/** Basename patterns that must never be written (auth/session/cache). */
+const FORBIDDEN_BASENAMES = new Set(
+  [
+    "auth.json",
+    "credentials.json",
+    "session.json",
+    "sessions.json",
+    "history.jsonl",
+    "history.json",
+    "cache",
+    ".cache",
+  ].map((s) => s.toLowerCase()),
+);
+
+const FORBIDDEN_PATH_FRAGMENTS = [
+  "/auth.json",
+  "\\auth.json",
+  "/history.",
+  "\\history.",
+  "/session",
+  "\\session",
+  "/cache/",
+  "\\cache\\",
+  "/.cache/",
+  "\\.cache\\",
+];
 
 /** recipeRef must resolve under configRepo/recipes/ (no abs, no ..). */
 export function validateRecipeRef(
@@ -89,23 +111,26 @@ export function validateTargetRecipePaths(recipe: TargetRecipe): void {
   }
 }
 
-/** Allowed write roots for a target tool under a given home. */
-export function managedWriteRoots(home: string, target: TargetTool): string[] {
-  if (target === "claude") {
-    return [claudeSkillsDir(home), path.join(claudeHome(home), "skills")];
-  }
-  return [
-    codexSkillsDir(home),
-    agentsSkillsDir(home),
-    codexHooksDir(home),
-    path.dirname(codexHooksManifestPath(home)),
-    path.dirname(codexConfigPath(home)),
-  ];
+function isForbiddenDest(abs: string): boolean {
+  const base = path.basename(abs).toLowerCase();
+  if (FORBIDDEN_BASENAMES.has(base)) return true;
+  const norm = abs.replace(/\\/g, "/").toLowerCase();
+  return FORBIDDEN_PATH_FRAGMENTS.some((f) =>
+    norm.includes(f.replace(/\\/g, "/").toLowerCase()),
+  );
 }
 
 /**
  * Ensure a destination path is under a managed root for the target.
- * Relative paths are expanded with ~ against home.
+ *
+ * Claude: only ~/.claude/skills/**
+ * Codex:
+ *   - ~/.agents/skills/**
+ *   - ~/.codex/skills/**
+ *   - ~/.codex/hooks/**
+ *   - exact ~/.codex/hooks.json
+ *   - exact ~/.codex/config.toml
+ * Does NOT allow arbitrary writes under ~/.codex (auth/history/session/cache blocked).
  */
 export function validateManagedWritePath(
   home: string,
@@ -114,17 +139,38 @@ export function validateManagedWritePath(
 ): string {
   const expanded = expandHome(dest, home);
   const abs = path.resolve(expanded);
-  const roots = managedWriteRoots(home, target).map((r) => path.resolve(r));
-  const extras =
-    target === "codex"
-      ? [path.resolve(codexConfigPath(home)), path.resolve(codexHooksManifestPath(home))]
-      : [];
 
-  if (extras.includes(abs)) return abs;
-  for (const root of roots) {
-    if (abs === root || isUnder(root, abs)) return abs;
+  if (isForbiddenDest(abs)) {
+    throw new Error(
+      `Write path forbidden (auth/session/cache/history): ${dest}`,
+    );
   }
-  throw new Error(`Write path not in managed directories for ${target}: ${dest}`);
+
+  if (target === "claude") {
+    const skills = path.resolve(claudeSkillsDir(home));
+    if (abs === skills || isUnder(skills, abs)) return abs;
+    throw new Error(
+      `Write path not in managed Claude skills dir: ${dest} (allowed: ${skills}/**)`,
+    );
+  }
+
+  // Codex / agents
+  const agentsSkills = path.resolve(agentsSkillsDir(home));
+  const codexSkills = path.resolve(path.join(codexHome(home), "skills"));
+  const hooksDir = path.resolve(codexHooksDir(home));
+  const hooksJson = path.resolve(codexHooksManifestPath(home));
+  const configToml = path.resolve(codexConfigPath(home));
+
+  if (abs === hooksJson || abs === configToml) return abs;
+  if (abs === agentsSkills || isUnder(agentsSkills, abs)) return abs;
+  if (abs === codexSkills || isUnder(codexSkills, abs)) return abs;
+  if (abs === hooksDir || isUnder(hooksDir, abs)) return abs;
+
+  throw new Error(
+    `Write path not in managed Codex directories: ${dest}. ` +
+      `Allowed: ${agentsSkills}/**, ${codexSkills}/**, ${hooksDir}/**, ` +
+      `exact ${hooksJson}, exact ${configToml}`,
+  );
 }
 
 /** Reject if path is a symlink. */
@@ -221,7 +267,10 @@ export function recomputeTargetRisk(recipe: TargetRecipe): RiskLevel {
   return risk;
 }
 
-/** Full validation of a target recipe before apply. */
+/**
+ * Full validation of a target recipe before apply.
+ * Any operation.to that fails managed-path checks blocks apply (no silent pass).
+ */
 export function validateTargetRecipeForApply(
   home: string,
   target: TargetTool,
@@ -237,15 +286,23 @@ export function validateTargetRecipeForApply(
     }
   }
   for (const op of recipe.operations ?? []) {
-    if (op.to) {
-      try {
-        validateManagedWritePath(home, target, op.to);
-      } catch {
-        if (path.isAbsolute(op.to) || op.to.includes("..")) {
-          throw new Error(`operation.to not managed: ${op.to}`);
-        }
-      }
+    if (op.to !== undefined && op.to !== null && String(op.to).length > 0) {
+      // Strict: every destination must pass managed write validation
+      validateManagedWritePath(home, target, String(op.to));
     }
   }
   return { risk: recomputeTargetRisk(recipe) };
 }
+
+/** Compare risk levels for plan-vs-apply revalidation. */
+export function riskRank(r: RiskLevel): number {
+  return r === "low" ? 1 : r === "medium" ? 2 : 3;
+}
+
+/** Normalize paths for set comparison (platform-aware). */
+export function normalizeRelPath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/^\.?\//, "");
+}
+
+// silence unused import if normalizePath only needed in some builds
+void normalizePath;

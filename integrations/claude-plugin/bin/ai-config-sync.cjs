@@ -16077,30 +16077,39 @@ function validateTargetRecipePaths(recipe) {
       validateRecipeRelativePath("operation.from", op.from);
   }
 }
-function managedWriteRoots(home, target) {
-  if (target === "claude") {
-    return [claudeSkillsDir(home), import_node_path7.default.join(claudeHome(home), "skills")];
-  }
-  return [
-    codexSkillsDir(home),
-    agentsSkillsDir(home),
-    codexHooksDir(home),
-    import_node_path7.default.dirname(codexHooksManifestPath(home)),
-    import_node_path7.default.dirname(codexConfigPath(home))
-  ];
+function isForbiddenDest(abs) {
+  const base = import_node_path7.default.basename(abs).toLowerCase();
+  if (FORBIDDEN_BASENAMES.has(base))
+    return true;
+  const norm = abs.replace(/\\/g, "/").toLowerCase();
+  return FORBIDDEN_PATH_FRAGMENTS.some((f) => norm.includes(f.replace(/\\/g, "/").toLowerCase()));
 }
 function validateManagedWritePath(home, target, dest) {
   const expanded = expandHome(dest, home);
   const abs = import_node_path7.default.resolve(expanded);
-  const roots = managedWriteRoots(home, target).map((r) => import_node_path7.default.resolve(r));
-  const extras = target === "codex" ? [import_node_path7.default.resolve(codexConfigPath(home)), import_node_path7.default.resolve(codexHooksManifestPath(home))] : [];
-  if (extras.includes(abs))
-    return abs;
-  for (const root of roots) {
-    if (abs === root || isUnder(root, abs))
-      return abs;
+  if (isForbiddenDest(abs)) {
+    throw new Error(`Write path forbidden (auth/session/cache/history): ${dest}`);
   }
-  throw new Error(`Write path not in managed directories for ${target}: ${dest}`);
+  if (target === "claude") {
+    const skills = import_node_path7.default.resolve(claudeSkillsDir(home));
+    if (abs === skills || isUnder(skills, abs))
+      return abs;
+    throw new Error(`Write path not in managed Claude skills dir: ${dest} (allowed: ${skills}/**)`);
+  }
+  const agentsSkills = import_node_path7.default.resolve(agentsSkillsDir(home));
+  const codexSkills = import_node_path7.default.resolve(import_node_path7.default.join(codexHome(home), "skills"));
+  const hooksDir = import_node_path7.default.resolve(codexHooksDir(home));
+  const hooksJson = import_node_path7.default.resolve(codexHooksManifestPath(home));
+  const configToml = import_node_path7.default.resolve(codexConfigPath(home));
+  if (abs === hooksJson || abs === configToml)
+    return abs;
+  if (abs === agentsSkills || isUnder(agentsSkills, abs))
+    return abs;
+  if (abs === codexSkills || isUnder(codexSkills, abs))
+    return abs;
+  if (abs === hooksDir || isUnder(hooksDir, abs))
+    return abs;
+  throw new Error(`Write path not in managed Codex directories: ${dest}. Allowed: ${agentsSkills}/**, ${codexSkills}/**, ${hooksDir}/**, exact ${hooksJson}, exact ${configToml}`);
 }
 async function assertNotSymlink(p) {
   try {
@@ -16196,19 +16205,19 @@ function validateTargetRecipeForApply(home, target, configRepoPath, recipe, opti
     }
   }
   for (const op of recipe.operations ?? []) {
-    if (op.to) {
-      try {
-        validateManagedWritePath(home, target, op.to);
-      } catch {
-        if (import_node_path7.default.isAbsolute(op.to) || op.to.includes("..")) {
-          throw new Error(`operation.to not managed: ${op.to}`);
-        }
-      }
+    if (op.to !== void 0 && op.to !== null && String(op.to).length > 0) {
+      validateManagedWritePath(home, target, String(op.to));
     }
   }
   return { risk: recomputeTargetRisk(recipe) };
 }
-var import_promises3, import_node_path7;
+function riskRank(r) {
+  return r === "low" ? 1 : r === "medium" ? 2 : 3;
+}
+function normalizeRelPath(p) {
+  return p.replace(/\\/g, "/").replace(/^\.?\//, "");
+}
+var import_promises3, import_node_path7, FORBIDDEN_BASENAMES, FORBIDDEN_PATH_FRAGMENTS;
 var init_path_security = __esm({
   "packages/core/dist/path-security.js"() {
     "use strict";
@@ -16216,6 +16225,28 @@ var init_path_security = __esm({
     import_node_path7 = __toESM(require("node:path"), 1);
     init_storage_key();
     init_paths();
+    FORBIDDEN_BASENAMES = new Set([
+      "auth.json",
+      "credentials.json",
+      "session.json",
+      "sessions.json",
+      "history.jsonl",
+      "history.json",
+      "cache",
+      ".cache"
+    ].map((s) => s.toLowerCase()));
+    FORBIDDEN_PATH_FRAGMENTS = [
+      "/auth.json",
+      "\\auth.json",
+      "/history.",
+      "\\history.",
+      "/session",
+      "\\session",
+      "/cache/",
+      "\\cache\\",
+      "/.cache/",
+      "\\.cache\\"
+    ];
   }
 });
 
@@ -16305,13 +16336,13 @@ __export(dist_exports, {
   localOverridesPath: () => localOverridesPath,
   localStatePath: () => localStatePath,
   logsDir: () => logsDir,
-  managedWriteRoots: () => managedWriteRoots,
   mergeJson: () => mergeJson,
   mergeManagedCodexSessionStart: () => mergeManagedCodexSessionStart,
   mergeManagedMarkdown: () => mergeManagedMarkdown,
   mergeTomlText: () => mergeTomlText,
   needsWindowsCmdShell: () => needsWindowsCmdShell,
   normalizePath: () => normalizePath,
+  normalizeRelPath: () => normalizeRelPath,
   parseRecipeRef: () => parseRecipeRef,
   parseValidatedYaml: () => parseValidatedYaml,
   pathExists: () => pathExists,
@@ -16332,6 +16363,7 @@ __export(dist_exports, {
   resolveSecret: () => resolveSecret,
   resolveSecretFromEnv: () => resolveSecretFromEnv,
   resolveWindowsCommand: () => resolveWindowsCommand,
+  riskRank: () => riskRank,
   runClaude: () => runClaude,
   runCommand: () => runCommand,
   safeJoin: () => safeJoin,
@@ -17660,9 +17692,36 @@ async function commitPaths(dir, message, relPaths, options = {}) {
     }
     return null;
   }
+  for (const p of relPaths) {
+    if (!p || typeof p !== "string") {
+      throw new GitError(`commitPaths: empty path rejected`);
+    }
+    if (import_node_path12.default.isAbsolute(p) || /^[A-Za-z]:[\\/]/.test(p)) {
+      throw new GitError(`commitPaths: absolute path rejected: ${p}`);
+    }
+    if (p.split(/[\/\\]/).some((seg) => seg === "..")) {
+      throw new GitError(`commitPaths: path traversal rejected: ${p}`);
+    }
+  }
   const unique = [
     ...new Set(relPaths.map((p) => p.replace(/\\/g, "/").replace(/^\.?\//, "")).filter(Boolean))
   ];
+  const allowed = new Set(unique);
+  const isAllowedStaged = (p) => {
+    if (allowed.has(p))
+      return true;
+    for (const a of allowed) {
+      if (p === a || p.startsWith(a.endsWith("/") ? a : a + "/"))
+        return true;
+    }
+    return false;
+  };
+  const stagedBefore = await runGit(dir, ["diff", "--cached", "--name-only", "-z"], { allowFail: true });
+  const alreadyStaged = (stagedBefore.stdout || "").split("\0").map((s) => s.replace(/\\/g, "/").trim()).filter(Boolean);
+  const foreignStaged = alreadyStaged.filter((p) => !isAllowedStaged(p));
+  if (foreignStaged.length > 0) {
+    throw new GitError(`Refusing capture commit: index already has staged files outside this capture: ${foreignStaged.slice(0, 5).join(", ")}` + (foreignStaged.length > 5 ? ` (+${foreignStaged.length - 5} more)` : "") + `. Commit or unstage them first (git restore --staged <path>). Index left unchanged.`);
+  }
   const findings = await scanPathsForSecrets(dir, unique);
   if (findings.length > 0) {
     const summary = findings.slice(0, 5).map((f) => `${f.path}:${f.line} ${f.rule} ${f.preview}`).join("; ");
@@ -17672,7 +17731,16 @@ async function commitPaths(dir, message, relPaths, options = {}) {
   const staged = await runGit(dir, ["diff", "--cached", "--name-only", "-z"], {
     allowFail: true
   });
-  const stagedNames = (staged.stdout || "").split("\0").map((s) => s.trim()).filter(Boolean);
+  const stagedNames = (staged.stdout || "").split("\0").map((s) => s.replace(/\\/g, "/").trim()).filter(Boolean);
+  const leaked = stagedNames.filter((p) => !isAllowedStaged(p));
+  if (leaked.length > 0) {
+    await runGit(dir, ["restore", "--staged", "--", ...unique], {
+      allowFail: true
+    }).catch(async () => {
+      await runGit(dir, ["reset", "HEAD", "--", ...unique], { allowFail: true });
+    });
+    throw new GitError(`Capture commit aborted: unexpected staged files ${leaked.join(", ")}. Index restored.`);
+  }
   if (stagedNames.length === 0 && !options.allowEmpty) {
     return null;
   }
@@ -18814,25 +18882,27 @@ async function resolveSourceRoot(ctx, resource) {
       offline: !!ctx.offline
     });
     if (cached?.root) {
-      await assertNoSymlinksInTree(cached.root).catch(() => {
-      });
+      await assertNoSymlinksInTree(cached.root);
     }
     return cached?.root;
-  } catch {
+  } catch (e) {
+    if (e.message?.startsWith("Symlink rejected")) {
+      throw e;
+    }
     return void 0;
   }
 }
 function installedSkillPath(home, target, resourceId) {
   return target === "claude" ? import_node_path16.default.join(claudeSkillsDir(home), resourceId) : import_node_path16.default.join(codexSkillsDir(home), resourceId);
 }
-function riskRank(r) {
+function riskRank2(r) {
   return r === "low" ? 1 : r === "medium" ? 2 : 3;
 }
 function riskAllowed(actionRisk, allowRisk, yes) {
   if (!yes)
     return false;
   const max = allowRisk ?? "low";
-  return riskRank(actionRisk) <= riskRank(max);
+  return riskRank2(actionRisk) <= riskRank2(max);
 }
 async function loadResolvedProfile(configRepoPath, profileName) {
   const profilePath = import_node_path16.default.join(configRepoPath, "profiles", `${profileName}.yaml`);
@@ -19155,7 +19225,64 @@ async function applyPlan(ctx, plan) {
       manual.push(`No recipe for ${resourceId}@${target}`);
       continue;
     }
-    const sourceRoot = await resolveSourceRoot(ctx, resource);
+    let applyRisk = targetRecipe.risk;
+    try {
+      const revalidated = validateTargetRecipeForApply(ctx.home, target, ctx.configRepoPath, targetRecipe, {
+        resourceSourcePath: resource.source?.provider === "vendored" || resource.source?.provider === "local" ? resource.source.path : void 0
+      });
+      applyRisk = revalidated.risk;
+    } catch (e) {
+      failed.push({
+        actionId: group[0].id,
+        error: `security revalidation blocked apply: ${e.message}`
+      });
+      hardFailure = true;
+      break;
+    }
+    const planRisk = group.reduce((max, a) => riskRank2(a.risk) > riskRank2(max) ? a.risk : max, "low");
+    if (riskRank2(applyRisk) > riskRank2(planRisk)) {
+      failed.push({
+        actionId: group[0].id,
+        error: `Recipe risk increased since plan (${planRisk} \u2192 ${applyRisk}). Re-run plan/apply. No files were modified for ${resourceId}@${target}.`
+      });
+      hardFailure = true;
+      break;
+    }
+    const maxAllow = ctx.allowRisk ?? "low";
+    if (riskRank2(applyRisk) > riskRank2(maxAllow)) {
+      failed.push({
+        actionId: group[0].id,
+        error: `Apply risk ${applyRisk} exceeds --allow-risk ${maxAllow} for ${resourceId}@${target}. No files were modified.`
+      });
+      hardFailure = true;
+      break;
+    }
+    let sourceRoot;
+    try {
+      sourceRoot = await resolveSourceRoot(ctx, resource);
+    } catch (e) {
+      if (e.message?.startsWith("Symlink rejected")) {
+        failed.push({
+          actionId: group[0].id,
+          error: `security: ${e.message}`
+        });
+        hardFailure = true;
+        break;
+      }
+      throw e;
+    }
+    if (sourceRoot) {
+      try {
+        await assertNoSymlinksInTree(sourceRoot);
+      } catch (e) {
+        failed.push({
+          actionId: group[0].id,
+          error: `security: ${e.message}`
+        });
+        hardFailure = true;
+        break;
+      }
+    }
     const driver = getDriver(targetRecipe.driver);
     try {
       const result = await driver.apply(targetRecipe, {

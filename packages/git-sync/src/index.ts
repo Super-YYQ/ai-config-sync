@@ -202,6 +202,10 @@ export async function commitAll(
 /**
  * Stage and commit only the given relative paths (never git add -A).
  * Leaves other dirty files unstaged/uncommitted.
+ *
+ * Safety: if the index already has staged files outside relPaths, refuse to
+ * commit so we never bundle the user's pre-staged work into a capture commit.
+ * On failure, the index is left unchanged (we do not stage anything first).
  */
 export async function commitPaths(
   dir: string,
@@ -218,6 +222,19 @@ export async function commitPaths(
     return null;
   }
 
+  // Reject absolute paths and traversal in the path list itself
+  for (const p of relPaths) {
+    if (!p || typeof p !== "string") {
+      throw new GitError(`commitPaths: empty path rejected`);
+    }
+    if (path.isAbsolute(p) || /^[A-Za-z]:[\\/]/.test(p)) {
+      throw new GitError(`commitPaths: absolute path rejected: ${p}`);
+    }
+    if (p.split(/[\/\\]/).some((seg) => seg === "..")) {
+      throw new GitError(`commitPaths: path traversal rejected: ${p}`);
+    }
+  }
+
   // Normalize to forward-slash relative paths under dir
   const unique = [
     ...new Set(
@@ -226,6 +243,37 @@ export async function commitPaths(
         .filter(Boolean),
     ),
   ];
+  const allowed = new Set(unique);
+  const isAllowedStaged = (p: string): boolean => {
+    if (allowed.has(p)) return true;
+    // git add on a directory stages nested files
+    for (const a of allowed) {
+      if (p === a || p.startsWith(a.endsWith("/") ? a : a + "/")) return true;
+    }
+    return false;
+  };
+
+  // Inspect already-staged files BEFORE any git add
+  const stagedBefore = await runGit(
+    dir,
+    ["diff", "--cached", "--name-only", "-z"],
+    { allowFail: true },
+  );
+  const alreadyStaged = (stagedBefore.stdout || "")
+    .split("\0")
+    .map((s) => s.replace(/\\/g, "/").trim())
+    .filter(Boolean);
+
+  const foreignStaged = alreadyStaged.filter((p) => !isAllowedStaged(p));
+  if (foreignStaged.length > 0) {
+    throw new GitError(
+      `Refusing capture commit: index already has staged files outside this capture: ` +
+        `${foreignStaged.slice(0, 5).join(", ")}` +
+        (foreignStaged.length > 5 ? ` (+${foreignStaged.length - 5} more)` : "") +
+        `. Commit or unstage them first (git restore --staged <path>). ` +
+        `Index left unchanged.`,
+    );
+  }
 
   // Secret scan ONLY the files we intend to commit
   const findings = await scanPathsForSecrets(dir, unique);
@@ -242,14 +290,27 @@ export async function commitPaths(
   // Stage only these paths (pathspec). Use -- to stop option parsing.
   await runGit(dir, ["add", "--", ...unique]);
 
-  // If nothing staged, skip commit unless allowEmpty
+  // Verify staged set is still only allowed paths (incl. nested under dirs)
   const staged = await runGit(dir, ["diff", "--cached", "--name-only", "-z"], {
     allowFail: true,
   });
   const stagedNames = (staged.stdout || "")
     .split("\0")
-    .map((s) => s.trim())
+    .map((s) => s.replace(/\\/g, "/").trim())
     .filter(Boolean);
+  const leaked = stagedNames.filter((p) => !isAllowedStaged(p));
+  if (leaked.length > 0) {
+    // Unstage what we just added to restore prior index
+    await runGit(dir, ["restore", "--staged", "--", ...unique], {
+      allowFail: true,
+    }).catch(async () => {
+      await runGit(dir, ["reset", "HEAD", "--", ...unique], { allowFail: true });
+    });
+    throw new GitError(
+      `Capture commit aborted: unexpected staged files ${leaked.join(", ")}. Index restored.`,
+    );
+  }
+
   if (stagedNames.length === 0 && !options.allowEmpty) {
     return null;
   }

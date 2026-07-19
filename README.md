@@ -2,11 +2,13 @@
 
 在 **Claude Code / Codex** 中管理 Skill、Plugin，并同步到私有 Git 仓库。
 
-> **状态：v0.4.1 Alpha — Beta Compatibility 进行中**  
+> **状态：v0.4.1 Safe Personal Beta**（检查点 tag：`v0.4.1-safe-beta.1`）  
 > Claude Plugin 已内置 CLI（无需单独 `npm i -g` 也可在插件 PATH 中调用）。  
 > npm 包使用打包后的单文件 `dist/ai-config-sync.cjs`。  
-> CI：跨平台 Build/Test + 隔离 tarball Smoke + Plugin Validate；**尚未**覆盖真实 Claude/Codex E2E。  
-> 请先在隔离 HOME / 测试环境验证，再用于公司真机。
+> CI：跨平台 Build/Test + 隔离 tarball Smoke + Plugin Validate。  
+> **真实 Claude Code / Codex E2E 仍未覆盖** — 请先在隔离 HOME / 测试环境验证，再用于公司真机。  
+> 跨电脑继续开发：见 [`docs/DEVELOPMENT_CHECKPOINT.md`](docs/DEVELOPMENT_CHECKPOINT.md)。  
+> 下一阶段主题（未开始）：Stage B — Skill Inventory / Adopt / Deployment Model。
 
 ---
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1-safe-beta.1 — Safe Personal Beta checkpoint
+
+### Security final gate
+- Strict managed write roots (Claude skills only; Codex skills/hooks + exact config.toml/hooks.json)
+- Block auth/history/session/cache destinations; no whole-`~/.codex` writes
+- `validateTargetRecipeForApply` never swallows `operation.to` failures
+- Apply re-validates recipe security + recomputed risk + source symlinks before `driver.apply`
+- Git cache / all sources: nested symlink → hard block (no silent catch)
+- `commitPaths` refuses foreign staged index files; rejects abs/`..` pathspecs
+
+### Handoff
+- `docs/DEVELOPMENT_CHECKPOINT.md` for cross-machine continue
+- Tag `v0.4.1-safe-beta.1`
+
 ## 0.4.1+safe-beta — Safe personal Beta gate
 
 ### Capture

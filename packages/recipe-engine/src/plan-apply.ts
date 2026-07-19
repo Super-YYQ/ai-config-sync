@@ -156,7 +156,7 @@ async function resolveSourceRoot(
     return vendored;
   }
 
-  // GitHub / git cache
+  // GitHub / git cache — symlink rejection is hard fail (no silent catch)
   try {
     const lock = await loadLock(path.join(ctx.configRepoPath, "lock.yaml"));
     const locked = lock.entries.find((e) => e.resourceId === resource.id);
@@ -167,12 +167,14 @@ async function resolveSourceRoot(
       offline: !!ctx.offline,
     });
     if (cached?.root) {
-      await assertNoSymlinksInTree(cached.root).catch(() => {
-        /* cache trees may contain links in node_modules — only check shallow later */
-      });
+      // Propagate symlink errors — do not swallow
+      await assertNoSymlinksInTree(cached.root);
     }
     return cached?.root;
-  } catch {
+  } catch (e) {
+    if ((e as Error).message?.startsWith("Symlink rejected")) {
+      throw e;
+    }
     return undefined;
   }
 }
@@ -677,7 +679,89 @@ export async function applyPlan(
       continue;
     }
 
-    const sourceRoot = await resolveSourceRoot(ctx, resource);
+    // Re-validate security on the *current* recipe before any driver.apply
+    // (Plan may have been built earlier; recipe files may have changed.)
+    let applyRisk = targetRecipe.risk;
+    try {
+      const revalidated = validateTargetRecipeForApply(
+        ctx.home,
+        target,
+        ctx.configRepoPath,
+        targetRecipe,
+        {
+          resourceSourcePath:
+            resource.source?.provider === "vendored" ||
+            resource.source?.provider === "local"
+              ? resource.source.path
+              : undefined,
+        },
+      );
+      applyRisk = revalidated.risk;
+    } catch (e) {
+      failed.push({
+        actionId: group[0]!.id,
+        error: `security revalidation blocked apply: ${(e as Error).message}`,
+      });
+      hardFailure = true;
+      break;
+    }
+
+    // If recomputed risk exceeds plan action risk or --allow-risk, stop with no writes
+    const planRisk = group.reduce(
+      (max, a) => (riskRank(a.risk) > riskRank(max) ? a.risk : max),
+      "low" as RiskLevel,
+    );
+    if (riskRank(applyRisk) > riskRank(planRisk)) {
+      failed.push({
+        actionId: group[0]!.id,
+        error:
+          `Recipe risk increased since plan (${planRisk} → ${applyRisk}). ` +
+          `Re-run plan/apply. No files were modified for ${resourceId}@${target}.`,
+      });
+      hardFailure = true;
+      break;
+    }
+    const maxAllow = ctx.allowRisk ?? "low";
+    if (riskRank(applyRisk) > riskRank(maxAllow)) {
+      failed.push({
+        actionId: group[0]!.id,
+        error:
+          `Apply risk ${applyRisk} exceeds --allow-risk ${maxAllow} ` +
+          `for ${resourceId}@${target}. No files were modified.`,
+      });
+      hardFailure = true;
+      break;
+    }
+
+    let sourceRoot: string | undefined;
+    try {
+      sourceRoot = await resolveSourceRoot(ctx, resource);
+    } catch (e) {
+      if ((e as Error).message?.startsWith("Symlink rejected")) {
+        failed.push({
+          actionId: group[0]!.id,
+          error: `security: ${(e as Error).message}`,
+        });
+        hardFailure = true;
+        break;
+      }
+      throw e;
+    }
+
+    // Final symlink check on resolved source root before apply
+    if (sourceRoot) {
+      try {
+        await assertNoSymlinksInTree(sourceRoot);
+      } catch (e) {
+        failed.push({
+          actionId: group[0]!.id,
+          error: `security: ${(e as Error).message}`,
+        });
+        hardFailure = true;
+        break;
+      }
+    }
+
     const driver = getDriver(targetRecipe.driver);
     try {
       const result = await driver.apply(targetRecipe, {
