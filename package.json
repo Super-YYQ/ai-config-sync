@@ -1,6 +1,6 @@
 {
   "name": "ai-config-sync",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "AI Agent configuration sync — Claude Code / Codex skills & plugins via private config repo",
   "type": "module",
   "bin": {
@@ -33,7 +33,7 @@
     "validate:plugin": "node scripts/validate-plugin.mjs",
     "check:version": "node scripts/check-version-consistency.mjs",
     "version:set": "node scripts/sync-version.mjs",
-    "release:check": "npm run build && node scripts/check-version-consistency.mjs && npm test"
+    "release:check": "node scripts/release-check.mjs"
   },
   "workspaces": [
     "packages/*",

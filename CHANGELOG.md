@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.2-stable-beta.1 — Stable Beta Gate (P0 fixes)
+
+Review-driven P0 gate per `docs/ai-config-sync_最新全面审查与开发建议_a95c7ab.docx`.
+
+### Ticket 1 — Plan Snapshot + Apply Confirmation
+- Plan snapshots config-repo commit + per-action recipe hash + locked source commit
+- `applyPlan` refuses a stale plan (HEAD advanced, recipe edited, source moved) before any write
+- CLI `runApplyLike` now Pull → build Plan → display → confirm → Apply; plan shown before writes
+
+### Ticket 2 — Config Repo Write Lock
+- Shared `config-repo` write lock (state-manager `file-lock`) covers Capture → Commit → Push
+- `capture --commit` commits under the same lock as the resources.yaml write (no cross-commit)
+
+### Ticket 3 — Source Resolver Hardening
+- `validateGitRemote` / `validateGitRef`: https|git@ only, no creds, no `-` option injection, no control chars
+- Fail-closed git ops in source cache; verify final HEAD; per-cache lock; reject non-Git cache dirs
+
+### Ticket 4 — Atomic Skill Deployment
+- `atomicReplaceDirectory`: whole-target-dir replace (source-deleted files converge), symlink-safe, atomic
+
+### Ticket 5 — Managed Config Field Policy
+- `managed-fields`: merge-toml allowlist (`features.hooks`); blocks model/auth/sandbox; hooks.json via dedicated merge only
+
+### Apply Lock
+- `home-apply` lock serializes concurrent applies to one HOME (skills/hooks/state.json safe)
+
+### release:check + E2E
+- `release:check` now: typecheck, build, version, plugin validate, tests, npm smoke, pack inspection, secret scan (allowlist), git clean
+- New isolated-HOME E2E: Setup → Capture → Restore → Rollback (`tests/integration/e2e-lifecycle.test.ts`)
+
 ## 0.4.1-safe-beta.1 — Safe Personal Beta checkpoint
 
 ### Security final gate

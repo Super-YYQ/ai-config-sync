@@ -154,6 +154,81 @@ export async function copyDirectory(
   });
 }
 
+/**
+ * Atomically replace the entire destination directory with a copy of `src`.
+ *
+ * Unlike `copyDirectory(overwrite: true)` (which only overwrites same-named
+ * files and leaves stale files behind), this swaps the whole target dir so a
+ * source that deleted a file results in that file being removed at the target
+ * - drift converges. Flow: copy src to a sibling temp dir -> remove dest ->
+ * rename temp into place. On any error the temp dir is cleaned up and dest is
+ * left untouched. Symlinks in src are rejected.
+ *
+ * Returns the absolute destination path.
+ */
+export async function atomicReplaceDirectory(
+  src: string,
+  dest: string,
+  options: { rejectSymlinks?: boolean } = {},
+): Promise<string> {
+  const rejectSymlinks = options.rejectSymlinks ?? true;
+  if (!(await pathExists(src))) {
+    throw new Error(`Source directory does not exist: ${src}`);
+  }
+  if (rejectSymlinks) {
+    const st = await fs.lstat(src);
+    if (st.isSymbolicLink()) {
+      throw new Error(`Symlink rejected as copy source: ${src}`);
+    }
+  }
+  await ensureDir(path.dirname(dest));
+  // Sibling temp so the rename stays on the same filesystem (atomic).
+  const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    await fs.cp(src, tmp, {
+      recursive: true,
+      force: true,
+      // Reject symlinks inside the tree so a malicious source can't plant one
+      dereference: false,
+    });
+    if (rejectSymlinks) {
+      await assertNoSymlinksInTreeRaw(tmp);
+    }
+    if (await pathExists(dest)) {
+      await fs.rm(dest, { recursive: true, force: true });
+    }
+    await fs.rename(tmp, dest).catch(async () => {
+      // Cross-device fallback: recursive copy then rm temp
+      await fs.cp(tmp, dest, { recursive: true, force: true });
+      await fs.rm(tmp, { recursive: true, force: true });
+    });
+    return dest;
+  } catch (e) {
+    await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+    throw e;
+  }
+}
+
+async function assertNoSymlinksInTreeRaw(root: string): Promise<void> {
+  const stack = [root];
+  while (stack.length) {
+    const current = stack.pop()!;
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`Symlink rejected in source tree: ${full}`);
+      }
+      if (entry.isDirectory()) stack.push(full);
+    }
+  }
+}
+
 export async function removePath(target: string): Promise<void> {
   await fs.rm(target, { recursive: true, force: true });
 }

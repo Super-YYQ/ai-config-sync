@@ -258,7 +258,9 @@ describe("Final Gate: apply revalidation after plan", () => {
     const result = await applyPlan(ctx, plan);
     expect(result.failed.length).toBeGreaterThan(0);
     expect(
-      result.failed.some((f) => /security|managed|forbidden|risk/i.test(f.error)),
+      result.failed.some((f) =>
+        /security|managed|forbidden|risk|stale/i.test(f.error),
+      ),
     ).toBe(true);
     // Must not create the dangerous path
     expect(await pathExists(path.join(home, ".ssh", "stolen"))).toBe(false);

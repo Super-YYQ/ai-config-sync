@@ -5,7 +5,9 @@ import {
   codexHooksDir,
   codexHooksManifestPath,
   codexSkillsDir,
-  copyDirectory,
+  atomicReplaceDirectory,
+  checkJsonFieldPolicy,
+  checkTomlFieldPolicy,
   ensureDir,
   expandHome,
   mergeJson,
@@ -164,8 +166,11 @@ export const genericSkillDriver: Driver = {
         pathsTouched: [to],
       };
     }
+    // Ticket 4: atomic whole-directory replacement so source-deleted files
+    // are removed at the target (drift converges), with rollback via the
+    // apply-layer transaction backup.
     await ensureDir(path.dirname(to));
-    await copyDirectory(from, to, { overwrite: true });
+    await atomicReplaceDirectory(from, to);
     return {
       ok: true,
       message: `Installed skill ${ctx.resourceId} -> ${to}`,
@@ -293,7 +298,8 @@ export const repositoryLayoutDriver: Driver = {
       const from = path.join(ctx.sourceRoot, recipe.sourcePaths.skill);
       const to = destSkillDir(ctx.target, ctx.resourceId, ctx.home);
       await ensureDir(path.dirname(to));
-      await copyDirectory(from, to, { overwrite: true });
+      // Ticket 4: atomic whole-directory replacement.
+      await atomicReplaceDirectory(from, to);
       touched.push(to);
     }
 
@@ -302,7 +308,8 @@ export const repositoryLayoutDriver: Driver = {
       const from = path.join(ctx.sourceRoot, recipe.sourcePaths.hookScripts);
       const to = path.join(codexHooksDir(ctx.home), ctx.resourceId);
       if (await pathReady(from)) {
-        await copyDirectory(from, to, { overwrite: true });
+        // Ticket 4: atomic replace so stale hook scripts are removed too.
+        await atomicReplaceDirectory(from, to);
         touched.push(to);
       }
     }
@@ -356,6 +363,16 @@ async function applyOperation(
       if (!op.path) {
         return { ok: false, message: "merge-toml requires path", pathsTouched: [] };
       }
+      // Ticket 5: only registered managed fields may be written to config.toml.
+      // Block model/auth/sandbox and any non-allowlisted field.
+      const policy = checkTomlFieldPolicy(op.path);
+      if (!policy.allowed) {
+        return {
+          ok: false,
+          message: `merge-toml blocked by field policy: ${policy.reason}`,
+          pathsTouched: [],
+        };
+      }
       // path like features.hooks
       const parts = op.path.split(".");
       const key = parts.pop()!;
@@ -383,6 +400,16 @@ async function applyOperation(
       const dest = op.to ? expandHome(op.to, ctx.home) : "";
       if (!dest) {
         return { ok: false, message: "merge-json requires to", pathsTouched: [] };
+      }
+      // Ticket 5: generic merge-json must not touch hooks.json/auth/settings.
+      // Managed hook manifests go through merge-hook-manifest (dedicated merge).
+      const policy = checkJsonFieldPolicy(dest);
+      if (!policy.allowed) {
+        return {
+          ok: false,
+          message: `merge-json blocked by field policy: ${policy.reason}`,
+          pathsTouched: [],
+        };
       }
       const base = (await pathReady(dest)) ? await readJsonFile(dest) : {};
       const managed = op.value ?? {};
@@ -412,7 +439,9 @@ async function applyOperation(
       }
       if (!ctx.dryRun) {
         await ensureDir(path.dirname(to));
-        await copyDirectory(from, to, { overwrite: true });
+        // Ticket 4: atomic whole-directory replacement for any directory copy
+        // operation, so source-deleted files don't linger at the target.
+        await atomicReplaceDirectory(from, to);
       }
       return { ok: true, message: `${op.type} ${from} -> ${to}`, pathsTouched: [to] };
     }

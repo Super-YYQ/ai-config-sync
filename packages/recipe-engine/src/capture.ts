@@ -26,6 +26,11 @@ import {
 import type { ScannedResource } from "@ai-config-sync/scanner";
 import { isNeverCapturableResource } from "@ai-config-sync/scanner";
 import { resolveCachedSource } from "@ai-config-sync/git-sync";
+import {
+  acquireFileLock,
+  releaseFileLock,
+  lockFilePath,
+} from "@ai-config-sync/state-manager";
 import { analyzeSourceTree } from "./analyzer.js";
 import { analyzeWithOptionalAi } from "./ai-assistant.js";
 import { vendorSkillDirectory } from "./vendor.js";
@@ -650,76 +655,22 @@ export async function commitCaptureItems(
   await ensureDir(txBase);
 
   // Repo-level mutex — acquire BEFORE reading resources.yaml so concurrent
-  // captures re-read and merge under the lock (no lost updates).
-  const repoHash = crypto
-    .createHash("sha256")
-    .update(path.resolve(configRepoPath))
-    .digest("hex")
-    .slice(0, 16);
-  const lockPath = path.join(txBase, `capture-${repoHash}.lock`);
+  // captures (and capture → commit) re-read under one lock (no lost updates,
+  // no cross-commit). Shared across capture/commit/push so the user's commit
+  // can never race a second capture writing resources.yaml.
+  const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
   const lockPayload = {
     pid: process.pid,
     startedAt: new Date().toISOString(),
-    configRepository: path.resolve(configRepoPath),
+    target: path.resolve(configRepoPath),
+    scope: "config-repo",
     command: "commitCaptureItems",
   };
 
-  const acquireLock = async () => {
-    for (let attempt = 0; attempt < 50; attempt++) {
-      try {
-        // wx: fail if exists
-        const fh = await fs.open(lockPath, "wx");
-        await fh.writeFile(JSON.stringify(lockPayload, null, 2), "utf8");
-        await fh.close();
-        return;
-      } catch (e) {
-        const err = e as NodeJS.ErrnoException;
-        if (err.code !== "EEXIST") throw e;
-        // Stale lock: owner dead or older than 30 minutes
-        try {
-          const raw = await fs.readFile(lockPath, "utf8");
-          const existingLock = JSON.parse(raw) as {
-            pid?: number;
-            startedAt?: string;
-          };
-          let stale = false;
-          if (existingLock.startedAt) {
-            const age = Date.now() - Date.parse(existingLock.startedAt);
-            if (Number.isFinite(age) && age > 30 * 60 * 1000) stale = true;
-          }
-          if (existingLock.pid && existingLock.pid !== process.pid) {
-            try {
-              process.kill(existingLock.pid, 0);
-            } catch {
-              stale = true; // process does not exist
-            }
-          }
-          if (stale) {
-            await fs.rm(lockPath, { force: true });
-            continue;
-          }
-        } catch {
-          // unreadable lock — remove and retry
-          await fs.rm(lockPath, { force: true }).catch(() => {});
-          continue;
-        }
-        await new Promise((r) => setTimeout(r, 50 + attempt * 30));
-      }
-    }
-    throw new Error(
-      `Capture lock busy for ${configRepoPath} (lock: ${lockPath})`,
-    );
-  };
-
-  await acquireLock();
-
-  const releaseLock = async () => {
-    try {
-      await fs.rm(lockPath, { force: true });
-    } catch {
-      /* ignore */
-    }
-  };
+  await acquireFileLock(lockPath, lockPayload, {
+    maxAttempts: 60,
+    injectThrowAfterAcquire: options.injectFailureAfter?.includes("__throw-after-lock__"),
+  });
 
   // ALL post-lock work is under try/finally so corrupt resources.yaml,
   // permission errors, or inject failures always release the lock.
@@ -1004,6 +955,6 @@ export async function commitCaptureItems(
       throw e;
     }
   } finally {
-    await releaseLock();
+    await releaseFileLock(lockPath);
   }
 }

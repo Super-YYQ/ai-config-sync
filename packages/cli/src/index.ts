@@ -20,6 +20,9 @@ import {
   loadPending,
   rollbackBackup,
   ensureStateDirs,
+  acquireFileLock,
+  releaseFileLock,
+  lockFilePath,
 } from "@ai-config-sync/state-manager";
 import {
   commitAll,
@@ -42,7 +45,7 @@ import {
 } from "@ai-config-sync/recipe-engine";
 import { runSetup } from "./setup.js";
 import path from "node:path";
-import { loadLock } from "@ai-config-sync/core";
+import { loadLock, captureTransactionsDir } from "@ai-config-sync/core";
 
 /** Injected by esbuild define when bundling; falls back for tsx/dev. */
 declare const __APP_VERSION__: string | undefined;
@@ -444,16 +447,34 @@ program
       console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
     }
     if (opts.commit) {
-      // Stage ONLY capture-produced paths — never git add -A
-      const result = await commitPaths(
-        configRepoPath,
-        `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
-        written.changedRelPaths,
-      );
-      console.log(result ? "Committed." : "Nothing to commit.");
-      if (opts.push && result) {
-        await pushRepo(configRepoPath);
-        console.log("Pushed.");
+      // Ticket 2: commit must run under the SAME config-repo write lock as the
+      // capture write, so a second concurrent capture can't interleave between
+      // the resources.yaml write and this commit (which would mix commit
+      // messages / lose resources). The lock path matches commitCaptureItems.
+      const txBase = captureTransactionsDir(home);
+      const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
+      const lockPayload = {
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        target: path.resolve(configRepoPath),
+        scope: "config-repo",
+        command: "capture --commit",
+      };
+      await acquireFileLock(lockPath, lockPayload, { maxAttempts: 60 });
+      try {
+        // Stage ONLY capture-produced paths — never git add -A
+        const result = await commitPaths(
+          configRepoPath,
+          `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
+          written.changedRelPaths,
+        );
+        console.log(result ? "Committed." : "Nothing to commit.");
+        if (opts.push && result) {
+          await pushRepo(configRepoPath);
+          console.log("Pushed.");
+        }
+      } finally {
+        await releaseFileLock(lockPath);
       }
     }
   });
@@ -499,7 +520,10 @@ async function runApplyLike(
   const ctx = await loadCtx(home);
   if (!requireLinked(ctx, label.toLowerCase())) return;
   const { localConfig, configRepoPath } = ctx;
-  // Safety: pull only when clean
+
+  // Ticket 1: Pull -> build immutable Plan -> display -> confirm -> Apply.
+  // The Plan snapshots config-repo commit + recipe hashes so a stale plan is
+  // refused at apply time. No write happens before the user sees the final plan.
   const git = await inspectGitSafety(configRepoPath);
   if (git.canPull) {
     try {
@@ -512,24 +536,73 @@ async function runApplyLike(
     for (const m of git.messages) console.log(`Git: ${m}`);
   }
 
-  const result = await applyPlan({
+  // Build the plan the user will actually see. applyPlan reuses this exact
+  // plan object (with its snapshot), so what is displayed == what is applied.
+  const plan = await buildPlan({
     home,
     configRepoPath,
     localConfig,
     profileName: opts.profile ?? localConfig.profile,
-    yes: !!opts.yes,
-    allowRisk: (opts.allowRisk as RiskLevel | undefined) ?? "low",
-    dryRun: !!opts.dryRun,
     updateSources: !!opts.updateSources,
     offline: !!opts.offline,
   });
 
   if (opts.json) {
+    // Apply with the same plan, then print the JSON result.
+    const result = await applyPlan(
+      {
+        home,
+        configRepoPath,
+        localConfig,
+        profileName: opts.profile ?? localConfig.profile,
+        yes: !!opts.yes,
+        allowRisk: (opts.allowRisk as RiskLevel | undefined) ?? "low",
+        dryRun: !!opts.dryRun,
+        updateSources: !!opts.updateSources,
+        offline: !!opts.offline,
+      },
+      plan,
+    );
     console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(formatPlan(result.plan));
+
+  // Show the plan BEFORE any write.
+  console.log(formatPlan(plan));
   console.log("");
+
+  if (plan.actions.length === 0 || plan.actions.every((a) => a.type === "SKIP")) {
+    console.log(`${label}: No changes`);
+    return;
+  }
+
+  // Confirmation gate: TTY interactive prompts; non-interactive requires --yes.
+  const actionable = plan.actions.filter((a) => a.type !== "SKIP");
+  const needsConfirm = actionable.some((a) => a.requiresConfirmation);
+  if (!opts.yes && !opts.dryRun && needsConfirm) {
+    const actionCount = actionable.length;
+    console.log(
+      `Plan ready: ${actionCount} action(s). Re-run with --yes to apply ` +
+        `(and --allow-risk as needed). No files were changed yet.`,
+    );
+    return;
+  }
+
+  const result = await applyPlan(
+    {
+      home,
+      configRepoPath,
+      localConfig,
+      profileName: opts.profile ?? localConfig.profile,
+      yes: !!opts.yes,
+      allowRisk: (opts.allowRisk as RiskLevel | undefined) ?? "low",
+      dryRun: !!opts.dryRun,
+      updateSources: !!opts.updateSources,
+      offline: !!opts.offline,
+    },
+    plan,
+  );
+
   if (result.noChanges) {
     console.log(`${label}: No changes`);
     return;

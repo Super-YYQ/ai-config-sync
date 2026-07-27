@@ -155,6 +155,8 @@ export async function cloneRepo(
       `Target directory already exists: ${localPath}. Refusing to clone over it.`,
     );
   }
+  // Validate remote before git sees it (option injection / credentials leak).
+  validateGitRemote(remote);
   await ensureDir(path.dirname(localPath));
   await runGit(path.dirname(localPath), ["clone", remote, localPath]);
 }
@@ -430,9 +432,20 @@ export function remotesMatch(a?: string, b?: string): boolean {
   return norm(a) === norm(b);
 }
 
-export {
+import {
   resolveCachedSource,
   listCachedSources,
+  validateGitRemote,
+  validateGitRef,
   type ResolveSourceOptions,
   type ResolvedSource,
 } from "./source-cache.js";
+
+export {
+  resolveCachedSource,
+  listCachedSources,
+  validateGitRemote,
+  validateGitRef,
+  type ResolveSourceOptions,
+  type ResolvedSource,
+};

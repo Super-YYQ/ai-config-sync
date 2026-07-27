@@ -18,6 +18,16 @@ import {
   type StateFile,
 } from "@ai-config-sync/core";
 
+export * from "./file-lock.js";
+export type { LockPayload, AcquireOptions } from "./file-lock.js";
+export {
+  acquireFileLock,
+  releaseFileLock,
+  withFileLock,
+  lockFilePath,
+  isLockHeld,
+} from "./file-lock.js";
+
 export type PathOpKind = "create" | "replace" | "merge" | "delete" | "touch";
 
 export interface PathOperation {

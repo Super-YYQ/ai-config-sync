@@ -2,9 +2,10 @@
 
 在 **Claude Code / Codex** 中管理 Skill、Plugin，并同步到私有 Git 仓库。
 
-> **状态：v0.4.1 Safe Personal Beta**（检查点 tag：`v0.4.1-safe-beta.1`）  
+> **状态：v0.4.2 Stable Beta Gate**（检查点 tag：`v0.4.2-stable-beta.1`）  
 > Claude Plugin 已内置 CLI（无需单独 `npm i -g` 也可在插件 PATH 中调用）。  
 > npm 包使用打包后的单文件 `dist/ai-config-sync.cjs`。  
+> 本版完成 5 项 P0 安全加固（Plan 快照确认、配置仓写锁、Source Resolver 加固、Skill 原子部署、配置字段策略）+ Apply 锁 + 完整 release:check。  
 > CI：跨平台 Build/Test + 隔离 tarball Smoke + Plugin Validate。  
 > **真实 Claude Code / Codex E2E 仍未覆盖** — 请先在隔离 HOME / 测试环境验证，再用于公司真机。  
 > 跨电脑继续开发：见 [`docs/DEVELOPMENT_CHECKPOINT.md`](docs/DEVELOPMENT_CHECKPOINT.md)。  
@@ -130,4 +131,4 @@ npm run smoke:npm
 - 变更：`CHANGELOG.md`  
 - 计划基线：v0.3 Alpha Hardening（审查2 + 后续优化计划）
 
-MIT · v0.4.1
+MIT · v0.4.2

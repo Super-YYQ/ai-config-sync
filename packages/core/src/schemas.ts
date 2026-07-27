@@ -398,8 +398,29 @@ export const PlanActionSchema = z.object({
   operation: RecipeOperationSchema.optional(),
   paths: z.array(z.string()).default([]),
   requiresConfirmation: z.boolean().default(true),
+  /** Recipe file this action was built from (relative to config repo). */
+  recipeRef: z.string().optional(),
+  /** Hash of that recipe file contents when the plan was built. */
+  recipeHash: z.string().optional(),
+  /** Source commit the action targeted (for git sources). */
+  sourceCommit: z.string().optional(),
 });
 export type PlanAction = z.output<typeof PlanActionSchema>;
+
+/**
+ * Snapshot of mutable inputs captured when the plan was built, so apply can
+ * detect drift (remote config repo, edited recipe files, advanced source ref)
+ * and refuse a stale plan instead of acting on a plan the user never saw.
+ */
+export const PlanSnapshotSchema = z
+  .object({
+    configRepoCommit: z.string().optional(),
+    /** recipeRef → content hash of the recipe file at plan-build time. */
+    recipeHashes: z.record(z.string(), z.string()).default({}),
+    /** resourceId → source commit recorded at plan-build time. */
+    sourceCommits: z.record(z.string(), z.string()).default({}),
+  })
+  .default({});
 
 export const PlanSchema = z.object({
   id: z.string(),
@@ -408,6 +429,8 @@ export const PlanSchema = z.object({
   createdAt: z.string(),
   actions: z.array(PlanActionSchema).default([]),
   summary: z.string().optional(),
+  /** Immutable input snapshot for stale-plan detection. */
+  snapshot: PlanSnapshotSchema,
 });
 export type Plan = z.output<typeof PlanSchema>;
 

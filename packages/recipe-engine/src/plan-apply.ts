@@ -1,8 +1,12 @@
 import path from "node:path";
+import fs from "node:fs/promises";
 import {
+  captureTransactionsDir,
   claudeSkillsDir,
   codexSkillsDir,
+  ensureDir,
   hashDirectory,
+  hashFile,
   loadLock,
   loadProfile,
   loadRecipe,
@@ -34,6 +38,9 @@ import {
   type ApplyReceipt,
 } from "@ai-config-sync/drivers";
 import {
+  acquireFileLock,
+  releaseFileLock,
+  lockFilePath,
   beginTransaction,
   confirmCreatedPaths,
   getState,
@@ -42,7 +49,10 @@ import {
   rollbackBackup,
   type BackupRecord,
 } from "@ai-config-sync/state-manager";
-import { resolveCachedSource } from "@ai-config-sync/git-sync";
+import {
+  getHeadCommit,
+  resolveCachedSource,
+} from "@ai-config-sync/git-sync";
 import { loadRecipeRegistry } from "./analyzer.js";
 import { computeResourceDrift } from "./drift.js";
 
@@ -243,7 +253,7 @@ async function resolveRecipe(
   resource: Resource,
   target: TargetTool,
   registry: Map<string, Recipe>,
-): Promise<Recipe | undefined> {
+): Promise<{ recipe: Recipe; absPath?: string } | undefined> {
   const targetCfg = resource.targets[target];
   if (!targetCfg?.enabled) return undefined;
 
@@ -255,14 +265,86 @@ async function resolveRecipe(
     );
     if (await pathExists(absPath)) {
       const recipe = await loadRecipe(absPath);
-      return recipe;
+      return { recipe, absPath };
     }
     // try registry by basename (storage key)
     const base = path.basename(file, path.extname(file));
-    return registry.get(base) ?? registry.get(resource.id);
+    const fromReg = registry.get(base) ?? registry.get(resource.id);
+    if (fromReg) return { recipe: fromReg };
+    return undefined;
   }
 
-  return registry.get(resource.id);
+  const fromReg = registry.get(resource.id);
+  return fromReg ? { recipe: fromReg } : undefined;
+}
+
+/**
+ * Detect whether the inputs a plan was built from have drifted since the plan
+ * was created. Returns a human reason string when the plan is stale (so apply
+ * must refuse), or undefined when the plan is fresh or carries no snapshot.
+ *
+ * - configRepoCommit: HEAD changed → user pulled/rewrote the repo after plan
+ * - recipeHash: the recipe file this action came from was edited after plan
+ * - sourceCommit: a locked source advanced past the snapshot
+ */
+async function detectSnapshotDrift(
+  ctx: EngineContext,
+  action: PlanAction | undefined,
+): Promise<string | undefined> {
+  if (!action) return undefined;
+
+  // Recipe-file hash drift
+  if (action.recipeRef && action.recipeHash) {
+    const reqPath = validateRecipeRef(ctx.configRepoPath, action.recipeRef);
+    if (await pathExists(reqPath.absPath)) {
+      try {
+        const now = shortHash(await hashFile(reqPath.absPath));
+        if (now !== action.recipeHash) {
+          return `recipe ${action.recipeRef} changed (hash ${action.recipeHash} → ${now})`;
+        }
+      } catch {
+        /* unreadable: leave to security revalidation */
+      }
+    }
+  }
+
+  // Source-commit drift (git resources) — only when a lock records a *current*
+  // commit that differs from the one snapshotted at plan time.
+  if (action.resourceId && action.sourceCommit) {
+    try {
+      const lock = await loadLock(path.join(ctx.configRepoPath, "lock.yaml"));
+      const locked = lock.entries.find((e) => e.resourceId === action.resourceId);
+      if (locked?.commit && locked.commit !== action.sourceCommit) {
+        return `source commit for ${action.resourceId} changed (${action.sourceCommit} → ${locked.commit})`;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Verify the plan's config-repo commit still matches the live HEAD.
+ * Used once at the top of applyPlan — refuses the whole apply when the repo
+ * advanced under the user (e.g. they pulled between plan and apply).
+ */
+async function detectConfigRepoDrift(
+  ctx: EngineContext,
+  plan: Plan,
+): Promise<string | undefined> {
+  const snapshotted = plan.snapshot?.configRepoCommit;
+  if (!snapshotted) return undefined;
+  try {
+    const head = await getHeadCommit(ctx.configRepoPath);
+    if (head && head !== snapshotted) {
+      return `config repo HEAD changed (${snapshotted} → ${head})`;
+    }
+  } catch {
+    /* non-git repo: nothing to compare */
+  }
+  return undefined;
 }
 
 export async function buildPlan(ctx: EngineContext): Promise<Plan> {
@@ -305,13 +387,13 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
       const tcfg = resource.targets[target];
       if (!tcfg?.enabled) continue;
 
-      const recipe = await resolveRecipe(
+      const resolved = await resolveRecipe(
         ctx.configRepoPath,
         resource,
         target,
         registry,
       );
-      if (!recipe) {
+      if (!resolved) {
         actions.push({
           id: `a${++actionSeq}`,
           type: "MANUAL",
@@ -323,6 +405,31 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
           requiresConfirmation: true,
         });
         continue;
+      }
+      const recipe = resolved.recipe;
+      const recipeFileRel = resolved.absPath
+        ? path.relative(ctx.configRepoPath, resolved.absPath).replace(/\\/g, "/")
+        : undefined;
+      // Stale-plan signal: content hash of the recipe file at plan-build time.
+      // Apply re-hashes and refuses if anyone edited the recipe in between.
+      let recipeHash: string | undefined;
+      if (resolved.absPath) {
+        try {
+          recipeHash = shortHash(await hashFile(resolved.absPath));
+        } catch {
+          /* unreadable file: no hash recorded */
+        }
+      }
+      // Lock-derived source commit (for git sources), captured into the plan.
+      let sourceCommit: string | undefined;
+      if (resource.source?.provider === "github" || resource.source?.provider === "git") {
+        try {
+          const lock = await loadLock(path.join(ctx.configRepoPath, "lock.yaml"));
+          const locked = lock.entries.find((e) => e.resourceId === resource.id);
+          sourceCommit = locked?.commit ?? resource.source?.commit;
+        } catch {
+          /* ignore */
+        }
       }
 
       const targetRecipe = recipe.targets[target];
@@ -495,12 +602,24 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
           driver: targetRecipe.driver,
           paths: p.paths,
           requiresConfirmation,
+          recipeRef: recipeFileRel,
+          recipeHash,
+          sourceCommit,
         });
       }
     }
   }
 
   // secret manual hints from lock optional — skip
+
+  // Capture the config-repo HEAD so a later apply can detect the plan is stale
+  // (remote changed / recipe files edited between plan and apply).
+  let configRepoCommit: string | undefined;
+  try {
+    configRepoCommit = await getHeadCommit(ctx.configRepoPath);
+  } catch {
+    /* non-git repos: no commit snapshotted */
+  }
 
   const plan: Plan = {
     id: `plan-${Date.now()}`,
@@ -512,6 +631,24 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
       actions.length === 0
         ? "No changes"
         : `${actions.length} action(s) for profile ${ctx.profileName}`,
+    snapshot: {
+      configRepoCommit,
+      recipeHashes: {},
+      sourceCommits: {},
+    },
+  };
+  // Populate snapshot maps keyed by recipeRef / resourceId (deduped).
+  const recipeHashes: Record<string, string> = {};
+  const sourceCommits: Record<string, string> = {};
+  for (const a of actions) {
+    if (a.recipeRef && a.recipeHash) recipeHashes[a.recipeRef] = a.recipeHash;
+    if (a.resourceId && a.sourceCommit)
+      sourceCommits[a.resourceId] = a.sourceCommit;
+  }
+  plan.snapshot = {
+    configRepoCommit,
+    recipeHashes,
+    sourceCommits,
   };
   return plan;
 }
@@ -551,6 +688,17 @@ export async function applyPlan(
   plan?: Plan,
 ): Promise<ApplyResult> {
   const activePlan = plan ?? (await buildPlan(ctx));
+
+  // Ticket 1: a plan passed to apply must be immutable. If the config repo
+  // advanced since the plan was built (user pulled, another capture committed),
+  // refuse the whole apply - the user never saw this plan.
+  const repoDrift = await detectConfigRepoDrift(ctx, activePlan);
+  if (repoDrift) {
+    throw new Error(
+      `Plan is stale: ${repoDrift}. Re-run plan to see the current plan before apply.`,
+    );
+  }
+
   const actionable = activePlan.actions.filter((a) => a.type !== "SKIP");
   if (actionable.length === 0) {
     return {
@@ -590,6 +738,36 @@ export async function applyPlan(
   const statePath = localStatePath(ctx.home);
   if (!paths.includes(statePath)) paths.push(statePath);
 
+  // Ticket 6 / Apply Lock: serialize concurrent applies to the same HOME so two
+  // sessions cannot simultaneously mutate Skills, Hooks and state.json.
+  // Non-dryRun only; dry runs are read-only plan previews.
+  const lockPath = lockFilePath(
+    captureTransactionsDir(ctx.home),
+    "home-apply",
+    ctx.home,
+  );
+  const applyLock = ctx.dryRun
+    ? undefined
+    : await acquireFileLock(lockPath, {
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        scope: "home-apply",
+        target: path.resolve(ctx.home),
+        command: "applyPlan",
+      });
+  try {
+    return await runApplyBody(ctx, activePlan, actionable, paths);
+  } finally {
+    if (applyLock) await releaseFileLock(applyLock);
+  }
+}
+
+async function runApplyBody(
+  ctx: EngineContext,
+  activePlan: Plan,
+  actionable: PlanAction[],
+  paths: string[],
+): Promise<ApplyResult> {
   let tx: BackupRecord | undefined;
   let backupId: string | undefined;
   if (!ctx.dryRun) {
@@ -667,16 +845,33 @@ export async function applyPlan(
       break;
     }
 
-    const recipe = await resolveRecipe(
+    const resolved = await resolveRecipe(
       ctx.configRepoPath,
       resource,
       target,
       registry,
     );
+    const recipe = resolved?.recipe;
     const targetRecipe = recipe?.targets[target];
     if (!recipe || !targetRecipe) {
       manual.push(`No recipe for ${resourceId}@${target}`);
       continue;
+    }
+
+    // Stale-plan detection (Ticket 1): if the plan snapshotted a recipe hash
+    // and/or config-repo commit, refuse to write when inputs drifted between
+    // the plan the user approved and this apply.
+    {
+      const planAction = group[0];
+      const drifted = await detectSnapshotDrift(ctx, planAction);
+      if (drifted) {
+        failed.push({
+          actionId: group[0]!.id,
+          error: `Plan is stale (${drifted}). Run plan again before apply. No files modified for ${resourceId}@${target}.`,
+        });
+        hardFailure = true;
+        break;
+      }
     }
 
     // Re-validate security on the *current* recipe before any driver.apply
