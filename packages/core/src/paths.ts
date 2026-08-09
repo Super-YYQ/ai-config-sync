@@ -101,7 +101,9 @@ export function claudeSettingsPath(home = os.homedir()): string {
 
 /** Codex user dirs (best-effort defaults). */
 export function codexHome(home = os.homedir()): string {
-  return process.env.CODEX_HOME
+  // An explicit --home is an isolation boundary (tests, preview sandboxes,
+  // secondary machines). Only honor ambient CODEX_HOME for the real HOME.
+  return process.env.CODEX_HOME && pathsEqual(home, os.homedir(), os.homedir())
     ? expandHome(process.env.CODEX_HOME, home)
     : path.join(home, ".codex");
 }

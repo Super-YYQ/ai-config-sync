@@ -125,6 +125,7 @@ describe("P0 review fixes", () => {
       [claudeItem, codexItem] as never,
       configRepo,
       "test",
+      { home },
     );
     const { toStorageKey } = await import("@ai-config-sync/core");
     const recipe = await loadRecipe(

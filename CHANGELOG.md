@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Practical Readiness Hardening
+
+- Plan snapshots all mutable config inputs (`resources.yaml`, `lock.yaml`, `config.yaml`, and the full profile chain), including uncommitted edits.
+- Apply now requires `--yes` for every real write and revalidates the Plan while holding both config-repo and HOME locks.
+- Config/source locks carry ownership tokens; an old owner cannot remove a replacement lock, and live long-running owners are not expired by age alone.
+- `capture --commit [--push]` now keeps Capture → Commit → Push inside one lock; `--push` without `--commit` is rejected.
+- Cached Git sources always checkout and verify the requested branch/tag/commit, including offline pinned commits.
+- Directory replacement preserves the previous destination until the new tree is ready; rollback also preserves symlink destinations and uses collision-proof backup IDs.
+- Profile inheritance is transitive, validates names/identity, and rejects missing parents or cycles.
+- Pending events and standalone state updates are serialized to prevent lost concurrent writes.
+- External Claude CLI calls inherit the explicit `--home` sandbox, so tests and alternate HOME runs cannot modify the operator's real plugin state.
+- Tests no longer write capture locks into the developer's real HOME.
+- Vitest upgraded to the Node 18-compatible 3.x line; `npm audit` now reports zero production and development dependency vulnerabilities.
+
 ## 0.4.2-stable-beta.1 — Stable Beta Gate (P0 fixes)
 
 Review-driven P0 gate per `docs/ai-config-sync_最新全面审查与开发建议_a95c7ab.docx`.

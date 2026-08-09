@@ -21,6 +21,7 @@ ai-config-sync scan
 ai-config-sync capture --analyze          # 启发式分析未知布局
 ai-config-sync capture --yes              # 只写入 READY 提案
 ai-config-sync capture --yes --commit     # 可选：secret-scan 后 git commit
+ai-config-sync capture --yes --commit --push  # 写入、提交、推送在同一把锁内完成
 ```
 
 ### Capture 提案状态
@@ -55,6 +56,7 @@ Marketplace 类资源会走 `claude plugin marketplace add / install / enable`�
 ## Profile
 
 - `home` / `company` 等在私有仓 `profiles/*.yaml` 中定义
+- `extends` 支持多层继承；循环、缺失父 Profile、文件名与 `profile:` 身份不一致会直接报错
 - 公司机可用更严格 profile，排除个人 skill
 - `setup --profile company` 切换；资源的 `profiles` 字段控制是否纳入
 

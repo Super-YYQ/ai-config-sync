@@ -193,6 +193,26 @@ describe("v0.4.2 Ticket 1: Plan Snapshot + Apply Confirmation", () => {
     );
   });
 
+  it("refuses apply when resources.yaml changed without a commit", async () => {
+    const plan = await buildPlan(ctxFor(home, configRepo));
+    const resourcesPath = path.join(configRepo, "resources.yaml");
+    const original = await fs.readFile(resourcesPath, "utf8");
+    await writeText(resourcesPath, `${original.trimEnd()}\n# changed after plan\n`);
+
+    await expect(applyPlan(ctxFor(home, configRepo), plan)).rejects.toThrow(
+      /stale|config input changed|resources\.yaml/i,
+    );
+    expect(await pathExists(path.join(home, ".claude", "skills", "demo"))).toBe(false);
+  });
+
+  it("requires --yes for every non-dry-run write", async () => {
+    const plan = await buildPlan(ctxFor(home, configRepo));
+    await expect(
+      applyPlan(ctxFor(home, configRepo, { yes: false }), plan),
+    ).rejects.toThrow(/requires confirmation|--yes/i);
+    expect(await pathExists(path.join(home, ".claude", "skills", "demo"))).toBe(false);
+  });
+
   it("refuses apply when recipe file edited after plan (hash drift)", async () => {
     const plan = await buildPlan(ctxFor(home, configRepo));
     const recipeFile = path.join(configRepo, recipeRelPath("demo"));
@@ -225,6 +245,18 @@ describe("v0.4.2 Ticket 1: Plan Snapshot + Apply Confirmation", () => {
     expect(
       result.failed.some((f) => /stale|recipe.*changed|hash/i.test(f.error)),
     ).toBe(true);
+  });
+
+  it("refuses apply when vendored source content changed after plan", async () => {
+    const plan = await buildPlan(ctxFor(home, configRepo));
+    await writeText(
+      path.join(configRepo, "sources", "skills", "demo", "SKILL.md"),
+      "# replaced after plan\n",
+    );
+    await expect(applyPlan(ctxFor(home, configRepo), plan)).rejects.toThrow(
+      /stale|config input changed|sources\/skills\/demo/i,
+    );
+    expect(await pathExists(path.join(home, ".claude", "skills", "demo"))).toBe(false);
   });
 
   it("apply proceeds unchanged when nothing drifted", async () => {

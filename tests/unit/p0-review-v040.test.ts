@@ -200,6 +200,9 @@ describe("P0-1 setup does not rewrite marketplace internals", () => {
       // Force offline path: no local marketplace copy without explicit allow
       programRoot: path.resolve(__dirname, "../.."),
       allowLocalPluginInstall: false,
+      // This test verifies our filesystem code, not Claude CLI-owned writes.
+      // Keep the external installer out of scope and assert no direct rewrite.
+      skipSelfPluginInstall: true,
     });
 
     // Must not create ai-config-sync marketplace dir via manual copy

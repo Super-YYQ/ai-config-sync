@@ -27,6 +27,13 @@ export type VersionPolicy = z.output<typeof VersionPolicySchema>;
 export const RiskLevelSchema = z.enum(["low", "medium", "high"]);
 export type RiskLevel = z.output<typeof RiskLevelSchema>;
 
+export const ProfileNameSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, "invalid profile name")
+  .refine((v) => !v.includes(".."), { message: "profile name must not contain .." });
+
 export const DriverNameSchema = z.enum([
   "claude-marketplace",
   "repository-layout",
@@ -185,10 +192,24 @@ export const ResourceSchema = z.object({
 });
 export type Resource = z.output<typeof ResourceSchema>;
 
-export const ResourcesFileSchema = z.object({
-  schemaVersion: z.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
-  resources: z.array(ResourceSchema).default([]),
-});
+export const ResourcesFileSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
+    resources: z.array(ResourceSchema).default([]),
+  })
+  .superRefine((value, ctx) => {
+    const seen = new Set<string>();
+    for (const resource of value.resources) {
+      if (seen.has(resource.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate resource id: ${resource.id}`,
+          path: ["resources"],
+        });
+      }
+      seen.add(resource.id);
+    }
+  });
 export type ResourcesFile = z.output<typeof ResourcesFileSchema>;
 
 // ---------------------------------------------------------------------------
@@ -196,8 +217,8 @@ export type ResourcesFile = z.output<typeof ResourcesFileSchema>;
 // ---------------------------------------------------------------------------
 
 export const ProfileSchema = z.object({
-  profile: z.string().min(1),
-  extends: z.array(z.string()).default([]),
+  profile: ProfileNameSchema,
+  extends: z.array(ProfileNameSchema).default([]),
   include: z
     .object({
       resources: z.array(z.string()).default([]),
@@ -290,7 +311,7 @@ export const LocalConfigSchema = z.object({
     remote: z.string().optional(),
     localPath: z.string(),
   }),
-  profile: z.string().default("home"),
+  profile: ProfileNameSchema.default("home"),
   targets: z
     .object({
       claude: z.boolean().default(true),
@@ -419,6 +440,8 @@ export const PlanSnapshotSchema = z
     recipeHashes: z.record(z.string(), z.string()).default({}),
     /** resourceId → source commit recorded at plan-build time. */
     sourceCommits: z.record(z.string(), z.string()).default({}),
+    /** Config-repo relative input path → content hash at plan-build time. */
+    inputHashes: z.record(z.string(), z.string()).default({}),
   })
   .default({});
 

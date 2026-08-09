@@ -7142,7 +7142,7 @@ var init_zod = __esm({
 });
 
 // packages/core/dist/schemas.js
-var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, ResourceIdSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, PlanActionSchema, PlanSnapshotSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
+var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, ProfileNameSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, ResourceIdSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, PlanActionSchema, PlanSnapshotSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
 var init_schemas = __esm({
   "packages/core/dist/schemas.js"() {
     "use strict";
@@ -7164,6 +7164,7 @@ var init_schemas = __esm({
       "vendored"
     ]);
     RiskLevelSchema = external_exports.enum(["low", "medium", "high"]);
+    ProfileNameSchema = external_exports.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, "invalid profile name").refine((v) => !v.includes(".."), { message: "profile name must not contain .." });
     DriverNameSchema = external_exports.enum([
       "claude-marketplace",
       "repository-layout",
@@ -7279,10 +7280,22 @@ var init_schemas = __esm({
     ResourcesFileSchema = external_exports.object({
       schemaVersion: external_exports.literal(SCHEMA_VERSION).default(SCHEMA_VERSION),
       resources: external_exports.array(ResourceSchema).default([])
+    }).superRefine((value, ctx) => {
+      const seen = /* @__PURE__ */ new Set();
+      for (const resource of value.resources) {
+        if (seen.has(resource.id)) {
+          ctx.addIssue({
+            code: external_exports.ZodIssueCode.custom,
+            message: `duplicate resource id: ${resource.id}`,
+            path: ["resources"]
+          });
+        }
+        seen.add(resource.id);
+      }
     });
     ProfileSchema = external_exports.object({
-      profile: external_exports.string().min(1),
-      extends: external_exports.array(external_exports.string()).default([]),
+      profile: ProfileNameSchema,
+      extends: external_exports.array(ProfileNameSchema).default([]),
       include: external_exports.object({
         resources: external_exports.array(external_exports.string()).default([])
       }).default({ resources: [] }),
@@ -7337,7 +7350,7 @@ var init_schemas = __esm({
         remote: external_exports.string().optional(),
         localPath: external_exports.string()
       }),
-      profile: external_exports.string().default("home"),
+      profile: ProfileNameSchema.default("home"),
       targets: external_exports.object({
         claude: external_exports.boolean().default(true),
         codex: external_exports.boolean().default(true)
@@ -7422,7 +7435,9 @@ var init_schemas = __esm({
       /** recipeRef → content hash of the recipe file at plan-build time. */
       recipeHashes: external_exports.record(external_exports.string(), external_exports.string()).default({}),
       /** resourceId → source commit recorded at plan-build time. */
-      sourceCommits: external_exports.record(external_exports.string(), external_exports.string()).default({})
+      sourceCommits: external_exports.record(external_exports.string(), external_exports.string()).default({}),
+      /** Config-repo relative input path → content hash at plan-build time. */
+      inputHashes: external_exports.record(external_exports.string(), external_exports.string()).default({})
     }).default({});
     PlanSchema = external_exports.object({
       id: external_exports.string(),
@@ -7526,7 +7541,7 @@ function claudeSettingsPath(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(claudeHome(home), "settings.json");
 }
 function codexHome(home = import_node_os.default.homedir()) {
-  return process.env.CODEX_HOME ? expandHome(process.env.CODEX_HOME, home) : import_node_path.default.join(home, ".codex");
+  return process.env.CODEX_HOME && pathsEqual(home, import_node_os.default.homedir(), import_node_os.default.homedir()) ? expandHome(process.env.CODEX_HOME, home) : import_node_path.default.join(home, ".codex");
 }
 function agentsSkillsDir(home = import_node_os.default.homedir()) {
   return import_node_path.default.join(home, ".agents", "skills");
@@ -14933,9 +14948,14 @@ async function readText(filePath) {
 }
 async function writeText(filePath, content) {
   await ensureDir(import_node_path2.default.dirname(filePath));
-  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  await import_promises.default.writeFile(tmp, content, "utf8");
-  await import_promises.default.rename(tmp, filePath);
+  const tmp = `${filePath}.${process.pid}.${import_node_crypto.default.randomUUID()}.tmp`;
+  try {
+    await import_promises.default.writeFile(tmp, content, "utf8");
+    await import_promises.default.rename(tmp, filePath);
+  } finally {
+    await import_promises.default.rm(tmp, { force: true }).catch(() => {
+    });
+  }
 }
 async function readJsonFile(filePath) {
   const raw = await readText(filePath);
@@ -15042,7 +15062,10 @@ async function atomicReplaceDirectory(src, dest, options = {}) {
     }
   }
   await ensureDir(import_node_path2.default.dirname(dest));
-  const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
+  const nonce = `${process.pid}-${import_node_crypto.default.randomUUID()}`;
+  const tmp = `${dest}.tmp-${nonce}`;
+  const previous = `${dest}.previous-${nonce}`;
+  let movedPrevious = false;
   try {
     await import_promises.default.cp(src, tmp, {
       recursive: true,
@@ -15053,17 +15076,30 @@ async function atomicReplaceDirectory(src, dest, options = {}) {
     if (rejectSymlinks) {
       await assertNoSymlinksInTreeRaw(tmp);
     }
-    if (await pathExists(dest)) {
-      await import_promises.default.rm(dest, { recursive: true, force: true });
+    try {
+      await import_promises.default.lstat(dest);
+      await import_promises.default.rename(dest, previous);
+      movedPrevious = true;
+    } catch (e) {
+      const err = e;
+      if (err.code !== "ENOENT")
+        throw e;
     }
-    await import_promises.default.rename(tmp, dest).catch(async () => {
-      await import_promises.default.cp(tmp, dest, { recursive: true, force: true });
-      await import_promises.default.rm(tmp, { recursive: true, force: true });
-    });
+    await import_promises.default.rename(tmp, dest);
+    if (movedPrevious) {
+      await import_promises.default.rm(previous, { recursive: true, force: true }).catch(() => {
+      });
+    }
     return dest;
   } catch (e) {
     await import_promises.default.rm(tmp, { recursive: true, force: true }).catch(() => {
     });
+    if (movedPrevious) {
+      await import_promises.default.rm(dest, { recursive: true, force: true }).catch(() => {
+      });
+      await import_promises.default.rename(previous, dest).catch(() => {
+      });
+    }
     throw e;
   }
 }
@@ -15094,11 +15130,12 @@ async function readDirTree(root, maxDepth = 3) {
   const files = await listFilesRecursive(root, { maxDepth });
   return files.map((f) => import_node_path2.default.relative(root, f).replace(/\\/g, "/"));
 }
-var import_promises, import_node_path2, import_yaml;
+var import_promises, import_node_crypto, import_node_path2, import_yaml;
 var init_fs = __esm({
   "packages/core/dist/fs.js"() {
     "use strict";
     import_promises = __toESM(require("node:fs/promises"), 1);
+    import_node_crypto = __toESM(require("node:crypto"), 1);
     import_node_path2 = __toESM(require("node:path"), 1);
     import_yaml = __toESM(require_dist(), 1);
   }
@@ -15107,7 +15144,7 @@ var init_fs = __esm({
 // packages/core/dist/hash.js
 async function hashFile(filePath) {
   const data = await import_promises2.default.readFile(filePath);
-  return import_node_crypto.default.createHash("sha256").update(data).digest("hex");
+  return import_node_crypto2.default.createHash("sha256").update(data).digest("hex");
 }
 async function hashDirectory(dir, options = {}) {
   if (!await pathExists(dir)) {
@@ -15116,7 +15153,7 @@ async function hashDirectory(dir, options = {}) {
   const files = (await listFilesRecursive(dir, {
     ignoreNames: options.ignoreNames
   })).sort((a, b) => a.localeCompare(b));
-  const hash = import_node_crypto.default.createHash("sha256");
+  const hash = import_node_crypto2.default.createHash("sha256");
   for (const file of files) {
     const rel = import_node_path3.default.relative(dir, file).replace(/\\/g, "/");
     hash.update(rel);
@@ -15130,11 +15167,11 @@ async function hashDirectory(dir, options = {}) {
 function shortHash(hex, len = 12) {
   return hex.slice(0, len);
 }
-var import_node_crypto, import_promises2, import_node_path3;
+var import_node_crypto2, import_promises2, import_node_path3;
 var init_hash = __esm({
   "packages/core/dist/hash.js"() {
     "use strict";
-    import_node_crypto = __toESM(require("node:crypto"), 1);
+    import_node_crypto2 = __toESM(require("node:crypto"), 1);
     import_promises2 = __toESM(require("node:fs/promises"), 1);
     import_node_path3 = __toESM(require("node:path"), 1);
     init_fs();
@@ -15871,6 +15908,28 @@ var init_codex_hooks = __esm({
 function claudeExecutable() {
   return process.platform === "win32" ? "claude.cmd" : "claude";
 }
+function homeScopedEnv(home) {
+  const resolved = import_node_path5.default.resolve(home);
+  const env = {
+    ...process.env,
+    HOME: resolved,
+    USERPROFILE: resolved
+  };
+  const compare = (p) => process.platform === "win32" ? import_node_path5.default.resolve(p).toLowerCase() : import_node_path5.default.resolve(p);
+  const isDefaultHome = compare(resolved) === compare(import_node_os2.default.homedir());
+  if (!isDefaultHome || !env.CLAUDE_CONFIG_DIR) {
+    env.CLAUDE_CONFIG_DIR = import_node_path5.default.join(resolved, ".claude");
+  }
+  if (!isDefaultHome || !env.XDG_CONFIG_HOME) {
+    env.XDG_CONFIG_HOME = import_node_path5.default.join(resolved, ".config");
+  }
+  if (process.platform === "win32") {
+    const parsed = import_node_path5.default.parse(resolved);
+    env.HOMEDRIVE = parsed.root.replace(/[\\/]$/, "");
+    env.HOMEPATH = resolved.slice(env.HOMEDRIVE.length) || "\\";
+  }
+  return env;
+}
 function quoteCmdArg(arg) {
   if (arg.length === 0)
     return '""';
@@ -16007,12 +16066,13 @@ async function runClaude(args, options = {}) {
   const command = options.command ?? claudeExecutable();
   return runCommand(command, args, options);
 }
-var import_node_child_process, import_node_fs, import_node_path5, WINDOWS_CMD_SHIMS;
+var import_node_child_process, import_node_fs, import_node_os2, import_node_path5, WINDOWS_CMD_SHIMS;
 var init_claude_cli = __esm({
   "packages/core/dist/claude-cli.js"() {
     "use strict";
     import_node_child_process = require("node:child_process");
     import_node_fs = __toESM(require("node:fs"), 1);
+    import_node_os2 = __toESM(require("node:os"), 1);
     import_node_path5 = __toESM(require("node:path"), 1);
     WINDOWS_CMD_SHIMS = /* @__PURE__ */ new Set([
       "claude",
@@ -16031,7 +16091,7 @@ var init_claude_cli = __esm({
 
 // packages/core/dist/storage-key.js
 function toStorageKey(id) {
-  const hash = import_node_crypto2.default.createHash("sha256").update(id).digest("hex").slice(0, 6);
+  const hash = import_node_crypto3.default.createHash("sha256").update(id).digest("hex").slice(0, 6);
   let key = id.normalize("NFKC");
   key = key.replace(/[\/\\]/g, "_").replace(/[<>:"|?*\x00-\x1f]/g, "_").replace(/\.\./g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
   key = key.replace(/[.\s]+$/g, "");
@@ -16069,11 +16129,11 @@ function assertSafeRelPath(rel) {
   }
   return norm;
 }
-var import_node_crypto2, import_node_path6, WIN_RESERVED;
+var import_node_crypto3, import_node_path6, WIN_RESERVED;
 var init_storage_key = __esm({
   "packages/core/dist/storage-key.js"() {
     "use strict";
-    import_node_crypto2 = __toESM(require("node:crypto"), 1);
+    import_node_crypto3 = __toESM(require("node:crypto"), 1);
     import_node_path6 = __toESM(require("node:path"), 1);
     WIN_RESERVED = /* @__PURE__ */ new Set([
       "CON",
@@ -16437,6 +16497,7 @@ __export(dist_exports, {
   PlanActionTypeSchema: () => PlanActionTypeSchema,
   PlanSchema: () => PlanSchema,
   PlanSnapshotSchema: () => PlanSnapshotSchema,
+  ProfileNameSchema: () => ProfileNameSchema,
   ProfileSchema: () => ProfileSchema,
   RecipeEvidenceSchema: () => RecipeEvidenceSchema,
   RecipeOperationSchema: () => RecipeOperationSchema,
@@ -16489,6 +16550,7 @@ __export(dist_exports, {
   hasManagedCodexSessionStart: () => hasManagedCodexSessionStart,
   hashDirectory: () => hashDirectory,
   hashFile: () => hashFile,
+  homeScopedEnv: () => homeScopedEnv,
   isConfigRepository: () => isConfigRepository,
   isManagedHookEntryId: () => isManagedHookEntryId,
   isSelfManagedResourceId: () => isSelfManagedResourceId,
@@ -16604,7 +16666,7 @@ var {
 } = import_index.default;
 
 // packages/cli/src/index.ts
-var import_node_os4 = __toESM(require("node:os"), 1);
+var import_node_os5 = __toESM(require("node:os"), 1);
 init_dist();
 
 // packages/scanner/dist/index.js
@@ -17365,30 +17427,42 @@ function inventryDiff(scan, managedIds) {
 
 // packages/state-manager/dist/index.js
 var import_promises7 = __toESM(require("node:fs/promises"), 1);
+var import_node_crypto5 = __toESM(require("node:crypto"), 1);
 var import_node_path12 = __toESM(require("node:path"), 1);
-init_dist();
 
 // packages/state-manager/dist/file-lock.js
 var import_promises6 = __toESM(require("node:fs/promises"), 1);
-var import_node_crypto3 = __toESM(require("node:crypto"), 1);
+var import_node_crypto4 = __toESM(require("node:crypto"), 1);
 var import_node_path11 = __toESM(require("node:path"), 1);
 init_dist();
+var ownedLocks = /* @__PURE__ */ new Map();
 async function acquireFileLock(lockPath, payload, options = {}) {
   const maxAttempts = options.maxAttempts ?? 50;
   const baseDelay = options.baseDelayMs ?? 50;
   const stepDelay = options.stepDelayMs ?? 30;
   const staleMs = options.staleMs ?? 30 * 60 * 1e3;
   await ensureDir(import_node_path11.default.dirname(lockPath));
+  const ownerId = import_node_crypto4.default.randomUUID();
+  const ownedPayload = { ...payload, ownerId };
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const fh = await import_promises6.default.open(lockPath, "wx");
-      await fh.writeFile(JSON.stringify(payload, null, 2), "utf8");
+      try {
+        await fh.writeFile(JSON.stringify(ownedPayload, null, 2), "utf8");
+      } catch (e) {
+        await fh.close().catch(() => {
+        });
+        await import_promises6.default.rm(lockPath, { force: true }).catch(() => {
+        });
+        throw e;
+      }
       await fh.close();
       if (options.injectThrowAfterAcquire) {
         await import_promises6.default.rm(lockPath, { force: true }).catch(() => {
         });
         throw new Error("injectThrowAfterAcquire");
       }
+      ownedLocks.set(import_node_path11.default.resolve(lockPath), ownerId);
       return lockPath;
     } catch (e) {
       const err = e;
@@ -17398,18 +17472,26 @@ async function acquireFileLock(lockPath, payload, options = {}) {
       try {
         const raw = await import_promises6.default.readFile(lockPath, "utf8");
         const existing = JSON.parse(raw);
-        if (existing.startedAt) {
+        let ownerAlive;
+        if (existing.pid) {
+          if (existing.pid === process.pid) {
+            ownerAlive = true;
+          } else {
+            try {
+              process.kill(existing.pid, 0);
+              ownerAlive = true;
+            } catch (e2) {
+              ownerAlive = e2.code === "EPERM";
+            }
+          }
+        }
+        if (existing.startedAt && ownerAlive !== true) {
           const age = Date.now() - Date.parse(existing.startedAt);
           if (Number.isFinite(age) && age > staleMs)
             stale = true;
         }
-        if (existing.pid && existing.pid !== process.pid) {
-          try {
-            process.kill(existing.pid, 0);
-          } catch {
-            stale = true;
-          }
-        }
+        if (ownerAlive === false)
+          stale = true;
         if (stale) {
           await import_promises6.default.rm(lockPath, { force: true });
           continue;
@@ -17425,17 +17507,36 @@ async function acquireFileLock(lockPath, payload, options = {}) {
   throw new Error(`Lock busy (${payload.scope} on ${payload.target}): ${lockPath}`);
 }
 async function releaseFileLock(lockPath) {
+  const key = import_node_path11.default.resolve(lockPath);
+  const ownerId = ownedLocks.get(key);
+  if (!ownerId)
+    return;
   try {
-    await import_promises6.default.rm(lockPath, { force: true });
+    const raw = await import_promises6.default.readFile(lockPath, "utf8");
+    const current = JSON.parse(raw);
+    if (current.ownerId === ownerId) {
+      await import_promises6.default.rm(lockPath, { force: true });
+    }
   } catch {
+  } finally {
+    ownedLocks.delete(key);
   }
 }
 function lockFilePath(baseDir, scope, targetPath) {
-  const key = import_node_crypto3.default.createHash("sha256").update(import_node_path11.default.resolve(targetPath)).digest("hex").slice(0, 16);
+  const key = import_node_crypto4.default.createHash("sha256").update(import_node_path11.default.resolve(targetPath)).digest("hex").slice(0, 16);
   return import_node_path11.default.join(baseDir, `${scope}-${key}.lock`);
+}
+async function withFileLock(lockPath, payload, work, options = {}) {
+  await acquireFileLock(lockPath, payload, options);
+  try {
+    return await work();
+  } finally {
+    await releaseFileLock(lockPath);
+  }
 }
 
 // packages/state-manager/dist/index.js
+init_dist();
 async function ensureStateDirs(home) {
   const root = defaultStateRoot(home);
   await ensureDir(root);
@@ -17466,25 +17567,34 @@ async function savePending(batches, home) {
   await writeJsonFile(pendingEventsPath(home), { batches });
 }
 async function appendPendingEvents(events, home) {
-  const batches = await loadPending(home);
-  const now = /* @__PURE__ */ new Date();
-  const batchId = `${now.toISOString().replace(/[:.]/g, "").slice(0, 15)}-local`;
-  const batch = {
-    batchId,
-    events: events.map((e) => ({
-      ...e,
-      detectedAt: e.detectedAt ?? now.toISOString()
-    })),
-    status: "pending-review",
-    createdAt: now.toISOString()
-  };
-  batches.push(batch);
-  await savePending(batches, home);
-  return batch;
+  const lockPath = lockFilePath(captureTransactionsDir(home), "pending", pendingEventsPath(home));
+  return withFileLock(lockPath, {
+    pid: process.pid,
+    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    scope: "pending",
+    target: pendingEventsPath(home),
+    command: "appendPendingEvents"
+  }, async () => {
+    const batches = await loadPending(home);
+    const now = /* @__PURE__ */ new Date();
+    const batchId = `${now.toISOString().replace(/[:.]/g, "").slice(0, 15)}-${import_node_crypto5.default.randomUUID().slice(0, 8)}-local`;
+    const batch = {
+      batchId,
+      events: events.map((e) => ({
+        ...e,
+        detectedAt: e.detectedAt ?? now.toISOString()
+      })),
+      status: "pending-review",
+      createdAt: now.toISOString()
+    };
+    batches.push(batch);
+    await savePending(batches, home);
+    return batch;
+  });
 }
 async function beginTransaction(plannedPaths, reason, home, operations) {
   await ensureStateDirs(home);
-  const id = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  const id = `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}-${import_node_crypto5.default.randomUUID().slice(0, 8)}`;
   const dir = import_node_path12.default.join(backupsDir(home), id);
   await ensureDir(dir);
   const record = {
@@ -17505,7 +17615,13 @@ async function beginTransaction(plannedPaths, reason, home, operations) {
     if (seen.has(key))
       continue;
     seen.add(key);
-    const existed = await pathExists(original);
+    let existed = false;
+    try {
+      await import_promises7.default.lstat(original);
+      existed = true;
+    } catch {
+      existed = false;
+    }
     if (!existed) {
       record.pathOps.push({
         kind: "create",
@@ -17522,11 +17638,22 @@ async function beginTransaction(plannedPaths, reason, home, operations) {
       continue;
     }
     if (st.isSymbolicLink()) {
+      const symlinkTarget = await import_promises7.default.readlink(original);
+      let symlinkType = "file";
+      try {
+        const targetStat = await import_promises7.default.stat(original);
+        if (targetStat.isDirectory()) {
+          symlinkType = process.platform === "win32" ? "junction" : "dir";
+        }
+      } catch {
+      }
       record.pathOps.push({
         kind: "replace",
         path: original,
         existedBefore: true,
-        note: "symlink-skipped-snapshot"
+        symlinkTarget,
+        symlinkType,
+        note: "symlink-snapshot"
       });
       continue;
     }
@@ -17600,7 +17727,14 @@ async function listBackups(home) {
   for (const name of names) {
     const op = import_node_path12.default.join(root, name, "operations.json");
     if (await pathExists(op)) {
-      const rec = await readJsonFile(op);
+      let rec;
+      try {
+        rec = await readJsonFile(op);
+      } catch {
+        continue;
+      }
+      if (rec.id !== name)
+        continue;
       if (!rec.pathOps)
         rec.pathOps = [];
       if (rec.files) {
@@ -17636,8 +17770,16 @@ async function rollbackBackup(id, home) {
       }
       continue;
     }
+    if (op.symlinkTarget) {
+      if (await pathExists(op.path)) {
+        await import_promises7.default.rm(op.path, { recursive: true, force: true });
+      }
+      await ensureDir(import_node_path12.default.dirname(op.path));
+      await import_promises7.default.symlink(op.symlinkTarget, op.path, op.symlinkType);
+      continue;
+    }
     if (op.backupRel) {
-      const backupPath = import_node_path12.default.join(txDir, op.backupRel);
+      const backupPath = safeJoin(txDir, op.backupRel);
       if (await pathExists(backupPath)) {
         if (await pathExists(op.path)) {
           await import_promises7.default.rm(op.path, { recursive: true, force: true });
@@ -17648,6 +17790,9 @@ async function rollbackBackup(id, home) {
       }
     }
     const file = record.files?.find((f) => f.original === op.path);
+    if (file && !isUnder(txDir, file.backup)) {
+      throw new Error(`Unsafe backup source outside transaction: ${file.backup}`);
+    }
     if (file && await pathExists(file.backup)) {
       if (await pathExists(op.path)) {
         await import_promises7.default.rm(op.path, { recursive: true, force: true });
@@ -17659,6 +17804,9 @@ async function rollbackBackup(id, home) {
   for (const file of record.files ?? []) {
     if (record.pathOps?.some((p) => p.path === file.original))
       continue;
+    if (!isUnder(txDir, file.backup)) {
+      throw new Error(`Unsafe backup source outside transaction: ${file.backup}`);
+    }
     if (!await pathExists(file.backup))
       continue;
     if (await pathExists(file.original)) {
@@ -17695,6 +17843,7 @@ var import_node_child_process2 = require("node:child_process");
 var import_node_util = require("node:util");
 var import_node_path13 = __toESM(require("node:path"), 1);
 var import_promises8 = __toESM(require("node:fs/promises"), 1);
+var import_node_crypto6 = __toESM(require("node:crypto"), 1);
 init_dist();
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process2.execFile);
 function remotesMatch(a, b) {
@@ -17785,9 +17934,6 @@ function validateGitRef(ref) {
   }
   return ref;
 }
-function looksLikeCommitHash(ref) {
-  return /^[0-9a-f]{7,40}$/i.test(ref);
-}
 async function resolveCachedSource(source, options) {
   if (!source)
     return void 0;
@@ -17806,10 +17952,14 @@ async function resolveCachedSource(source, options) {
   const lockPath = `${root}.lock`;
   await ensureDir(import_node_path13.default.dirname(root));
   let lockHandle;
+  const lockOwnerId = import_node_crypto6.default.randomUUID();
+  let ownsLock = false;
+  let lockWritten = false;
   try {
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
         lockHandle = await import_promises8.default.open(lockPath, "wx");
+        ownsLock = true;
         break;
       } catch (e) {
         const err = e;
@@ -17819,18 +17969,26 @@ async function resolveCachedSource(source, options) {
         try {
           const raw = await import_promises8.default.readFile(lockPath, "utf8");
           const existing = JSON.parse(raw);
-          if (existing.startedAt) {
+          let ownerAlive;
+          if (existing.pid) {
+            if (existing.pid === process.pid) {
+              ownerAlive = true;
+            } else {
+              try {
+                process.kill(existing.pid, 0);
+                ownerAlive = true;
+              } catch (e2) {
+                ownerAlive = e2.code === "EPERM";
+              }
+            }
+          }
+          if (existing.startedAt && ownerAlive !== true) {
             const age = Date.now() - Date.parse(existing.startedAt);
             if (Number.isFinite(age) && age > 30 * 60 * 1e3)
               stale = true;
           }
-          if (existing.pid && existing.pid !== process.pid) {
-            try {
-              process.kill(existing.pid, 0);
-            } catch {
-              stale = true;
-            }
-          }
+          if (ownerAlive === false)
+            stale = true;
           if (stale) {
             await import_promises8.default.rm(lockPath, { force: true });
             continue;
@@ -17846,16 +18004,35 @@ async function resolveCachedSource(source, options) {
     if (!lockHandle) {
       throw new Error(`Source cache lock busy: ${lockPath}`);
     }
-    await lockHandle.writeFile(JSON.stringify({ pid: process.pid, startedAt: (/* @__PURE__ */ new Date()).toISOString(), cache: root }, null, 2), "utf8");
+    await lockHandle.writeFile(JSON.stringify({
+      pid: process.pid,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ownerId: lockOwnerId,
+      cache: root
+    }, null, 2), "utf8");
     await lockHandle.close();
     lockHandle = void 0;
+    lockWritten = true;
     return await resolveUnderLock(root, remote, source, options);
   } finally {
-    await import_promises8.default.rm(lockPath, { force: true }).catch(() => {
-    });
     if (lockHandle) {
       try {
         await lockHandle.close();
+      } catch {
+      }
+      lockHandle = void 0;
+    }
+    if (ownsLock) {
+      try {
+        if (!lockWritten) {
+          await import_promises8.default.rm(lockPath, { force: true });
+        } else {
+          const raw = await import_promises8.default.readFile(lockPath, "utf8");
+          const current = JSON.parse(raw);
+          if (current.ownerId === lockOwnerId) {
+            await import_promises8.default.rm(lockPath, { force: true });
+          }
+        }
       } catch {
       }
     }
@@ -17872,26 +18049,51 @@ async function resolveUnderLock(root, remote, source, options) {
     if (existingRemote && !remotesMatch(remote, existingRemote)) {
       throw new Error(`Cache path ${root} has remote ${existingRemote}, expected ${remote}`);
     }
+    const want = options.ref ?? source.commit ?? source.ref;
+    let fetched = false;
     if (options.update && !options.offline) {
       await git(root, ["fetch", "--tags", "--force"]);
-      const ref2 = options.ref ?? source.commit ?? source.ref;
-      if (ref2) {
-        validateGitRef(ref2);
-        await git(root, ["checkout", ref2]);
-      } else {
-        await git(root, ["pull", "--ff-only"]);
-      }
-    } else if (options.ref || source.commit) {
-      const want = options.ref ?? source.commit;
+      fetched = true;
+    }
+    if (want) {
       validateGitRef(want);
-      const head3 = await git(root, ["rev-parse", "HEAD"]);
-      if (head3.code === 0 && !head3.stdout.startsWith(want) && want.length >= 7 && !looksLikeCommitHash(want)) {
-        if (!options.offline)
+      const resolveDesired = async () => {
+        const candidates = fetched ? [`refs/remotes/origin/${want}^{commit}`, `${want}^{commit}`] : [`${want}^{commit}`];
+        for (const candidate of candidates) {
+          const resolved = await gitMaybe(root, ["rev-parse", "--verify", candidate]);
+          if (resolved?.stdout.trim())
+            return resolved;
+        }
+        return void 0;
+      };
+      let desired = await resolveDesired();
+      if ((!desired || !desired.stdout.trim()) && !options.offline) {
+        if (!fetched) {
           await git(root, ["fetch", "--tags", "--force"]);
-        await git(root, ["checkout", want]);
+          fetched = true;
+        }
+        desired = await resolveDesired();
       }
+      if (!desired?.stdout.trim()) {
+        throw new Error(`Requested git ref is unavailable in source cache: ${want}`);
+      }
+      const head3 = await git(root, ["rev-parse", "HEAD"]);
+      const desiredCommit = desired.stdout.trim();
+      if (head3.stdout.trim() !== desiredCommit) {
+        await git(root, ["checkout", "--detach", desiredCommit]);
+        const checkedOut = await git(root, ["rev-parse", "HEAD"]);
+        if (checkedOut.stdout.trim() !== desiredCommit) {
+          throw new Error(`Source cache checkout mismatch for ${want}: expected ${desiredCommit}, got ${checkedOut.stdout.trim()}`);
+        }
+      }
+    } else if (options.update && !options.offline) {
+      await git(root, ["pull", "--ff-only"]);
     }
     const head2 = await git(root, ["rev-parse", "HEAD"]);
+    const dirty = await git(root, ["status", "--porcelain", "--untracked-files=all"]);
+    if (dirty.stdout.trim()) {
+      throw new Error(`Source cache has uncommitted or untracked changes; refusing mutable source: ${root}`);
+    }
     return {
       root,
       fromCache: true,
@@ -18081,9 +18283,8 @@ async function commitPaths(dir, message, relPaths, options = {}) {
   };
   const stagedBefore = await runGit(dir, ["diff", "--cached", "--name-only", "-z"], { allowFail: true });
   const alreadyStaged = (stagedBefore.stdout || "").split("\0").map((s) => s.replace(/\\/g, "/").trim()).filter(Boolean);
-  const foreignStaged = alreadyStaged.filter((p) => !isAllowedStaged(p));
-  if (foreignStaged.length > 0) {
-    throw new GitError(`Refusing capture commit: index already has staged files outside this capture: ${foreignStaged.slice(0, 5).join(", ")}` + (foreignStaged.length > 5 ? ` (+${foreignStaged.length - 5} more)` : "") + `. Commit or unstage them first (git restore --staged <path>). Index left unchanged.`);
+  if (alreadyStaged.length > 0) {
+    throw new GitError(`Refusing capture commit: index already has staged files: ${alreadyStaged.slice(0, 5).join(", ")}` + (alreadyStaged.length > 5 ? ` (+${alreadyStaged.length - 5} more)` : "") + `. Commit or unstage them first (git restore --staged <path>). Index left unchanged.`);
   }
   const findings = await scanPathsForSecrets(dir, unique);
   if (findings.length > 0) {
@@ -18107,9 +18308,18 @@ async function commitPaths(dir, message, relPaths, options = {}) {
   if (stagedNames.length === 0 && !options.allowEmpty) {
     return null;
   }
-  return runGit(dir, ["commit", "-m", message], {
-    allowFail: options.allowEmpty
-  });
+  try {
+    return await runGit(dir, ["commit", "-m", message], {
+      allowFail: options.allowEmpty
+    });
+  } catch (e) {
+    await runGit(dir, ["restore", "--staged", "--", ...unique], {
+      allowFail: true
+    }).catch(async () => {
+      await runGit(dir, ["reset", "HEAD", "--", ...unique], { allowFail: true });
+    });
+    throw e;
+  }
 }
 async function pushRepo(dir) {
   const safety = await inspectGitSafety(dir);
@@ -18400,11 +18610,13 @@ function findPluginStatus(entries, pluginId, pluginName) {
   }
   return { installed: false, enabled: false, source: "json" };
 }
-async function queryClaudePluginStatus(pluginId, pluginName) {
+async function queryClaudePluginStatus(pluginId, pluginName, options = {}) {
+  const env = options.home ? homeScopedEnv(options.home) : void 0;
   try {
     const listOut = await runClaude(["plugin", "list", "--json"], {
       timeout: 3e4,
-      maxBuffer: 5 * 1024 * 1024
+      maxBuffer: 5 * 1024 * 1024,
+      env
     });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
@@ -18420,7 +18632,8 @@ async function queryClaudePluginStatus(pluginId, pluginName) {
   try {
     const listOut = await runClaude(["plugin", "list"], {
       timeout: 3e4,
-      maxBuffer: 5 * 1024 * 1024
+      maxBuffer: 5 * 1024 * 1024,
+      env
     });
     const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
     const lines = text.split(/\r?\n/);
@@ -18839,7 +19052,7 @@ var claudeMarketplaceDriver = {
         pathsTouched: []
       };
     }
-    const status = await queryClaudePluginStatus(pluginId, plugin);
+    const status = await queryClaudePluginStatus(pluginId, plugin, { home: ctx.home });
     let previouslyInstalled = status.installed;
     let previouslyEnabled = status.enabled;
     const receipt = {
@@ -18888,7 +19101,10 @@ var claudeMarketplaceDriver = {
     for (const { args, kind } of commands) {
       const label = `claude ${args.join(" ")}`;
       try {
-        await runClaude(args, { maxBuffer: 5 * 1024 * 1024 });
+        await runClaude(args, {
+          maxBuffer: 5 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home)
+        });
         messages.push(`ok: ${label}`);
         receipt.actions.push(label);
         if (kind === "marketplace")
@@ -18944,7 +19160,8 @@ var claudeMarketplaceDriver = {
     if (receipt.pluginEnabled && !receipt.previouslyEnabled && receipt.pluginId) {
       try {
         await runClaude(["plugin", "disable", receipt.pluginId], {
-          maxBuffer: 2 * 1024 * 1024
+          maxBuffer: 2 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home)
         });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
@@ -18954,7 +19171,8 @@ var claudeMarketplaceDriver = {
     if (receipt.pluginInstalled && !receipt.previouslyInstalled && receipt.pluginId) {
       try {
         await runClaude(["plugin", "uninstall", receipt.pluginId], {
-          maxBuffer: 2 * 1024 * 1024
+          maxBuffer: 2 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home)
         });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
@@ -18970,7 +19188,7 @@ var claudeMarketplaceDriver = {
     const plugin = recipe.plugin ?? ctx.resourceId;
     const marketplace = recipe.marketplace;
     const pluginId = marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
-    const status = await queryClaudePluginStatus(pluginId, plugin);
+    const status = await queryClaudePluginStatus(pluginId, plugin, { home: ctx.home });
     if (status.source === "unavailable") {
       return {
         ok: false,
@@ -19196,6 +19414,9 @@ async function checkVersionPolicy(options) {
 }
 
 // packages/recipe-engine/dist/plan-apply.js
+var MISSING_INPUT = "missing:";
+var FILE_INPUT = "file:";
+var DIRECTORY_INPUT = "dir:";
 function groupActionsByResourceTarget(actions) {
   const nested = /* @__PURE__ */ new Map();
   for (const a of actions) {
@@ -19234,9 +19455,8 @@ async function resolveSourceRoot(ctx, resource) {
       }
       return void 0;
     }
-    const p = import_node_path18.default.join(ctx.configRepoPath, resource.source.path);
-    if (p.includes("..") || !await pathExists(p)) {
-    } else if (await pathExists(p)) {
+    const p = safeJoin(ctx.configRepoPath, resource.source.path);
+    if (await pathExists(p)) {
       await assertNoSymlinksInTree(p);
       return p;
     }
@@ -19284,7 +19504,14 @@ function riskAllowed(actionRisk, allowRisk, yes) {
   return riskRank2(actionRisk) <= riskRank2(max);
 }
 async function loadResolvedProfile(configRepoPath, profileName) {
-  const profilePath = import_node_path18.default.join(configRepoPath, "profiles", `${profileName}.yaml`);
+  const validateName = (name) => {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name.includes("..")) {
+      throw new Error(`Invalid profile name: ${name}`);
+    }
+    return name;
+  };
+  validateName(profileName);
+  const profilePath = safeJoin(configRepoPath, "profiles", `${profileName}.yaml`);
   if (!await pathExists(profilePath)) {
     return {
       profile: {
@@ -19298,17 +19525,46 @@ async function loadResolvedProfile(configRepoPath, profileName) {
           secrets: { provider: "local-only" }
         }
       },
-      parents: []
+      parents: [],
+      files: [profilePath]
     };
   }
   const profile = await loadProfile(profilePath);
-  const parents = [];
-  for (const ext of profile.extends) {
-    const p = import_node_path18.default.join(configRepoPath, "profiles", `${ext}.yaml`);
-    if (await pathExists(p))
-      parents.push(await loadProfile(p));
+  if (profile.profile !== profileName) {
+    throw new Error(`Profile identity mismatch: ${profilePath} declares ${profile.profile}, expected ${profileName}`);
   }
-  return { profile, parents };
+  const parents = [];
+  const files = [];
+  const visited = /* @__PURE__ */ new Set();
+  const visiting = /* @__PURE__ */ new Set([profileName]);
+  const visit = async (name) => {
+    validateName(name);
+    if (visiting.has(name)) {
+      throw new Error(`Profile inheritance cycle: ${[...visiting, name].join(" -> ")}`);
+    }
+    if (visited.has(name))
+      return;
+    visiting.add(name);
+    const p = safeJoin(configRepoPath, "profiles", `${name}.yaml`);
+    if (!await pathExists(p)) {
+      throw new Error(`Extended profile not found: ${name} (${p})`);
+    }
+    const parent = await loadProfile(p);
+    if (parent.profile !== name) {
+      throw new Error(`Profile identity mismatch: ${p} declares ${parent.profile}, expected ${name}`);
+    }
+    for (const ext of parent.extends)
+      await visit(ext);
+    visiting.delete(name);
+    visited.add(name);
+    parents.push(parent);
+    files.push(p);
+  };
+  for (const ext of profile.extends) {
+    await visit(ext);
+  }
+  files.push(profilePath);
+  return { profile, parents, files };
 }
 async function resolveRecipe(configRepoPath, resource, target, registry) {
   const targetCfg = resource.targets[target];
@@ -19367,11 +19623,26 @@ async function detectConfigRepoDrift(ctx, plan) {
     }
   } catch {
   }
+  for (const [rel, expected] of Object.entries(plan.snapshot?.inputHashes ?? {})) {
+    const abs = safeJoin(ctx.configRepoPath, rel);
+    if (expected === MISSING_INPUT) {
+      if (await pathExists(abs))
+        return `config input added: ${rel}`;
+      continue;
+    }
+    if (!await pathExists(abs)) {
+      return `config input removed: ${rel}`;
+    }
+    const current = expected.startsWith(DIRECTORY_INPUT) ? `${DIRECTORY_INPUT}${shortHash(await hashDirectory(abs))}` : `${expected.startsWith(FILE_INPUT) ? FILE_INPUT : ""}${shortHash(await hashFile(abs))}`;
+    if (current !== expected) {
+      return `config input changed: ${rel} (hash ${expected} \u2192 ${current})`;
+    }
+  }
   return void 0;
 }
 async function buildPlan(ctx) {
   const resourcesFile = await loadResources(import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"));
-  const { profile, parents } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
+  const { profile, parents, files: profileFiles } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
   const allIds = resourcesFile.resources.map((r) => r.id);
   const selectedIds = new Set(resolveProfileResources(profile, allIds, parents, resourcesFile.resources.map((r) => ({ id: r.id, profiles: r.profiles }))));
   const resources = resourcesFile.resources.filter((r) => selectedIds.has(r.id));
@@ -19379,6 +19650,7 @@ async function buildPlan(ctx) {
   const riskRankLocal = (r) => r === "low" ? 1 : r === "medium" ? 2 : 3;
   const registry = await loadRecipeRegistry(import_node_path18.default.join(ctx.configRepoPath, "recipes"));
   const actions = [];
+  const repoSourceDirs = /* @__PURE__ */ new Set();
   let actionSeq = 0;
   const enabledTargets = [];
   if (ctx.localConfig.targets.claude)
@@ -19458,6 +19730,10 @@ async function buildPlan(ctx) {
       }
       const effectiveRisk = engineRisk;
       const sourceRoot = await resolveSourceRoot(ctx, resource);
+      const sourcesRoot = import_node_path18.default.join(ctx.configRepoPath, "sources");
+      if (sourceRoot && isUnder(sourcesRoot, sourceRoot)) {
+        repoSourceDirs.add(import_node_path18.default.resolve(sourceRoot));
+      }
       if ((targetRecipe.driver === "repository-layout" || targetRecipe.driver === "generic-skill") && !sourceRoot) {
         actions.push({
           id: `a${++actionSeq}`,
@@ -19563,6 +19839,21 @@ async function buildPlan(ctx) {
     configRepoCommit = await getHeadCommit(ctx.configRepoPath);
   } catch {
   }
+  const inputHashes = {};
+  const mutableInputs = [
+    import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"),
+    import_node_path18.default.join(ctx.configRepoPath, "lock.yaml"),
+    import_node_path18.default.join(ctx.configRepoPath, "config.yaml"),
+    ...profileFiles
+  ];
+  for (const file of mutableInputs) {
+    const rel = import_node_path18.default.relative(ctx.configRepoPath, file).replace(/\\/g, "/");
+    inputHashes[rel] = await pathExists(file) ? `${FILE_INPUT}${shortHash(await hashFile(file))}` : MISSING_INPUT;
+  }
+  for (const dir of repoSourceDirs) {
+    const rel = import_node_path18.default.relative(ctx.configRepoPath, dir).replace(/\\/g, "/");
+    inputHashes[rel] = `${DIRECTORY_INPUT}${shortHash(await hashDirectory(dir))}`;
+  }
   const plan = {
     id: `plan-${Date.now()}`,
     profile: ctx.profileName,
@@ -19573,7 +19864,8 @@ async function buildPlan(ctx) {
     snapshot: {
       configRepoCommit,
       recipeHashes: {},
-      sourceCommits: {}
+      sourceCommits: {},
+      inputHashes
     }
   };
   const recipeHashes = {};
@@ -19587,7 +19879,8 @@ async function buildPlan(ctx) {
   plan.snapshot = {
     configRepoCommit,
     recipeHashes,
-    sourceCommits
+    sourceCommits,
+    inputHashes
   };
   return plan;
 }
@@ -19625,6 +19918,9 @@ async function applyPlan(ctx, plan) {
       noChanges: true
     };
   }
+  if (!ctx.dryRun && !ctx.yes) {
+    throw new Error("Apply requires confirmation. Re-run with --yes after reviewing the plan.");
+  }
   for (const a of actionable) {
     if (a.requiresConfirmation && !riskAllowed(a.risk, ctx.allowRisk, ctx.yes)) {
       if (!ctx.yes) {
@@ -19641,19 +19937,35 @@ async function applyPlan(ctx, plan) {
   const statePath = localStatePath(ctx.home);
   if (!paths.includes(statePath))
     paths.push(statePath);
-  const lockPath = lockFilePath(captureTransactionsDir(ctx.home), "home-apply", ctx.home);
-  const applyLock = ctx.dryRun ? void 0 : await acquireFileLock(lockPath, {
+  const lockBase = captureTransactionsDir(ctx.home);
+  const repoLockPath = lockFilePath(lockBase, "config-repo", ctx.configRepoPath);
+  const lockPath = lockFilePath(lockBase, "home-apply", ctx.home);
+  const repoLock = ctx.dryRun ? void 0 : await acquireFileLock(repoLockPath, {
     pid: process.pid,
     startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    scope: "home-apply",
-    target: import_node_path18.default.resolve(ctx.home),
+    scope: "config-repo",
+    target: import_node_path18.default.resolve(ctx.configRepoPath),
     command: "applyPlan"
   });
+  let applyLock;
   try {
+    applyLock = ctx.dryRun ? void 0 : await acquireFileLock(lockPath, {
+      pid: process.pid,
+      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      scope: "home-apply",
+      target: import_node_path18.default.resolve(ctx.home),
+      command: "applyPlan"
+    });
+    const lockedDrift = await detectConfigRepoDrift(ctx, activePlan);
+    if (lockedDrift) {
+      throw new Error(`Plan is stale: ${lockedDrift}. Re-run plan to see the current plan before apply.`);
+    }
     return await runApplyBody(ctx, activePlan, actionable, paths);
   } finally {
     if (applyLock)
       await releaseFileLock(applyLock);
+    if (repoLock)
+      await releaseFileLock(repoLock);
   }
 }
 async function runApplyBody(ctx, activePlan, actionable, paths) {
@@ -19933,8 +20245,8 @@ async function buildDriftReport(ctx) {
 // packages/recipe-engine/dist/capture.js
 var import_node_path21 = __toESM(require("node:path"), 1);
 var import_promises11 = __toESM(require("node:fs/promises"), 1);
-var import_node_os2 = __toESM(require("node:os"), 1);
-var import_node_crypto4 = __toESM(require("node:crypto"), 1);
+var import_node_os3 = __toESM(require("node:os"), 1);
+var import_node_crypto7 = __toESM(require("node:crypto"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -20501,7 +20813,7 @@ async function rollbackCaptureTransaction(tx, configRepoPath) {
   }
 }
 async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", options = {}) {
-  const home = options.home ?? import_node_os2.default.homedir();
+  const home = options.home ?? import_node_os3.default.homedir();
   const txBase = captureTransactionsDir(home);
   await ensureDir(txBase);
   const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
@@ -20560,7 +20872,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         usedAi: prev.usedAi || item.usedAi
       });
     }
-    const txId = import_node_crypto4.default.randomUUID();
+    const txId = import_node_crypto7.default.randomUUID();
     const stagingRoot = import_node_path21.default.join(txBase, `${txId}-staging`);
     const backupRoot = import_node_path21.default.join(txBase, `${txId}-backup`);
     const stagedRecipeRels = [];
@@ -20580,6 +20892,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
       }
       txEntries.push({ path: rel, existedBefore, backupPath, type });
     };
+    let completed;
     try {
       await import_promises11.default.mkdir(import_node_path21.default.join(stagingRoot, "recipes"), { recursive: true });
       await import_promises11.default.mkdir(backupRoot, { recursive: true });
@@ -20733,7 +21046,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         seen.add(p);
         return true;
       });
-      return { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
     } catch (e) {
       try {
         await rollbackCaptureTransaction({
@@ -20748,6 +21061,9 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
       });
       throw e;
     }
+    if (options.afterWrite)
+      await options.afterWrite(completed);
+    return completed;
   } finally {
     await releaseFileLock(lockPath);
   }
@@ -21002,7 +21318,7 @@ function formatDoctor(report) {
 // packages/cli/src/setup.ts
 var import_node_path23 = __toESM(require("node:path"), 1);
 var import_promises12 = __toESM(require("node:fs/promises"), 1);
-var import_node_os3 = __toESM(require("node:os"), 1);
+var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
@@ -21339,7 +21655,11 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     return { ok: true, changed: false, warnings, errors, actions };
   }
   const invokeClaude = async (args, timeout = 12e4) => {
-    await runClaude(args, { timeout, maxBuffer: 4 * 1024 * 1024 });
+    await runClaude(args, {
+      timeout,
+      maxBuffer: 4 * 1024 * 1024,
+      env: homeScopedEnv(home)
+    });
   };
   let claudeAvailable = true;
   try {
@@ -21461,7 +21781,8 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   try {
     const listOut = await runClaude(["plugin", "list", "--json"], {
       timeout: 3e4,
-      maxBuffer: 4 * 1024 * 1024
+      maxBuffer: 4 * 1024 * 1024,
+      env: homeScopedEnv(home)
     });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
@@ -21733,7 +22054,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
   return { ok: true, changed, warnings, errors, actions };
 }
 async function runSetup(options = {}) {
-  const home = options.home ?? import_node_os3.default.homedir();
+  const home = options.home ?? import_node_os4.default.homedir();
   const mode = options.mode ?? "default";
   const messages = [];
   const actions = [];
@@ -22045,7 +22366,7 @@ program2.name("ai-config-sync").description(
   true ? "0.4.2" : process.env.npm_package_version || "0.4.1"
 );
 function homeOpt(cmd) {
-  return expandHome(cmd.opts().home ?? import_node_os4.default.homedir());
+  return expandHome(cmd.opts().home ?? import_node_os5.default.homedir());
 }
 async function loadCtx(home) {
   const cfgPath = localConfigPath(home);
@@ -22260,6 +22581,9 @@ program2.command("capture").description("Propose managing local resources into t
   "Alias of --analyze; real LLM only when localConfig.ai has a provider configured"
 ).action(async (opts) => {
   const home = homeOpt({ opts: () => opts });
+  if (opts.push && !opts.commit) {
+    throw new Error("--push requires --commit; nothing can be pushed safely before a capture commit.");
+  }
   const ctx = await loadCtx(home);
   if (!requireLinked(ctx, "capture")) return;
   const { localConfig, configRepoPath } = ctx;
@@ -22326,11 +22650,27 @@ program2.command("capture").description("Propose managing local resources into t
     }
     return;
   }
+  let committed = false;
+  let pushed = false;
   const written = await commitCaptureItems(
     confirmed,
     configRepoPath,
-    import_node_os4.default.userInfo().username,
-    { home }
+    import_node_os5.default.userInfo().username,
+    {
+      home,
+      afterWrite: opts.commit ? async (captureResult) => {
+        const result = await commitPaths(
+          configRepoPath,
+          `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
+          captureResult.changedRelPaths
+        );
+        committed = !!result;
+        if (opts.push && result) {
+          await pushRepo(configRepoPath);
+          pushed = true;
+        }
+      } : void 0
+    }
   );
   console.log(`Updated ${written.resourcesPath}`);
   for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
@@ -22338,30 +22678,8 @@ program2.command("capture").description("Propose managing local resources into t
     console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
   }
   if (opts.commit) {
-    const txBase = captureTransactionsDir(home);
-    const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
-    const lockPayload = {
-      pid: process.pid,
-      startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      target: import_node_path24.default.resolve(configRepoPath),
-      scope: "config-repo",
-      command: "capture --commit"
-    };
-    await acquireFileLock(lockPath, lockPayload, { maxAttempts: 60 });
-    try {
-      const result = await commitPaths(
-        configRepoPath,
-        `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
-        written.changedRelPaths
-      );
-      console.log(result ? "Committed." : "Nothing to commit.");
-      if (opts.push && result) {
-        await pushRepo(configRepoPath);
-        console.log("Pushed.");
-      }
-    } finally {
-      await releaseFileLock(lockPath);
-    }
+    console.log(committed ? "Committed." : "Nothing to commit.");
+    if (pushed) console.log("Pushed.");
   }
 });
 program2.command("plan").description("Show planned install/update/delete actions").option("--home <path>", "Override home directory").option("--profile <name>", "Profile override").option("--json", "JSON output").action(async (opts) => {

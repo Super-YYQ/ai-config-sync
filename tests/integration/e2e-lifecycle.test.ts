@@ -58,6 +58,8 @@ async function ctxFor(home: string, configRepo: string): Promise<{
   configRepoPath: string;
   localConfig: LocalConfig;
   profileName: string;
+  yes: true;
+  allowRisk: "medium";
 }> {
   const localConfig = await loadLocalConfig(localConfigPath(home));
   return {
@@ -65,6 +67,8 @@ async function ctxFor(home: string, configRepo: string): Promise<{
     configRepoPath: configRepo,
     localConfig,
     profileName: "home",
+    yes: true,
+    allowRisk: "medium",
   };
 }
 

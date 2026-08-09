@@ -10,6 +10,7 @@ import {
   checkTomlFieldPolicy,
   ensureDir,
   expandHome,
+  homeScopedEnv,
   mergeJson,
   mergeTomlText,
   pathExists,
@@ -591,7 +592,7 @@ export const claudeMarketplaceDriver: Driver = {
 
     // Probe existing install so rollback won't uninstall pre-existing plugins
     // Prefer `claude plugin list --json` and full plugin@marketplace id match
-    const status = await queryClaudePluginStatus(pluginId, plugin);
+    const status = await queryClaudePluginStatus(pluginId, plugin, { home: ctx.home });
     let previouslyInstalled = status.installed;
     let previouslyEnabled = status.enabled;
 
@@ -646,7 +647,10 @@ export const claudeMarketplaceDriver: Driver = {
     for (const { args, kind } of commands) {
       const label = `claude ${args.join(" ")}`;
       try {
-        await runClaude(args, { maxBuffer: 5 * 1024 * 1024 });
+        await runClaude(args, {
+          maxBuffer: 5 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home),
+        });
         messages.push(`ok: ${label}`);
         receipt.actions!.push(label);
         if (kind === "marketplace") receipt.marketplaceAdded = true;
@@ -702,6 +706,7 @@ export const claudeMarketplaceDriver: Driver = {
       try {
         await runClaude(["plugin", "disable", receipt.pluginId], {
           maxBuffer: 2 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home),
         });
         messages.push(`disabled ${receipt.pluginId}`);
       } catch (e) {
@@ -716,6 +721,7 @@ export const claudeMarketplaceDriver: Driver = {
       try {
         await runClaude(["plugin", "uninstall", receipt.pluginId], {
           maxBuffer: 2 * 1024 * 1024,
+          env: homeScopedEnv(ctx.home),
         });
         messages.push(`uninstalled ${receipt.pluginId}`);
       } catch (e) {
@@ -737,7 +743,7 @@ export const claudeMarketplaceDriver: Driver = {
     const marketplace = recipe.marketplace;
     const pluginId =
       marketplace && plugin ? `${plugin}@${marketplace}` : plugin;
-    const status = await queryClaudePluginStatus(pluginId, plugin);
+    const status = await queryClaudePluginStatus(pluginId, plugin, { home: ctx.home });
     if (status.source === "unavailable") {
       return {
         ok: false,

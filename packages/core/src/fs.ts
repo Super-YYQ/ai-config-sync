@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { z, ZodTypeAny } from "zod";
@@ -22,9 +23,13 @@ export async function readText(filePath: string): Promise<string> {
 
 export async function writeText(filePath: string, content: string): Promise<void> {
   await ensureDir(path.dirname(filePath));
-  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  await fs.writeFile(tmp, content, "utf8");
-  await fs.rename(tmp, filePath);
+  const tmp = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(tmp, content, "utf8");
+    await fs.rename(tmp, filePath);
+  } finally {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+  }
 }
 
 export async function readJsonFile<T>(filePath: string): Promise<T> {
@@ -183,7 +188,10 @@ export async function atomicReplaceDirectory(
   }
   await ensureDir(path.dirname(dest));
   // Sibling temp so the rename stays on the same filesystem (atomic).
-  const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
+  const nonce = `${process.pid}-${crypto.randomUUID()}`;
+  const tmp = `${dest}.tmp-${nonce}`;
+  const previous = `${dest}.previous-${nonce}`;
+  let movedPrevious = false;
   try {
     await fs.cp(src, tmp, {
       recursive: true,
@@ -194,17 +202,27 @@ export async function atomicReplaceDirectory(
     if (rejectSymlinks) {
       await assertNoSymlinksInTreeRaw(tmp);
     }
-    if (await pathExists(dest)) {
-      await fs.rm(dest, { recursive: true, force: true });
+    try {
+      await fs.lstat(dest);
+      await fs.rename(dest, previous);
+      movedPrevious = true;
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code !== "ENOENT") throw e;
     }
-    await fs.rename(tmp, dest).catch(async () => {
-      // Cross-device fallback: recursive copy then rm temp
-      await fs.cp(tmp, dest, { recursive: true, force: true });
-      await fs.rm(tmp, { recursive: true, force: true });
-    });
+    await fs.rename(tmp, dest);
+    if (movedPrevious) {
+      await fs.rm(previous, { recursive: true, force: true }).catch(() => {});
+    }
     return dest;
   } catch (e) {
     await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+    if (movedPrevious) {
+      // The new tree was never committed. Restore the exact previous entry
+      // (directory or symlink) instead of leaving the destination missing.
+      await fs.rm(dest, { recursive: true, force: true }).catch(() => {});
+      await fs.rename(previous, dest).catch(() => {});
+    }
     throw e;
   }
 }

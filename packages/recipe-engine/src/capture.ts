@@ -54,6 +54,13 @@ export interface CaptureItem {
   blockReason?: string;
 }
 
+export interface CaptureCommitResult {
+  resourcesPath: string;
+  recipePaths: string[];
+  /** Relative paths under config repo that this capture created or modified. */
+  changedRelPaths: string[];
+}
+
 /** Tool state files that must never be treated as installable local sources. */
 const FORBIDDEN_LOCAL_SOURCE_BASENAMES = new Set([
   "settings.json",
@@ -642,13 +649,13 @@ export async function commitCaptureItems(
     injectFailureAfter?: string[];
     /** Test hook: delay after lock acquired, before reading resources. */
     injectDelayMs?: number;
+    /**
+     * Optional follow-up executed while the config-repo lock is still held.
+     * Used by the CLI to make capture + git commit one serialized operation.
+     */
+    afterWrite?: (result: CaptureCommitResult) => Promise<void>;
   } = {},
-): Promise<{
-  resourcesPath: string;
-  recipePaths: string[];
-  /** Relative paths under config repo that this capture created or modified. */
-  changedRelPaths: string[];
-}> {
+): Promise<CaptureCommitResult> {
   // Stage/backup outside the private git repo
   const home = options.home ?? os.homedir();
   const txBase = captureTransactionsDir(home);
@@ -744,6 +751,7 @@ export async function commitCaptureItems(
       txEntries.push({ path: rel, existedBefore, backupPath, type });
     };
 
+    let completed: CaptureCommitResult;
     try {
       await fs.mkdir(path.join(stagingRoot, "recipes"), { recursive: true });
       await fs.mkdir(backupRoot, { recursive: true });
@@ -934,7 +942,7 @@ export async function commitCaptureItems(
         return true;
       });
 
-      return { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
     } catch (e) {
       // Precise restore: delete new paths; restore pre-existing from backup
       try {
@@ -954,6 +962,8 @@ export async function commitCaptureItems(
       // keep backup on failure for manual recovery (outside git repo)
       throw e;
     }
+    if (options.afterWrite) await options.afterWrite(completed);
+    return completed;
   } finally {
     await releaseFileLock(lockPath);
   }

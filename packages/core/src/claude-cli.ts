@@ -7,6 +7,7 @@
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export function claudeExecutable(): string {
@@ -42,6 +43,35 @@ export interface RunCommandResult {
   stdout: string;
   stderr: string;
   code: number | null;
+}
+
+/**
+ * Child-process environment scoped to an explicit HOME. This is essential for
+ * --home test/sandbox runs: external Claude commands must not fall back to the
+ * operator's real plugin/login state.
+ */
+export function homeScopedEnv(home: string): NodeJS.ProcessEnv {
+  const resolved = path.resolve(home);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: resolved,
+    USERPROFILE: resolved,
+  };
+  const compare = (p: string) =>
+    process.platform === "win32" ? path.resolve(p).toLowerCase() : path.resolve(p);
+  const isDefaultHome = compare(resolved) === compare(os.homedir());
+  if (!isDefaultHome || !env.CLAUDE_CONFIG_DIR) {
+    env.CLAUDE_CONFIG_DIR = path.join(resolved, ".claude");
+  }
+  if (!isDefaultHome || !env.XDG_CONFIG_HOME) {
+    env.XDG_CONFIG_HOME = path.join(resolved, ".config");
+  }
+  if (process.platform === "win32") {
+    const parsed = path.parse(resolved);
+    env.HOMEDRIVE = parsed.root.replace(/[\\/]$/, "");
+    env.HOMEPATH = resolved.slice(env.HOMEDRIVE.length) || "\\";
+  }
+  return env;
 }
 
 /**

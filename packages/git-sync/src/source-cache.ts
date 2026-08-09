@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import {
   cacheDir,
   ensureDir,
@@ -169,11 +170,6 @@ export function validateGitRef(ref: string): string {
   return ref;
 }
 
-/** True when a string looks like a full or abbreviated hex commit hash. */
-function looksLikeCommitHash(ref: string): boolean {
-  return /^[0-9a-f]{7,40}$/i.test(ref);
-}
-
 /**
  * Resolve a local directory for a resource source.
  * Order: absolute path -> git cache under ~/.ai-config-sync/cache/sources.
@@ -211,10 +207,14 @@ export async function resolveCachedSource(
   const lockPath = `${root}.lock`;
   await ensureDir(path.dirname(root));
   let lockHandle: fs.FileHandle | undefined;
+  const lockOwnerId = crypto.randomUUID();
+  let ownsLock = false;
+  let lockWritten = false;
   try {
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
         lockHandle = await fs.open(lockPath, "wx");
+        ownsLock = true;
         break;
       } catch (e) {
         const err = e as NodeJS.ErrnoException;
@@ -227,17 +227,24 @@ export async function resolveCachedSource(
             pid?: number;
             startedAt?: string;
           };
-          if (existing.startedAt) {
+          let ownerAlive: boolean | undefined;
+          if (existing.pid) {
+            if (existing.pid === process.pid) {
+              ownerAlive = true;
+            } else {
+              try {
+                process.kill(existing.pid, 0);
+                ownerAlive = true;
+              } catch (e) {
+                ownerAlive = (e as NodeJS.ErrnoException).code === "EPERM";
+              }
+            }
+          }
+          if (existing.startedAt && ownerAlive !== true) {
             const age = Date.now() - Date.parse(existing.startedAt);
             if (Number.isFinite(age) && age > 30 * 60 * 1000) stale = true;
           }
-          if (existing.pid && existing.pid !== process.pid) {
-            try {
-              process.kill(existing.pid, 0);
-            } catch {
-              stale = true;
-            }
-          }
+          if (ownerAlive === false) stale = true;
           if (stale) {
             await fs.rm(lockPath, { force: true });
             continue;
@@ -254,7 +261,12 @@ export async function resolveCachedSource(
     }
     await lockHandle.writeFile(
       JSON.stringify(
-        { pid: process.pid, startedAt: new Date().toISOString(), cache: root },
+        {
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+          ownerId: lockOwnerId,
+          cache: root,
+        },
         null,
         2,
       ),
@@ -262,15 +274,31 @@ export async function resolveCachedSource(
     );
     await lockHandle.close();
     lockHandle = undefined;
+    lockWritten = true;
 
     return await resolveUnderLock(root, remote, source, options);
   } finally {
-    await fs.rm(lockPath, { force: true }).catch(() => {});
     if (lockHandle) {
       try {
         await lockHandle.close();
       } catch {
         /* ignore */
+      }
+      lockHandle = undefined;
+    }
+    if (ownsLock) {
+      try {
+        if (!lockWritten) {
+          await fs.rm(lockPath, { force: true });
+        } else {
+          const raw = await fs.readFile(lockPath, "utf8");
+          const current = JSON.parse(raw) as { ownerId?: string };
+          if (current.ownerId === lockOwnerId) {
+            await fs.rm(lockPath, { force: true });
+          }
+        }
+      } catch {
+        /* already gone or replaced */
       }
     }
   }
@@ -302,34 +330,60 @@ async function resolveUnderLock(
       );
     }
 
+    const want = options.ref ?? source.commit ?? source.ref;
+    let fetched = false;
     if (options.update && !options.offline) {
       // Fail-closed fetch: a failed fetch aborts (no partial/unknown state).
       await git(root, ["fetch", "--tags", "--force"]);
-      const ref = options.ref ?? source.commit ?? source.ref;
-      if (ref) {
-        validateGitRef(ref);
-        await git(root, ["checkout", ref]);
-      } else {
-        await git(root, ["pull", "--ff-only"]);
-      }
-    } else if (options.ref || source.commit) {
-      const want = options.ref ?? source.commit!;
+      fetched = true;
+    }
+    if (want) {
       validateGitRef(want);
-      const head = await git(root, ["rev-parse", "HEAD"]);
-      if (
-        head.code === 0 &&
-        !head.stdout.startsWith(want) &&
-        want.length >= 7 &&
-        !looksLikeCommitHash(want)
-      ) {
-        if (!options.offline) await git(root, ["fetch", "--tags", "--force"]);
-        await git(root, ["checkout", want]);
+      const resolveDesired = async () => {
+        const candidates = fetched
+          ? [`refs/remotes/origin/${want}^{commit}`, `${want}^{commit}`]
+          : [`${want}^{commit}`];
+        for (const candidate of candidates) {
+          const resolved = await gitMaybe(root, ["rev-parse", "--verify", candidate]);
+          if (resolved?.stdout.trim()) return resolved;
+        }
+        return undefined;
+      };
+      let desired = await resolveDesired();
+      if ((!desired || !desired.stdout.trim()) && !options.offline) {
+        if (!fetched) {
+          await git(root, ["fetch", "--tags", "--force"]);
+          fetched = true;
+        }
+        desired = await resolveDesired();
       }
+      if (!desired?.stdout.trim()) {
+        throw new Error(`Requested git ref is unavailable in source cache: ${want}`);
+      }
+      const head = await git(root, ["rev-parse", "HEAD"]);
+      const desiredCommit = desired.stdout.trim();
+      if (head.stdout.trim() !== desiredCommit) {
+        await git(root, ["checkout", "--detach", desiredCommit]);
+        const checkedOut = await git(root, ["rev-parse", "HEAD"]);
+        if (checkedOut.stdout.trim() !== desiredCommit) {
+          throw new Error(
+            `Source cache checkout mismatch for ${want}: expected ${desiredCommit}, got ${checkedOut.stdout.trim()}`,
+          );
+        }
+      }
+    } else if (options.update && !options.offline) {
+      await git(root, ["pull", "--ff-only"]);
     }
 
     // Always verify the final HEAD - never return a cache whose commit we
     // could not confirm.
     const head = await git(root, ["rev-parse", "HEAD"]);
+    const dirty = await git(root, ["status", "--porcelain", "--untracked-files=all"]);
+    if (dirty.stdout.trim()) {
+      throw new Error(
+        `Source cache has uncommitted or untracked changes; refusing mutable source: ${root}`,
+      );
+    }
     return {
       root,
       fromCache: true,

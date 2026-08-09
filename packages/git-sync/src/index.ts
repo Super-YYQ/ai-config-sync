@@ -266,12 +266,11 @@ export async function commitPaths(
     .map((s) => s.replace(/\\/g, "/").trim())
     .filter(Boolean);
 
-  const foreignStaged = alreadyStaged.filter((p) => !isAllowedStaged(p));
-  if (foreignStaged.length > 0) {
+  if (alreadyStaged.length > 0) {
     throw new GitError(
-      `Refusing capture commit: index already has staged files outside this capture: ` +
-        `${foreignStaged.slice(0, 5).join(", ")}` +
-        (foreignStaged.length > 5 ? ` (+${foreignStaged.length - 5} more)` : "") +
+      `Refusing capture commit: index already has staged files: ` +
+        `${alreadyStaged.slice(0, 5).join(", ")}` +
+        (alreadyStaged.length > 5 ? ` (+${alreadyStaged.length - 5} more)` : "") +
         `. Commit or unstage them first (git restore --staged <path>). ` +
         `Index left unchanged.`,
     );
@@ -317,9 +316,20 @@ export async function commitPaths(
     return null;
   }
 
-  return runGit(dir, ["commit", "-m", message], {
-    allowFail: options.allowEmpty,
-  });
+  try {
+    return await runGit(dir, ["commit", "-m", message], {
+      allowFail: options.allowEmpty,
+    });
+  } catch (e) {
+    // We require an initially empty index, so unstaging these paths restores
+    // the exact pre-call index when hooks/identity/commit itself fails.
+    await runGit(dir, ["restore", "--staged", "--", ...unique], {
+      allowFail: true,
+    }).catch(async () => {
+      await runGit(dir, ["reset", "HEAD", "--", ...unique], { allowFail: true });
+    });
+    throw e;
+  }
 }
 
 export async function pushRepo(dir: string): Promise<GitResult> {

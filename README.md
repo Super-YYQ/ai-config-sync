@@ -101,7 +101,9 @@ npx ai-config-sync --help
 
 ## 安全
 
-- 默认只读扫描；写操作需 Plan / 确认  
+- 默认只读扫描；所有实际 Apply/Restore 写入都必须先查看 Plan 并显式传入 `--yes`
+- Plan 会校验配置仓 HEAD、未提交配置改动、完整 Profile 继承链、Recipe 与锁定来源，过期 Plan 拒绝执行
+- Capture、Commit、Push 共享同一配置仓锁；并发状态写入与 Apply 也会串行化
 - Apply 硬失败 **自动 rollback**（删新建 + 还原快照）  
 - 不同步 OAuth、聊天记录、明文密钥  
 

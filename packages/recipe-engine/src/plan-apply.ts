@@ -7,12 +7,14 @@ import {
   ensureDir,
   hashDirectory,
   hashFile,
+  isUnder,
   loadLock,
   loadProfile,
   loadRecipe,
   loadResources,
   parseRecipeRef,
   pathExists,
+  safeJoin,
   resolveProfileResources,
   shortHash,
   localStatePath,
@@ -55,6 +57,10 @@ import {
 } from "@ai-config-sync/git-sync";
 import { loadRecipeRegistry } from "./analyzer.js";
 import { computeResourceDrift } from "./drift.js";
+
+const MISSING_INPUT = "missing:";
+const FILE_INPUT = "file:";
+const DIRECTORY_INPUT = "dir:";
 
 export interface EngineContext {
   home: string;
@@ -135,10 +141,8 @@ async function resolveSourceRoot(
       return undefined;
     }
     // Other relative paths still join under config repo with safeJoin semantics
-    const p = path.join(ctx.configRepoPath, resource.source.path);
-    if (p.includes("..") || !(await pathExists(p))) {
-      /* fall through */
-    } else if (await pathExists(p)) {
+    const p = safeJoin(ctx.configRepoPath, resource.source.path);
+    if (await pathExists(p)) {
       await assertNoSymlinksInTree(p);
       return p;
     }
@@ -216,12 +220,15 @@ function riskAllowed(
 async function loadResolvedProfile(
   configRepoPath: string,
   profileName: string,
-): Promise<{ profile: Profile; parents: Profile[] }> {
-  const profilePath = path.join(
-    configRepoPath,
-    "profiles",
-    `${profileName}.yaml`,
-  );
+): Promise<{ profile: Profile; parents: Profile[]; files: string[] }> {
+  const validateName = (name: string) => {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name) || name.includes("..")) {
+      throw new Error(`Invalid profile name: ${name}`);
+    }
+    return name;
+  };
+  validateName(profileName);
+  const profilePath = safeJoin(configRepoPath, "profiles", `${profileName}.yaml`);
   if (!(await pathExists(profilePath))) {
     // synthetic default
     return {
@@ -237,15 +244,47 @@ async function loadResolvedProfile(
         },
       },
       parents: [],
+      files: [profilePath],
     };
   }
   const profile = await loadProfile(profilePath);
-  const parents: Profile[] = [];
-  for (const ext of profile.extends) {
-    const p = path.join(configRepoPath, "profiles", `${ext}.yaml`);
-    if (await pathExists(p)) parents.push(await loadProfile(p));
+  if (profile.profile !== profileName) {
+    throw new Error(
+      `Profile identity mismatch: ${profilePath} declares ${profile.profile}, expected ${profileName}`,
+    );
   }
-  return { profile, parents };
+  const parents: Profile[] = [];
+  const files: string[] = [];
+  const visited = new Set<string>();
+  const visiting = new Set<string>([profileName]);
+  const visit = async (name: string): Promise<void> => {
+    validateName(name);
+    if (visiting.has(name)) {
+      throw new Error(`Profile inheritance cycle: ${[...visiting, name].join(" -> ")}`);
+    }
+    if (visited.has(name)) return;
+    visiting.add(name);
+    const p = safeJoin(configRepoPath, "profiles", `${name}.yaml`);
+    if (!(await pathExists(p))) {
+      throw new Error(`Extended profile not found: ${name} (${p})`);
+    }
+    const parent = await loadProfile(p);
+    if (parent.profile !== name) {
+      throw new Error(
+        `Profile identity mismatch: ${p} declares ${parent.profile}, expected ${name}`,
+      );
+    }
+    for (const ext of parent.extends) await visit(ext);
+    visiting.delete(name);
+    visited.add(name);
+    parents.push(parent);
+    files.push(p);
+  };
+  for (const ext of profile.extends) {
+    await visit(ext);
+  }
+  files.push(profilePath);
+  return { profile, parents, files };
 }
 
 async function resolveRecipe(
@@ -344,6 +383,22 @@ async function detectConfigRepoDrift(
   } catch {
     /* non-git repo: nothing to compare */
   }
+  for (const [rel, expected] of Object.entries(plan.snapshot?.inputHashes ?? {})) {
+    const abs = safeJoin(ctx.configRepoPath, rel);
+    if (expected === MISSING_INPUT) {
+      if (await pathExists(abs)) return `config input added: ${rel}`;
+      continue;
+    }
+    if (!(await pathExists(abs))) {
+      return `config input removed: ${rel}`;
+    }
+    const current = expected.startsWith(DIRECTORY_INPUT)
+      ? `${DIRECTORY_INPUT}${shortHash(await hashDirectory(abs))}`
+      : `${expected.startsWith(FILE_INPUT) ? FILE_INPUT : ""}${shortHash(await hashFile(abs))}`;
+    if (current !== expected) {
+      return `config input changed: ${rel} (hash ${expected} → ${current})`;
+    }
+  }
   return undefined;
 }
 
@@ -351,7 +406,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
   const resourcesFile = await loadResources(
     path.join(ctx.configRepoPath, "resources.yaml"),
   );
-  const { profile, parents } = await loadResolvedProfile(
+  const { profile, parents, files: profileFiles } = await loadResolvedProfile(
     ctx.configRepoPath,
     ctx.profileName,
   );
@@ -376,6 +431,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
     path.join(ctx.configRepoPath, "recipes"),
   );
   const actions: PlanAction[] = [];
+  const repoSourceDirs = new Set<string>();
   let actionSeq = 0;
 
   const enabledTargets: TargetTool[] = [];
@@ -482,6 +538,10 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
       const effectiveRisk = engineRisk;
 
       const sourceRoot = await resolveSourceRoot(ctx, resource);
+      const sourcesRoot = path.join(ctx.configRepoPath, "sources");
+      if (sourceRoot && isUnder(sourcesRoot, sourceRoot)) {
+        repoSourceDirs.add(path.resolve(sourceRoot));
+      }
 
       // Layout drivers need a local source tree; marketplace may work without it.
       if (
@@ -620,6 +680,23 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
   } catch {
     /* non-git repos: no commit snapshotted */
   }
+  const inputHashes: Record<string, string> = {};
+  const mutableInputs = [
+    path.join(ctx.configRepoPath, "resources.yaml"),
+    path.join(ctx.configRepoPath, "lock.yaml"),
+    path.join(ctx.configRepoPath, "config.yaml"),
+    ...profileFiles,
+  ];
+  for (const file of mutableInputs) {
+    const rel = path.relative(ctx.configRepoPath, file).replace(/\\/g, "/");
+    inputHashes[rel] = (await pathExists(file))
+      ? `${FILE_INPUT}${shortHash(await hashFile(file))}`
+      : MISSING_INPUT;
+  }
+  for (const dir of repoSourceDirs) {
+    const rel = path.relative(ctx.configRepoPath, dir).replace(/\\/g, "/");
+    inputHashes[rel] = `${DIRECTORY_INPUT}${shortHash(await hashDirectory(dir))}`;
+  }
 
   const plan: Plan = {
     id: `plan-${Date.now()}`,
@@ -635,6 +712,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
       configRepoCommit,
       recipeHashes: {},
       sourceCommits: {},
+      inputHashes,
     },
   };
   // Populate snapshot maps keyed by recipeRef / resourceId (deduped).
@@ -649,6 +727,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
     configRepoCommit,
     recipeHashes,
     sourceCommits,
+    inputHashes,
   };
   return plan;
 }
@@ -710,6 +789,10 @@ export async function applyPlan(
     };
   }
 
+  if (!ctx.dryRun && !ctx.yes) {
+    throw new Error("Apply requires confirmation. Re-run with --yes after reviewing the plan.");
+  }
+
   // Risk gate (skip SKIP entries)
   for (const a of actionable) {
     if (a.requiresConfirmation && !riskAllowed(a.risk, ctx.allowRisk, ctx.yes)) {
@@ -741,24 +824,46 @@ export async function applyPlan(
   // Ticket 6 / Apply Lock: serialize concurrent applies to the same HOME so two
   // sessions cannot simultaneously mutate Skills, Hooks and state.json.
   // Non-dryRun only; dry runs are read-only plan previews.
+  const lockBase = captureTransactionsDir(ctx.home);
+  const repoLockPath = lockFilePath(lockBase, "config-repo", ctx.configRepoPath);
   const lockPath = lockFilePath(
-    captureTransactionsDir(ctx.home),
+    lockBase,
     "home-apply",
     ctx.home,
   );
-  const applyLock = ctx.dryRun
+  const repoLock = ctx.dryRun
     ? undefined
-    : await acquireFileLock(lockPath, {
+    : await acquireFileLock(repoLockPath, {
+        pid: process.pid,
+        startedAt: new Date().toISOString(),
+        scope: "config-repo",
+        target: path.resolve(ctx.configRepoPath),
+        command: "applyPlan",
+      });
+  let applyLock: string | undefined;
+  try {
+    applyLock = ctx.dryRun
+      ? undefined
+      : await acquireFileLock(lockPath, {
         pid: process.pid,
         startedAt: new Date().toISOString(),
         scope: "home-apply",
         target: path.resolve(ctx.home),
         command: "applyPlan",
       });
-  try {
+    // Re-check only after both locks are held. This closes the race where a
+    // concurrent capture changed resources/profile/recipes after the initial
+    // Plan check but before the first target write.
+    const lockedDrift = await detectConfigRepoDrift(ctx, activePlan);
+    if (lockedDrift) {
+      throw new Error(
+        `Plan is stale: ${lockedDrift}. Re-run plan to see the current plan before apply.`,
+      );
+    }
     return await runApplyBody(ctx, activePlan, actionable, paths);
   } finally {
     if (applyLock) await releaseFileLock(applyLock);
+    if (repoLock) await releaseFileLock(repoLock);
   }
 }
 

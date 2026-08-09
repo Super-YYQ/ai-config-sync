@@ -19,6 +19,7 @@ import {
   writeYamlFile,
   mergeTomlText,
   getTomlValue,
+  homeScopedEnv,
   readText,
   agentsSkillsDir,
   codexConfigPath,
@@ -555,7 +556,11 @@ async function installClaudePlugin(
   }
 
   const invokeClaude = async (args: string[], timeout = 120000) => {
-    await runClaude(args, { timeout, maxBuffer: 4 * 1024 * 1024 });
+    await runClaude(args, {
+      timeout,
+      maxBuffer: 4 * 1024 * 1024,
+      env: homeScopedEnv(home),
+    });
   };
 
   let claudeAvailable = true;
@@ -705,6 +710,7 @@ async function installClaudePlugin(
     const listOut = await runClaude(["plugin", "list", "--json"], {
       timeout: 30000,
       maxBuffer: 4 * 1024 * 1024,
+      env: homeScopedEnv(home),
     });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {

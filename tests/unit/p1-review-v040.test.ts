@@ -203,6 +203,7 @@ describe("P1-1 transactional capture commit", () => {
       ],
       configRepo,
       "test",
+      { home },
     );
 
     expect(await pathExists(result.resourcesPath)).toBe(true);

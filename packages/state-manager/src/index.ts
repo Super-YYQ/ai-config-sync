@@ -1,17 +1,22 @@
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
+import { lockFilePath, withFileLock } from "./file-lock.js";
 import {
   backupsDir,
   cacheDir,
+  captureTransactionsDir,
   defaultStateRoot,
   ensureDir,
   loadState,
   localConfigPath,
   logsDir,
+  isUnder,
   pathExists,
   pendingEventsPath,
   readJsonFile,
   saveState,
+  safeJoin,
   writeJsonFile,
   type PendingBatch,
   type PendingEvent,
@@ -37,6 +42,9 @@ export interface PathOperation {
   existedBefore: boolean;
   /** Relative path under backup dir when a snapshot was taken. */
   backupRel?: string;
+  /** Original symlink target when existedBefore was a symlink. */
+  symlinkTarget?: string;
+  symlinkType?: "file" | "dir" | "junction";
   note?: string;
 }
 
@@ -86,15 +94,28 @@ export async function markInstalled(
   },
   home?: string,
 ): Promise<StateFile> {
-  const state = await getState(home);
-  const entry = state.installed[resourceId] ?? {};
-  entry[target] = {
-    ...info,
-    lastChecked: new Date().toISOString(),
-  };
-  state.installed[resourceId] = entry;
-  await putState(state, home);
-  return state;
+  const lockPath = lockFilePath(captureTransactionsDir(home), "state", defaultStateRoot(home));
+  return withFileLock(
+    lockPath,
+    {
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+      scope: "state",
+      target: defaultStateRoot(home),
+      command: "markInstalled",
+    },
+    async () => {
+      const state = await getState(home);
+      const entry = state.installed[resourceId] ?? {};
+      entry[target] = {
+        ...info,
+        lastChecked: new Date().toISOString(),
+      };
+      state.installed[resourceId] = entry;
+      await putState(state, home);
+      return state;
+    },
+  );
 }
 
 export async function loadPending(home?: string): Promise<PendingBatch[]> {
@@ -119,21 +140,34 @@ export async function appendPendingEvents(
   events: PendingEvent[],
   home?: string,
 ): Promise<PendingBatch> {
-  const batches = await loadPending(home);
-  const now = new Date();
-  const batchId = `${now.toISOString().replace(/[:.]/g, "").slice(0, 15)}-local`;
-  const batch: PendingBatch = {
-    batchId,
-    events: events.map((e) => ({
-      ...e,
-      detectedAt: e.detectedAt ?? now.toISOString(),
-    })),
-    status: "pending-review",
-    createdAt: now.toISOString(),
-  };
-  batches.push(batch);
-  await savePending(batches, home);
-  return batch;
+  const lockPath = lockFilePath(captureTransactionsDir(home), "pending", pendingEventsPath(home));
+  return withFileLock(
+    lockPath,
+    {
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+      scope: "pending",
+      target: pendingEventsPath(home),
+      command: "appendPendingEvents",
+    },
+    async () => {
+      const batches = await loadPending(home);
+      const now = new Date();
+      const batchId = `${now.toISOString().replace(/[:.]/g, "").slice(0, 15)}-${crypto.randomUUID().slice(0, 8)}-local`;
+      const batch: PendingBatch = {
+        batchId,
+        events: events.map((e) => ({
+          ...e,
+          detectedAt: e.detectedAt ?? now.toISOString(),
+        })),
+        status: "pending-review",
+        createdAt: now.toISOString(),
+      };
+      batches.push(batch);
+      await savePending(batches, home);
+      return batch;
+    },
+  );
 }
 
 /**
@@ -146,7 +180,7 @@ export async function beginTransaction(
   operations?: unknown[],
 ): Promise<BackupRecord> {
   await ensureStateDirs(home);
-  const id = new Date().toISOString().replace(/[:.]/g, "-");
+  const id = `${new Date().toISOString().replace(/[:.]/g, "-")}-${crypto.randomUUID().slice(0, 8)}`;
   const dir = path.join(backupsDir(home), id);
   await ensureDir(dir);
   const record: BackupRecord = {
@@ -166,7 +200,13 @@ export async function beginTransaction(
     if (seen.has(key)) continue;
     seen.add(key);
 
-    const existed = await pathExists(original);
+    let existed = false;
+    try {
+      await fs.lstat(original);
+      existed = true;
+    } catch {
+      existed = false;
+    }
     if (!existed) {
       record.pathOps.push({
         kind: "create",
@@ -184,11 +224,23 @@ export async function beginTransaction(
       continue;
     }
     if (st.isSymbolicLink()) {
+      const symlinkTarget = await fs.readlink(original);
+      let symlinkType: PathOperation["symlinkType"] = "file";
+      try {
+        const targetStat = await fs.stat(original);
+        if (targetStat.isDirectory()) {
+          symlinkType = process.platform === "win32" ? "junction" : "dir";
+        }
+      } catch {
+        /* dangling link: preserve as a file-type symlink */
+      }
       record.pathOps.push({
         kind: "replace",
         path: original,
         existedBefore: true,
-        note: "symlink-skipped-snapshot",
+        symlinkTarget,
+        symlinkType,
+        note: "symlink-snapshot",
       });
       continue;
     }
@@ -296,7 +348,13 @@ export async function listBackups(home?: string): Promise<BackupRecord[]> {
   for (const name of names) {
     const op = path.join(root, name, "operations.json");
     if (await pathExists(op)) {
-      const rec = await readJsonFile<BackupRecord>(op);
+      let rec: BackupRecord;
+      try {
+        rec = await readJsonFile<BackupRecord>(op);
+      } catch {
+        continue;
+      }
+      if (rec.id !== name) continue;
       // migrate old records
       if (!rec.pathOps) rec.pathOps = [];
       if (rec.files) {
@@ -347,8 +405,16 @@ export async function rollbackBackup(
       }
       continue;
     }
+    if (op.symlinkTarget) {
+      if (await pathExists(op.path)) {
+        await fs.rm(op.path, { recursive: true, force: true });
+      }
+      await ensureDir(path.dirname(op.path));
+      await fs.symlink(op.symlinkTarget, op.path, op.symlinkType);
+      continue;
+    }
     if (op.backupRel) {
-      const backupPath = path.join(txDir, op.backupRel);
+      const backupPath = safeJoin(txDir, op.backupRel);
       if (await pathExists(backupPath)) {
         // remove current then restore clean snapshot
         if (await pathExists(op.path)) {
@@ -361,6 +427,9 @@ export async function rollbackBackup(
     }
     // fallback: files[] list
     const file = record.files?.find((f) => f.original === op.path);
+    if (file && !isUnder(txDir, file.backup)) {
+      throw new Error(`Unsafe backup source outside transaction: ${file.backup}`);
+    }
     if (file && (await pathExists(file.backup))) {
       if (await pathExists(op.path)) {
         await fs.rm(op.path, { recursive: true, force: true });
@@ -373,6 +442,9 @@ export async function rollbackBackup(
   // Also restore any files[] not in pathOps (legacy)
   for (const file of record.files ?? []) {
     if (record.pathOps?.some((p) => p.path === file.original)) continue;
+    if (!isUnder(txDir, file.backup)) {
+      throw new Error(`Unsafe backup source outside transaction: ${file.backup}`);
+    }
     if (!(await pathExists(file.backup))) continue;
     if (await pathExists(file.original)) {
       await fs.rm(file.original, { recursive: true, force: true });

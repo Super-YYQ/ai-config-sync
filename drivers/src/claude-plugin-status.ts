@@ -1,7 +1,7 @@
 /**
  * Precise Claude plugin install/enable status from `claude plugin list --json`.
  */
-import { runClaude } from "@ai-config-sync/core";
+import { homeScopedEnv, runClaude } from "@ai-config-sync/core";
 
 export interface ClaudePluginListEntry {
   id: string;
@@ -118,11 +118,14 @@ export function findPluginStatus(
 export async function queryClaudePluginStatus(
   pluginId: string,
   pluginName?: string,
+  options: { home?: string } = {},
 ): Promise<ClaudePluginStatus> {
+  const env = options.home ? homeScopedEnv(options.home) : undefined;
   try {
     const listOut = await runClaude(["plugin", "list", "--json"], {
       timeout: 30_000,
       maxBuffer: 5 * 1024 * 1024,
+      env,
     });
     const text = `${listOut.stdout ?? ""}`.trim();
     if (text) {
@@ -143,6 +146,7 @@ export async function queryClaudePluginStatus(
     const listOut = await runClaude(["plugin", "list"], {
       timeout: 30_000,
       maxBuffer: 5 * 1024 * 1024,
+      env,
     });
     const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
     const lines = text.split(/\r?\n/);

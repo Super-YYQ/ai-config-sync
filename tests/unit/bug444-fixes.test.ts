@@ -14,6 +14,7 @@ import {
   writeText,
   pathExists,
   captureTransactionsDir,
+  homeScopedEnv,
 } from "@ai-config-sync/core";
 import { commitCaptureItems } from "@ai-config-sync/recipe-engine";
 import { installStableCliShim } from "../../packages/cli/src/setup.js";
@@ -41,6 +42,14 @@ describe("P0 Windows-safe runClaude / runCommand", () => {
     expect(quoteCmdArg("plain")).toBe("plain");
     expect(quoteCmdArg("has space")).toBe('"has space"');
     expect(quoteCmdArg('say "hi"')).toBe('"say ""hi"""');
+  });
+
+  it("scopes external tool HOME for --home isolation", () => {
+    const isolated = path.join(tmp, "isolated-home");
+    const env = homeScopedEnv(isolated);
+    expect(env.HOME).toBe(path.resolve(isolated));
+    expect(env.USERPROFILE).toBe(path.resolve(isolated));
+    expect(env.CLAUDE_CONFIG_DIR).toBe(path.join(path.resolve(isolated), ".claude"));
   });
 
   it("actually executes a fake claude.cmd via PATH and preserves args", async () => {

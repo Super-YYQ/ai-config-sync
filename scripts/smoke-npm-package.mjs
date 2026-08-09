@@ -15,10 +15,29 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tgzArg = process.argv[2];
 
+function quoteCmdArg(arg) {
+  if (arg.length === 0) return '""';
+  if (!/[\s"&|<>^()%!"]/u.test(arg)) return arg;
+  return `"${arg.replace(/"/g, '""')}"`;
+}
+
+function spawnPortable(cmd, args, opts) {
+  if (process.platform !== "win32") {
+    return spawnSync(cmd, args, { ...opts, shell: false });
+  }
+  const resolved = /\.(?:cmd|bat)$/i.test(cmd) || path.isAbsolute(cmd)
+    ? cmd
+    : `${cmd}.cmd`;
+  const commandLine = [resolved, ...args].map(quoteCmdArg).join(" ");
+  return spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", commandLine], {
+    ...opts,
+    shell: false,
+  });
+}
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, {
+  const r = spawnPortable(cmd, args, {
     encoding: "utf8",
-    shell: process.platform === "win32",
     ...opts,
   });
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
@@ -110,10 +129,9 @@ const env = {
 
 function cli(args) {
   console.log(">", "ai-config-sync", ...args);
-  const r = spawnSync(bin, args, {
+  const r = spawnPortable(bin, args, {
     encoding: "utf8",
     env,
-    shell: process.platform === "win32",
     cwd: tmp, // only the isolated install dir — not monorepo root
   });
   console.log(r.stdout || "");
@@ -146,6 +164,7 @@ cli([
   "home",
   "--home",
   home,
+  "--no-claude",
 ]);
 cli(["scan", "--home", home, "--light"]);
 cli(["doctor", "--home", home]);

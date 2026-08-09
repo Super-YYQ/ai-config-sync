@@ -20,9 +20,6 @@ import {
   loadPending,
   rollbackBackup,
   ensureStateDirs,
-  acquireFileLock,
-  releaseFileLock,
-  lockFilePath,
 } from "@ai-config-sync/state-manager";
 import {
   commitAll,
@@ -45,7 +42,7 @@ import {
 } from "@ai-config-sync/recipe-engine";
 import { runSetup } from "./setup.js";
 import path from "node:path";
-import { loadLock, captureTransactionsDir } from "@ai-config-sync/core";
+import { loadLock } from "@ai-config-sync/core";
 
 /** Injected by esbuild define when bundling; falls back for tsx/dev. */
 declare const __APP_VERSION__: string | undefined;
@@ -352,6 +349,9 @@ program
     )
   .action(async (opts) => {
     const home = homeOpt({ opts: () => opts });
+    if (opts.push && !opts.commit) {
+      throw new Error("--push requires --commit; nothing can be pushed safely before a capture commit.");
+    }
     const ctx = await loadCtx(home);
     if (!requireLinked(ctx, "capture")) return;
     const { localConfig, configRepoPath } = ctx;
@@ -435,11 +435,29 @@ program
       }
       return;
     }
+    let committed = false;
+    let pushed = false;
     const written = await commitCaptureItems(
       confirmed,
       configRepoPath,
       os.userInfo().username,
-      { home },
+      {
+        home,
+        afterWrite: opts.commit
+          ? async (captureResult) => {
+              const result = await commitPaths(
+                configRepoPath,
+                `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
+                captureResult.changedRelPaths,
+              );
+              committed = !!result;
+              if (opts.push && result) {
+                await pushRepo(configRepoPath);
+                pushed = true;
+              }
+            }
+          : undefined,
+      },
     );
     console.log(`Updated ${written.resourcesPath}`);
     for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
@@ -447,35 +465,8 @@ program
       console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
     }
     if (opts.commit) {
-      // Ticket 2: commit must run under the SAME config-repo write lock as the
-      // capture write, so a second concurrent capture can't interleave between
-      // the resources.yaml write and this commit (which would mix commit
-      // messages / lose resources). The lock path matches commitCaptureItems.
-      const txBase = captureTransactionsDir(home);
-      const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
-      const lockPayload = {
-        pid: process.pid,
-        startedAt: new Date().toISOString(),
-        target: path.resolve(configRepoPath),
-        scope: "config-repo",
-        command: "capture --commit",
-      };
-      await acquireFileLock(lockPath, lockPayload, { maxAttempts: 60 });
-      try {
-        // Stage ONLY capture-produced paths — never git add -A
-        const result = await commitPaths(
-          configRepoPath,
-          `capture: add ${confirmed.map((c) => c.suggestedResource.id).join(", ")}`,
-          written.changedRelPaths,
-        );
-        console.log(result ? "Committed." : "Nothing to commit.");
-        if (opts.push && result) {
-          await pushRepo(configRepoPath);
-          console.log("Pushed.");
-        }
-      } finally {
-        await releaseFileLock(lockPath);
-      }
+      console.log(committed ? "Committed." : "Nothing to commit.");
+      if (pushed) console.log("Pushed.");
     }
   });
 

@@ -125,11 +125,17 @@ console.log("Plugin structural validation OK");
 // When claude is not installed, structural checks above are enough for CI.
 import { spawnSync } from "node:child_process";
 const claudeBin = process.platform === "win32" ? "claude.cmd" : "claude";
-const claude = spawnSync(claudeBin, ["plugin", "validate", "."], {
+const claude = spawnSync(
+  process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : claudeBin,
+  process.platform === "win32"
+    ? ["/d", "/s", "/c", "claude.cmd plugin validate ."]
+    : ["plugin", "validate", "."],
+  {
   encoding: "utf8",
   cwd: root,
-  shell: process.platform === "win32",
-});
+  shell: false,
+  },
+);
 const out = `${claude.stdout ?? ""}${claude.stderr ?? ""}`;
 const missing =
   (claude.error &&
