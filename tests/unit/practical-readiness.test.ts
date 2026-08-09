@@ -61,16 +61,38 @@ describe("practical readiness hardening", () => {
     expect(await pathExists(lockPath)).toBe(true);
   });
 
+  it("does not break a fresh lock while its owner is still writing", async () => {
+    const home = await temp("acs-lock-partial-");
+    const lockPath = lockFilePath(path.join(home, "locks"), "repo", home);
+    await ensureDir(path.dirname(lockPath));
+    await fs.writeFile(lockPath, "", "utf8");
+
+    await expect(
+      acquireFileLock(
+        lockPath,
+        {
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+          scope: "repo",
+          target: home,
+          command: "contender",
+        },
+        { maxAttempts: 2, baseDelayMs: 1, stepDelayMs: 1 },
+      ),
+    ).rejects.toThrow(/Lock busy/);
+    expect(await pathExists(lockPath)).toBe(true);
+  });
+
   it("serializes concurrent pending-event and state updates", async () => {
     const home = await temp("acs-state-race-");
     await Promise.all(
-      Array.from({ length: 8 }, (_, i) =>
+      Array.from({ length: 16 }, (_, i) =>
         appendPendingEvents([{ type: "resource-added", resourceId: `r${i}` }], home),
       ),
     );
     const pending = await loadPending(home);
-    expect(pending).toHaveLength(8);
-    expect(new Set(pending.map((batch) => batch.batchId)).size).toBe(8);
+    expect(pending).toHaveLength(16);
+    expect(new Set(pending.map((batch) => batch.batchId)).size).toBe(16);
 
     await Promise.all([
       markInstalled("shared", "claude", { status: "installed" }, home),

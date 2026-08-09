@@ -975,8 +975,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path25 = require("node:path");
-    var fs14 = require("node:fs");
+    var path32 = require("node:path");
+    var fs15 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1908,11 +1908,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path25.resolve(baseDir, baseName);
-          if (fs14.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path25.extname(baseName))) return void 0;
+          const localBin = path32.resolve(baseDir, baseName);
+          if (fs15.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path32.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs14.existsSync(`${localBin}${ext}`)
+            (ext) => fs15.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1924,21 +1924,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs14.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs15.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path25.resolve(
-            path25.dirname(resolvedScriptPath),
+          executableDir = path32.resolve(
+            path32.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path25.basename(
+            const legacyName = path32.basename(
               this._scriptPath,
-              path25.extname(this._scriptPath)
+              path32.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1949,7 +1949,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path25.extname(executableFile));
+        launchWithNode = sourceExt.includes(path32.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2789,7 +2789,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path25.basename(filename, path25.extname(filename));
+        this._name = path32.basename(filename, path32.extname(filename));
         return this;
       }
       /**
@@ -2803,9 +2803,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path26) {
-        if (path26 === void 0) return this._executableDir;
-        this._executableDir = path26;
+      executableDir(path33) {
+        if (path33 === void 0) return this._executableDir;
+        this._executableDir = path33;
         return this;
       }
       /**
@@ -3447,8 +3447,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path25, errorMaps, issueData } = params;
-      const fullPath = [...path25, ...issueData.path || []];
+      const { data, path: path32, errorMaps, issueData } = params;
+      const fullPath = [...path32, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -3756,11 +3756,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value, path25, key) {
+      constructor(parent, value, path32, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path25;
+        this._path = path32;
         this._key = key;
       }
       get path() {
@@ -7681,17 +7681,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path25) {
-      const ctrl = callVisitor(key, node, visitor, path25);
+    function visit_(key, node, visitor, path32) {
+      const ctrl = callVisitor(key, node, visitor, path32);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path25, ctrl);
-        return visit_(key, ctrl, visitor, path25);
+        replaceNode(key, path32, ctrl);
+        return visit_(key, ctrl, visitor, path32);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path25 = Object.freeze(path25.concat(node));
+          path32 = Object.freeze(path32.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path25);
+            const ci = visit_(i, node.items[i], visitor, path32);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7702,13 +7702,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path25 = Object.freeze(path25.concat(node));
-          const ck = visit_("key", node.key, visitor, path25);
+          path32 = Object.freeze(path32.concat(node));
+          const ck = visit_("key", node.key, visitor, path32);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path25);
+          const cv = visit_("value", node.value, visitor, path32);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7729,17 +7729,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path25) {
-      const ctrl = await callVisitor(key, node, visitor, path25);
+    async function visitAsync_(key, node, visitor, path32) {
+      const ctrl = await callVisitor(key, node, visitor, path32);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path25, ctrl);
-        return visitAsync_(key, ctrl, visitor, path25);
+        replaceNode(key, path32, ctrl);
+        return visitAsync_(key, ctrl, visitor, path32);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path25 = Object.freeze(path25.concat(node));
+          path32 = Object.freeze(path32.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path25);
+            const ci = await visitAsync_(i, node.items[i], visitor, path32);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7750,13 +7750,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path25 = Object.freeze(path25.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path25);
+          path32 = Object.freeze(path32.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path32);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path25);
+          const cv = await visitAsync_("value", node.value, visitor, path32);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7783,23 +7783,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path25) {
+    function callVisitor(key, node, visitor, path32) {
       if (typeof visitor === "function")
-        return visitor(key, node, path25);
+        return visitor(key, node, path32);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path25);
+        return visitor.Map?.(key, node, path32);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path25);
+        return visitor.Seq?.(key, node, path32);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path25);
+        return visitor.Pair?.(key, node, path32);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path25);
+        return visitor.Scalar?.(key, node, path32);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path25);
+        return visitor.Alias?.(key, node, path32);
       return void 0;
     }
-    function replaceNode(key, path25, node) {
-      const parent = path25[path25.length - 1];
+    function replaceNode(key, path32, node) {
+      const parent = path32[path32.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -8409,10 +8409,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path25, value) {
+    function collectionFromPath(schema, path32, value) {
       let v = value;
-      for (let i = path25.length - 1; i >= 0; --i) {
-        const k = path25[i];
+      for (let i = path32.length - 1; i >= 0; --i) {
+        const k = path32[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -8431,7 +8431,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path25) => path25 == null || typeof path25 === "object" && !!path25[Symbol.iterator]().next().done;
+    var isEmptyPath = (path32) => path32 == null || typeof path32 === "object" && !!path32[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -8461,11 +8461,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path25, value) {
-        if (isEmptyPath(path25))
+      addIn(path32, value) {
+        if (isEmptyPath(path32))
           this.add(value);
         else {
-          const [key, ...rest] = path25;
+          const [key, ...rest] = path32;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -8479,8 +8479,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path25) {
-        const [key, ...rest] = path25;
+      deleteIn(path32) {
+        const [key, ...rest] = path32;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -8494,8 +8494,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path25, keepScalar) {
-        const [key, ...rest] = path25;
+      getIn(path32, keepScalar) {
+        const [key, ...rest] = path32;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -8513,8 +8513,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path25) {
-        const [key, ...rest] = path25;
+      hasIn(path32) {
+        const [key, ...rest] = path32;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -8524,8 +8524,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path25, value) {
-        const [key, ...rest] = path25;
+      setIn(path32, value) {
+        const [key, ...rest] = path32;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -11040,9 +11040,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path25, value) {
+      addIn(path32, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path25, value);
+          this.contents.addIn(path32, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -11117,14 +11117,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path25) {
-        if (Collection.isEmptyPath(path25)) {
+      deleteIn(path32) {
+        if (Collection.isEmptyPath(path32)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path25) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path32) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -11139,10 +11139,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path25, keepScalar) {
-        if (Collection.isEmptyPath(path25))
+      getIn(path32, keepScalar) {
+        if (Collection.isEmptyPath(path32))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path25, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path32, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -11153,10 +11153,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path25) {
-        if (Collection.isEmptyPath(path25))
+      hasIn(path32) {
+        if (Collection.isEmptyPath(path32))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path25) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path32) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -11173,13 +11173,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path25, value) {
-        if (Collection.isEmptyPath(path25)) {
+      setIn(path32, value) {
+        if (Collection.isEmptyPath(path32)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path25), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path32), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path25, value);
+          this.contents.setIn(path32, value);
         }
       }
       /**
@@ -13139,9 +13139,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path25) => {
+    visit.itemAtPath = (cst, path32) => {
       let item = cst;
-      for (const [field, index] of path25) {
+      for (const [field, index] of path32) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -13150,23 +13150,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path25) => {
-      const parent = visit.itemAtPath(cst, path25.slice(0, -1));
-      const field = path25[path25.length - 1][0];
+    visit.parentCollection = (cst, path32) => {
+      const parent = visit.itemAtPath(cst, path32.slice(0, -1));
+      const field = path32[path32.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path25, item, visitor) {
-      let ctrl = visitor(item, path25);
+    function _visit(path32, item, visitor) {
+      let ctrl = visitor(item, path32);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path25.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path32.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -13177,10 +13177,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path25);
+            ctrl = ctrl(item, path32);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path25) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path32) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -14482,14 +14482,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs14 = this.flowScalar(this.type);
+              const fs15 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs14, sep: [] });
+                map.items.push({ start, key: fs15, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs14);
+                this.stack.push(fs15);
               } else {
-                Object.assign(it, { key: fs14, sep: [] });
+                Object.assign(it, { key: fs15, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -14617,13 +14617,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs14 = this.flowScalar(this.type);
+              const fs15 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs14, sep: [] });
+                fc.items.push({ start: [], key: fs15, sep: [] });
               else if (it.sep)
-                this.stack.push(fs14);
+                this.stack.push(fs15);
               else
-                Object.assign(it, { key: fs14, sep: [] });
+                Object.assign(it, { key: fs15, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -15185,10 +15185,10 @@ function isPlainObject(v) {
 function hasId(v) {
   return isPlainObject(v) && typeof v.id === "string";
 }
-function pathAllowed(path25, owned) {
+function pathAllowed(path32, owned) {
   if (!owned || owned.length === 0)
     return true;
-  return owned.some((o) => path25 === o || path25.startsWith(`${o}.`) || o.startsWith(`${path25}.`));
+  return owned.some((o) => path32 === o || path32.startsWith(`${o}.`) || o.startsWith(`${path32}.`));
 }
 function mergeJson(base, managed, options = {}, currentPath = "") {
   const preferManaged = options.preferManaged ?? true;
@@ -15477,7 +15477,7 @@ function redact(match) {
     return "***";
   return `${match.slice(0, 4)}\u2026${match.slice(-4)} (len=${match.length})`;
 }
-function scanTextForSecrets(text, path25) {
+function scanTextForSecrets(text, path32) {
   const findings = [];
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -15490,7 +15490,7 @@ function scanTextForSecrets(text, path25) {
           rule: rule.name,
           line: i + 1,
           preview: redact(m[0]),
-          path: path25
+          path: path32
         });
       }
     }
@@ -17496,10 +17496,19 @@ async function acquireFileLock(lockPath, payload, options = {}) {
           await import_promises6.default.rm(lockPath, { force: true });
           continue;
         }
-      } catch {
-        await import_promises6.default.rm(lockPath, { force: true }).catch(() => {
-        });
-        continue;
+      } catch (readError) {
+        if (readError.code === "ENOENT")
+          continue;
+        try {
+          const stat = await import_promises6.default.stat(lockPath);
+          if (Date.now() - stat.mtimeMs > staleMs) {
+            await import_promises6.default.rm(lockPath, { force: true });
+            continue;
+          }
+        } catch (statError) {
+          if (statError.code === "ENOENT")
+            continue;
+        }
       }
       await new Promise((r) => setTimeout(r, baseDelay + attempt * stepDelay));
     }
@@ -17519,7 +17528,8 @@ async function releaseFileLock(lockPath) {
     }
   } catch {
   } finally {
-    ownedLocks.delete(key);
+    if (ownedLocks.get(key) === ownerId)
+      ownedLocks.delete(key);
   }
 }
 function lockFilePath(baseDir, scope, targetPath) {
@@ -18535,8 +18545,8 @@ async function loadRecipeRegistry(recipesDir) {
   return map;
 }
 
-// packages/recipe-engine/dist/plan-apply.js
-var import_node_path18 = __toESM(require("node:path"), 1);
+// packages/recipe-engine/dist/plan-builder.js
+var import_node_path19 = __toESM(require("node:path"), 1);
 init_dist();
 
 // drivers/dist/index.js
@@ -19413,32 +19423,12 @@ async function checkVersionPolicy(options) {
   };
 }
 
-// packages/recipe-engine/dist/plan-apply.js
+// packages/recipe-engine/dist/planning-helpers.js
+var import_node_path18 = __toESM(require("node:path"), 1);
+init_dist();
 var MISSING_INPUT = "missing:";
 var FILE_INPUT = "file:";
 var DIRECTORY_INPUT = "dir:";
-function groupActionsByResourceTarget(actions) {
-  const nested = /* @__PURE__ */ new Map();
-  for (const a of actions) {
-    const resourceId = a.resourceId ?? "_";
-    const target = a.target ?? "_";
-    let byTarget = nested.get(resourceId);
-    if (!byTarget) {
-      byTarget = /* @__PURE__ */ new Map();
-      nested.set(resourceId, byTarget);
-    }
-    const list = byTarget.get(target) ?? [];
-    list.push(a);
-    byTarget.set(target, list);
-  }
-  const out = /* @__PURE__ */ new Map();
-  for (const [resourceId, byTarget] of nested) {
-    for (const [target, list] of byTarget) {
-      out.set({ resourceId, target }, list);
-    }
-  }
-  return out;
-}
 async function resolveSourceRoot(ctx, resource) {
   if (ctx.sourceRoots?.[resource.id])
     return ctx.sourceRoots[resource.id];
@@ -19490,18 +19480,6 @@ async function resolveSourceRoot(ctx, resource) {
     }
     return void 0;
   }
-}
-function installedSkillPath(home, target, resourceId) {
-  return target === "claude" ? import_node_path18.default.join(claudeSkillsDir(home), resourceId) : import_node_path18.default.join(codexSkillsDir(home), resourceId);
-}
-function riskRank2(r) {
-  return r === "low" ? 1 : r === "medium" ? 2 : 3;
-}
-function riskAllowed(actionRisk, allowRisk, yes) {
-  if (!yes)
-    return false;
-  const max = allowRisk ?? "low";
-  return riskRank2(actionRisk) <= riskRank2(max);
 }
 async function loadResolvedProfile(configRepoPath, profileName) {
   const validateName = (name) => {
@@ -19585,70 +19563,17 @@ async function resolveRecipe(configRepoPath, resource, target, registry) {
   const fromReg = registry.get(resource.id);
   return fromReg ? { recipe: fromReg } : void 0;
 }
-async function detectSnapshotDrift(ctx, action) {
-  if (!action)
-    return void 0;
-  if (action.recipeRef && action.recipeHash) {
-    const reqPath = validateRecipeRef(ctx.configRepoPath, action.recipeRef);
-    if (await pathExists(reqPath.absPath)) {
-      try {
-        const now = shortHash(await hashFile(reqPath.absPath));
-        if (now !== action.recipeHash) {
-          return `recipe ${action.recipeRef} changed (hash ${action.recipeHash} \u2192 ${now})`;
-        }
-      } catch {
-      }
-    }
-  }
-  if (action.resourceId && action.sourceCommit) {
-    try {
-      const lock = await loadLock(import_node_path18.default.join(ctx.configRepoPath, "lock.yaml"));
-      const locked = lock.entries.find((e) => e.resourceId === action.resourceId);
-      if (locked?.commit && locked.commit !== action.sourceCommit) {
-        return `source commit for ${action.resourceId} changed (${action.sourceCommit} \u2192 ${locked.commit})`;
-      }
-    } catch {
-    }
-  }
-  return void 0;
-}
-async function detectConfigRepoDrift(ctx, plan) {
-  const snapshotted = plan.snapshot?.configRepoCommit;
-  if (!snapshotted)
-    return void 0;
-  try {
-    const head = await getHeadCommit(ctx.configRepoPath);
-    if (head && head !== snapshotted) {
-      return `config repo HEAD changed (${snapshotted} \u2192 ${head})`;
-    }
-  } catch {
-  }
-  for (const [rel, expected] of Object.entries(plan.snapshot?.inputHashes ?? {})) {
-    const abs = safeJoin(ctx.configRepoPath, rel);
-    if (expected === MISSING_INPUT) {
-      if (await pathExists(abs))
-        return `config input added: ${rel}`;
-      continue;
-    }
-    if (!await pathExists(abs)) {
-      return `config input removed: ${rel}`;
-    }
-    const current = expected.startsWith(DIRECTORY_INPUT) ? `${DIRECTORY_INPUT}${shortHash(await hashDirectory(abs))}` : `${expected.startsWith(FILE_INPUT) ? FILE_INPUT : ""}${shortHash(await hashFile(abs))}`;
-    if (current !== expected) {
-      return `config input changed: ${rel} (hash ${expected} \u2192 ${current})`;
-    }
-  }
-  return void 0;
-}
+
+// packages/recipe-engine/dist/plan-builder.js
 async function buildPlan(ctx) {
-  const resourcesFile = await loadResources(import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"));
+  const resourcesFile = await loadResources(import_node_path19.default.join(ctx.configRepoPath, "resources.yaml"));
   const { profile, parents, files: profileFiles } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
   const allIds = resourcesFile.resources.map((r) => r.id);
   const selectedIds = new Set(resolveProfileResources(profile, allIds, parents, resourcesFile.resources.map((r) => ({ id: r.id, profiles: r.profiles }))));
   const resources = resourcesFile.resources.filter((r) => selectedIds.has(r.id));
   const maxRisk2 = profile.security?.maxRisk ?? "medium";
   const riskRankLocal = (r) => r === "low" ? 1 : r === "medium" ? 2 : 3;
-  const registry = await loadRecipeRegistry(import_node_path18.default.join(ctx.configRepoPath, "recipes"));
+  const registry = await loadRecipeRegistry(import_node_path19.default.join(ctx.configRepoPath, "recipes"));
   const actions = [];
   const repoSourceDirs = /* @__PURE__ */ new Set();
   let actionSeq = 0;
@@ -19677,7 +19602,7 @@ async function buildPlan(ctx) {
         continue;
       }
       const recipe = resolved.recipe;
-      const recipeFileRel = resolved.absPath ? import_node_path18.default.relative(ctx.configRepoPath, resolved.absPath).replace(/\\/g, "/") : void 0;
+      const recipeFileRel = resolved.absPath ? import_node_path19.default.relative(ctx.configRepoPath, resolved.absPath).replace(/\\/g, "/") : void 0;
       let recipeHash;
       if (resolved.absPath) {
         try {
@@ -19688,7 +19613,7 @@ async function buildPlan(ctx) {
       let sourceCommit;
       if (resource.source?.provider === "github" || resource.source?.provider === "git") {
         try {
-          const lock = await loadLock(import_node_path18.default.join(ctx.configRepoPath, "lock.yaml"));
+          const lock = await loadLock(import_node_path19.default.join(ctx.configRepoPath, "lock.yaml"));
           const locked = lock.entries.find((e) => e.resourceId === resource.id);
           sourceCommit = locked?.commit ?? resource.source?.commit;
         } catch {
@@ -19730,9 +19655,9 @@ async function buildPlan(ctx) {
       }
       const effectiveRisk = engineRisk;
       const sourceRoot = await resolveSourceRoot(ctx, resource);
-      const sourcesRoot = import_node_path18.default.join(ctx.configRepoPath, "sources");
+      const sourcesRoot = import_node_path19.default.join(ctx.configRepoPath, "sources");
       if (sourceRoot && isUnder(sourcesRoot, sourceRoot)) {
-        repoSourceDirs.add(import_node_path18.default.resolve(sourceRoot));
+        repoSourceDirs.add(import_node_path19.default.resolve(sourceRoot));
       }
       if ((targetRecipe.driver === "repository-layout" || targetRecipe.driver === "generic-skill") && !sourceRoot) {
         actions.push({
@@ -19841,17 +19766,17 @@ async function buildPlan(ctx) {
   }
   const inputHashes = {};
   const mutableInputs = [
-    import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"),
-    import_node_path18.default.join(ctx.configRepoPath, "lock.yaml"),
-    import_node_path18.default.join(ctx.configRepoPath, "config.yaml"),
+    import_node_path19.default.join(ctx.configRepoPath, "resources.yaml"),
+    import_node_path19.default.join(ctx.configRepoPath, "lock.yaml"),
+    import_node_path19.default.join(ctx.configRepoPath, "config.yaml"),
     ...profileFiles
   ];
   for (const file of mutableInputs) {
-    const rel = import_node_path18.default.relative(ctx.configRepoPath, file).replace(/\\/g, "/");
+    const rel = import_node_path19.default.relative(ctx.configRepoPath, file).replace(/\\/g, "/");
     inputHashes[rel] = await pathExists(file) ? `${FILE_INPUT}${shortHash(await hashFile(file))}` : MISSING_INPUT;
   }
   for (const dir of repoSourceDirs) {
-    const rel = import_node_path18.default.relative(ctx.configRepoPath, dir).replace(/\\/g, "/");
+    const rel = import_node_path19.default.relative(ctx.configRepoPath, dir).replace(/\\/g, "/");
     inputHashes[rel] = `${DIRECTORY_INPUT}${shortHash(await hashDirectory(dir))}`;
   }
   const plan = {
@@ -19902,6 +19827,99 @@ function formatPlan(plan) {
   lines.push("No OAuth, session or cache files will be changed.");
   return lines.join("\n");
 }
+
+// packages/recipe-engine/dist/apply-executor.js
+var import_node_path20 = __toESM(require("node:path"), 1);
+init_dist();
+function groupActionsByResourceTarget(actions) {
+  const nested = /* @__PURE__ */ new Map();
+  for (const a of actions) {
+    const resourceId = a.resourceId ?? "_";
+    const target = a.target ?? "_";
+    let byTarget = nested.get(resourceId);
+    if (!byTarget) {
+      byTarget = /* @__PURE__ */ new Map();
+      nested.set(resourceId, byTarget);
+    }
+    const list = byTarget.get(target) ?? [];
+    list.push(a);
+    byTarget.set(target, list);
+  }
+  const out = /* @__PURE__ */ new Map();
+  for (const [resourceId, byTarget] of nested) {
+    for (const [target, list] of byTarget) {
+      out.set({ resourceId, target }, list);
+    }
+  }
+  return out;
+}
+function installedSkillPath(home, target, resourceId) {
+  return target === "claude" ? import_node_path20.default.join(claudeSkillsDir(home), resourceId) : import_node_path20.default.join(codexSkillsDir(home), resourceId);
+}
+function riskRank2(r) {
+  return r === "low" ? 1 : r === "medium" ? 2 : 3;
+}
+function riskAllowed(actionRisk, allowRisk, yes) {
+  if (!yes)
+    return false;
+  const max = allowRisk ?? "low";
+  return riskRank2(actionRisk) <= riskRank2(max);
+}
+async function detectSnapshotDrift(ctx, action) {
+  if (!action)
+    return void 0;
+  if (action.recipeRef && action.recipeHash) {
+    const reqPath = validateRecipeRef(ctx.configRepoPath, action.recipeRef);
+    if (await pathExists(reqPath.absPath)) {
+      try {
+        const now = shortHash(await hashFile(reqPath.absPath));
+        if (now !== action.recipeHash) {
+          return `recipe ${action.recipeRef} changed (hash ${action.recipeHash} \u2192 ${now})`;
+        }
+      } catch {
+      }
+    }
+  }
+  if (action.resourceId && action.sourceCommit) {
+    try {
+      const lock = await loadLock(import_node_path20.default.join(ctx.configRepoPath, "lock.yaml"));
+      const locked = lock.entries.find((e) => e.resourceId === action.resourceId);
+      if (locked?.commit && locked.commit !== action.sourceCommit) {
+        return `source commit for ${action.resourceId} changed (${action.sourceCommit} \u2192 ${locked.commit})`;
+      }
+    } catch {
+    }
+  }
+  return void 0;
+}
+async function detectConfigRepoDrift(ctx, plan) {
+  const snapshotted = plan.snapshot?.configRepoCommit;
+  if (!snapshotted)
+    return void 0;
+  try {
+    const head = await getHeadCommit(ctx.configRepoPath);
+    if (head && head !== snapshotted) {
+      return `config repo HEAD changed (${snapshotted} \u2192 ${head})`;
+    }
+  } catch {
+  }
+  for (const [rel, expected] of Object.entries(plan.snapshot?.inputHashes ?? {})) {
+    const abs = safeJoin(ctx.configRepoPath, rel);
+    if (expected === MISSING_INPUT) {
+      if (await pathExists(abs))
+        return `config input added: ${rel}`;
+      continue;
+    }
+    if (!await pathExists(abs)) {
+      return `config input removed: ${rel}`;
+    }
+    const current = expected.startsWith(DIRECTORY_INPUT) ? `${DIRECTORY_INPUT}${shortHash(await hashDirectory(abs))}` : `${expected.startsWith(FILE_INPUT) ? FILE_INPUT : ""}${shortHash(await hashFile(abs))}`;
+    if (current !== expected) {
+      return `config input changed: ${rel} (hash ${expected} \u2192 ${current})`;
+    }
+  }
+  return void 0;
+}
 async function applyPlan(ctx, plan) {
   const activePlan = plan ?? await buildPlan(ctx);
   const repoDrift = await detectConfigRepoDrift(ctx, activePlan);
@@ -19944,7 +19962,7 @@ async function applyPlan(ctx, plan) {
     pid: process.pid,
     startedAt: (/* @__PURE__ */ new Date()).toISOString(),
     scope: "config-repo",
-    target: import_node_path18.default.resolve(ctx.configRepoPath),
+    target: import_node_path20.default.resolve(ctx.configRepoPath),
     command: "applyPlan"
   });
   let applyLock;
@@ -19953,7 +19971,7 @@ async function applyPlan(ctx, plan) {
       pid: process.pid,
       startedAt: (/* @__PURE__ */ new Date()).toISOString(),
       scope: "home-apply",
-      target: import_node_path18.default.resolve(ctx.home),
+      target: import_node_path20.default.resolve(ctx.home),
       command: "applyPlan"
     });
     const lockedDrift = await detectConfigRepoDrift(ctx, activePlan);
@@ -19975,8 +19993,8 @@ async function runApplyBody(ctx, activePlan, actionable, paths) {
     tx = await beginTransaction(paths, `apply ${activePlan.id}`, ctx.home, activePlan.actions);
     backupId = tx.id;
   }
-  const resourcesFile = await loadResources(import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"));
-  const registry = await loadRecipeRegistry(import_node_path18.default.join(ctx.configRepoPath, "recipes"));
+  const resourcesFile = await loadResources(import_node_path20.default.join(ctx.configRepoPath, "resources.yaml"));
+  const registry = await loadRecipeRegistry(import_node_path20.default.join(ctx.configRepoPath, "recipes"));
   const stateDraft = structuredClone(await getState(ctx.home));
   const receipts = [];
   function draftMark(resourceId, target, info) {
@@ -20210,8 +20228,12 @@ async function runApplyBody(ctx, activePlan, actionable, paths) {
     autoRolledBack
   };
 }
+
+// packages/recipe-engine/dist/drift-report.js
+var import_node_path21 = __toESM(require("node:path"), 1);
+init_dist();
 async function buildDriftReport(ctx) {
-  const resourcesFile = await loadResources(import_node_path18.default.join(ctx.configRepoPath, "resources.yaml"));
+  const resourcesFile = await loadResources(import_node_path21.default.join(ctx.configRepoPath, "resources.yaml"));
   const { profile, parents } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
   const selected = new Set(resolveProfileResources(profile, resourcesFile.resources.map((r) => r.id), parents));
   const items = [];
@@ -20243,14 +20265,11 @@ async function buildDriftReport(ctx) {
 }
 
 // packages/recipe-engine/dist/capture.js
-var import_node_path21 = __toESM(require("node:path"), 1);
-var import_promises11 = __toESM(require("node:fs/promises"), 1);
-var import_node_os3 = __toESM(require("node:os"), 1);
-var import_node_crypto7 = __toESM(require("node:crypto"), 1);
+var import_node_path26 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
-var import_node_path19 = __toESM(require("node:path"), 1);
+var import_node_path22 = __toESM(require("node:path"), 1);
 init_dist();
 var heuristicAiProvider = {
   name: "heuristic",
@@ -20258,7 +20277,7 @@ var heuristicAiProvider = {
     const skillMds = tree.filter((f) => f.endsWith("SKILL.md"));
     const out = [];
     for (const md of skillMds.slice(0, 5)) {
-      const dir = import_node_path19.default.posix.dirname(md);
+      const dir = import_node_path22.default.posix.dirname(md);
       out.push(CandidateRecipeSchema.parse({
         target,
         driver: "generic-skill",
@@ -20295,7 +20314,7 @@ async function analyzeWithOptionalAi(request, options = {}) {
   const docNames = tree.filter((f) => /(^|\/)(readme|install|skill\.md|plugin\.json|marketplace\.json|package\.json|hooks\.json)/i.test(f));
   const documents = [];
   for (const rel of docNames.slice(0, 12)) {
-    const full = import_node_path19.default.join(request.sourceRoot, rel);
+    const full = import_node_path22.default.join(request.sourceRoot, rel);
     if (!await pathExists(full))
       continue;
     try {
@@ -20332,9 +20351,103 @@ async function analyzeWithOptionalAi(request, options = {}) {
   return { candidates, usedAi, notes, promptContext };
 }
 
+// packages/recipe-engine/dist/capture-policy.js
+var import_node_path23 = __toESM(require("node:path"), 1);
+var FORBIDDEN_LOCAL_SOURCE_BASENAMES = /* @__PURE__ */ new Set([
+  "settings.json",
+  "installed_plugins.json",
+  "known_marketplaces.json",
+  "config.toml",
+  "hooks.json"
+]);
+function isForbiddenLocalSourcePath(p) {
+  if (!p)
+    return false;
+  const base = import_node_path23.default.basename(p).toLowerCase();
+  if (FORBIDDEN_LOCAL_SOURCE_BASENAMES.has(base))
+    return true;
+  const norm = p.replace(/\\/g, "/").toLowerCase();
+  return norm.endsWith("/.claude/settings.json") || norm.includes("/.claude/plugins/installed_plugins.json") || norm.includes("/.claude/plugins/known_marketplaces.json") || norm.endsWith("/.codex/config.toml") || norm.endsWith("/.codex/hooks.json");
+}
+function metaString(meta, key) {
+  const value = meta?.[key];
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function pluginIdentity(s) {
+  const pluginName = metaString(s.metadata, "pluginName") || (s.id.includes("@") ? s.id.slice(0, s.id.lastIndexOf("@")) : void 0);
+  const marketplace = metaString(s.metadata, "marketplace") || (s.id.includes("@") ? s.id.slice(s.id.lastIndexOf("@") + 1) : void 0);
+  const marketplaceRepository = metaString(s.metadata, "marketplaceRepository") || s.sourceCandidate;
+  return { pluginName, marketplace, marketplaceRepository };
+}
+function logicalId(s) {
+  if (s.kind === "skill")
+    return s.id;
+  if (s.kind === "plugin") {
+    const { pluginName, marketplace } = pluginIdentity(s);
+    if (pluginName && marketplace)
+      return `${pluginName}@${marketplace}`;
+    if (pluginName)
+      return pluginName;
+    if (s.id.includes("@"))
+      return s.id;
+  }
+  if (s.sourceCandidate) {
+    const repo = s.sourceCandidate.replace(/\.git$/i, "");
+    const short = repo.includes("/") ? repo.split("/").pop() : repo;
+    if (s.id.includes("@"))
+      return s.id;
+    return short || s.id;
+  }
+  return s.id;
+}
+function validateCaptureProposal(item) {
+  if (isNeverCapturableResource(item.scanned)) {
+    return { ok: false, reason: "system-resource-not-capturable" };
+  }
+  if (item.scanned.kind === "plugin") {
+    const { pluginName, marketplace, marketplaceRepository } = pluginIdentity(item.scanned);
+    const src = item.suggestedResource.source;
+    if (src?.provider === "local" && isForbiddenLocalSourcePath(src.path)) {
+      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+    }
+    if (!pluginName)
+      return { ok: false, reason: "plugin-name-missing" };
+    const claude = item.suggestedRecipe?.targets?.claude;
+    if (claude?.driver === "claude-marketplace" && !marketplace && !marketplaceRepository && !claude.marketplace && !claude.marketplaceRepository) {
+      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+    }
+    if (!marketplaceRepository && !marketplace && metaString(item.scanned.metadata, "sourceResolutionStatus") === "unresolved") {
+      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+    }
+    if (!item.scanned.sourceCandidate && !marketplaceRepository) {
+      const evidence = item.scanned.metadata?.evidence;
+      const onlySettings = Array.isArray(evidence) && evidence.length > 0 && evidence.every((entry) => typeof entry === "object" && entry !== null && entry.from === "settings.json");
+      if (onlySettings || !item.scanned.sourceCandidate) {
+        return { ok: false, reason: "plugin-marketplace-source-unresolved" };
+      }
+    }
+  }
+  if (item.suggestedResource.source?.provider === "local" && isForbiddenLocalSourcePath(item.suggestedResource.source.path)) {
+    return { ok: false, reason: "forbidden-local-source" };
+  }
+  return { ok: true };
+}
+function groupKey(s) {
+  const name = logicalId(s);
+  const repo = s.sourceCandidate?.replace(/\.git$/i, "") ?? "local";
+  return `${repo}::${name}::${s.kind}`;
+}
+
+// packages/recipe-engine/dist/capture-transaction.js
+var import_node_path25 = __toESM(require("node:path"), 1);
+var import_promises11 = __toESM(require("node:fs/promises"), 1);
+var import_node_os3 = __toESM(require("node:os"), 1);
+var import_node_crypto7 = __toESM(require("node:crypto"), 1);
+init_dist();
+
 // packages/recipe-engine/dist/vendor.js
 var import_promises10 = __toESM(require("node:fs/promises"), 1);
-var import_node_path20 = __toESM(require("node:path"), 1);
+var import_node_path24 = __toESM(require("node:path"), 1);
 init_dist();
 var SKIP_DIR_NAMES = /* @__PURE__ */ new Set([
   ".git",
@@ -20382,10 +20495,10 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, optio
   const blockedSecrets = [];
   const toCopy = [];
   for (const full of files) {
-    const base = import_node_path20.default.basename(full);
+    const base = import_node_path24.default.basename(full);
     if (shouldSkipFile(base))
       continue;
-    const rel = import_node_path20.default.relative(sourceDir, full);
+    const rel = import_node_path24.default.relative(sourceDir, full);
     try {
       const text = await readText(full);
       const findings = scanTextForSecrets(text, rel);
@@ -20415,9 +20528,9 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, optio
   await ensureDir(destAbs);
   let copied = 0;
   for (const full of toCopy) {
-    const rel = import_node_path20.default.relative(sourceDir, full);
-    const out = import_node_path20.default.join(destAbs, rel);
-    await ensureDir(import_node_path20.default.dirname(out));
+    const rel = import_node_path24.default.relative(sourceDir, full);
+    const out = import_node_path24.default.join(destAbs, rel);
+    await ensureDir(import_node_path24.default.dirname(out));
     await import_promises10.default.copyFile(full, out);
     copied++;
   }
@@ -20433,96 +20546,296 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, optio
   };
 }
 
+// packages/recipe-engine/dist/capture-transaction.js
+async function entryType(abs) {
+  try {
+    const st = await import_promises11.default.stat(abs);
+    return st.isDirectory() ? "directory" : "file";
+  } catch {
+    return "file";
+  }
+}
+async function rollbackCaptureTransaction(tx, configRepoPath) {
+  for (const entry of tx.entries) {
+    const live = import_node_path25.default.join(configRepoPath, entry.path);
+    try {
+      if (!entry.existedBefore) {
+        if (await pathExists(live)) {
+          await import_promises11.default.rm(live, { recursive: true, force: true });
+        }
+        continue;
+      }
+      if (await pathExists(live)) {
+        await import_promises11.default.rm(live, { recursive: true, force: true });
+      }
+      if (entry.backupPath && await pathExists(entry.backupPath)) {
+        await ensureDir(import_node_path25.default.dirname(live));
+        await import_promises11.default.cp(entry.backupPath, live, { recursive: true });
+      }
+    } catch {
+    }
+  }
+}
+async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", options = {}) {
+  const home = options.home ?? import_node_os3.default.homedir();
+  const txBase = captureTransactionsDir(home);
+  await ensureDir(txBase);
+  const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
+  const lockPayload = {
+    pid: process.pid,
+    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    target: import_node_path25.default.resolve(configRepoPath),
+    scope: "config-repo",
+    command: "commitCaptureItems"
+  };
+  await acquireFileLock(lockPath, lockPayload, {
+    maxAttempts: 60,
+    injectThrowAfterAcquire: options.injectFailureAfter?.includes("__throw-after-lock__")
+  });
+  try {
+    if (options.injectDelayMs && options.injectDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, options.injectDelayMs));
+    }
+    const resourcesPath = import_node_path25.default.join(configRepoPath, "resources.yaml");
+    const existing = await loadResources(resourcesPath);
+    const byId = new Map(existing.resources.map((r) => [r.id, r]));
+    const recipePaths = [];
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const batchById = /* @__PURE__ */ new Map();
+    for (const item of items) {
+      if (isSelfManagedResourceId(item.suggestedResource.id))
+        continue;
+      const prev = batchById.get(item.suggestedResource.id);
+      if (!prev) {
+        batchById.set(item.suggestedResource.id, item);
+        continue;
+      }
+      const mergedResource = {
+        ...prev.suggestedResource,
+        ...item.suggestedResource,
+        targets: {
+          ...prev.suggestedResource.targets,
+          ...item.suggestedResource.targets
+        }
+      };
+      let mergedRecipe = prev.suggestedRecipe;
+      if (item.suggestedRecipe) {
+        mergedRecipe = RecipeSchema.parse({
+          ...item.suggestedRecipe,
+          targets: {
+            ...prev.suggestedRecipe?.targets ?? {},
+            ...item.suggestedRecipe.targets
+          }
+        });
+      }
+      batchById.set(item.suggestedResource.id, {
+        ...item,
+        suggestedResource: mergedResource,
+        suggestedRecipe: mergedRecipe,
+        needsAi: prev.needsAi && item.needsAi,
+        usedAi: prev.usedAi || item.usedAi
+      });
+    }
+    const txId = import_node_crypto7.default.randomUUID();
+    const stagingRoot = import_node_path25.default.join(txBase, `${txId}-staging`);
+    const backupRoot = import_node_path25.default.join(txBase, `${txId}-backup`);
+    const stagedRecipeRels = [];
+    const stagedVendorRels = [];
+    const txEntries = [];
+    const trackPath = async (rel) => {
+      if (txEntries.some((e) => e.path === rel))
+        return;
+      const live = import_node_path25.default.join(configRepoPath, rel);
+      const existedBefore = await pathExists(live);
+      const type = existedBefore ? await entryType(live) : "file";
+      let backupPath;
+      if (existedBefore) {
+        backupPath = import_node_path25.default.join(backupRoot, rel);
+        await ensureDir(import_node_path25.default.dirname(backupPath));
+        await import_promises11.default.cp(live, backupPath, { recursive: true });
+      }
+      txEntries.push({ path: rel, existedBefore, backupPath, type });
+    };
+    let completed;
+    try {
+      await import_promises11.default.mkdir(import_node_path25.default.join(stagingRoot, "recipes"), { recursive: true });
+      await import_promises11.default.mkdir(backupRoot, { recursive: true });
+      for (const item of batchById.values()) {
+        if (item.status === "blocked" || item.status === "system-excluded") {
+          continue;
+        }
+        const validation = validateCaptureProposal(item);
+        if (!validation.ok) {
+          continue;
+        }
+        if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path25.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
+          const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id, { stagingRoot });
+          if (!v.ok) {
+            throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
+          }
+          stagedVendorRels.push(v.destRel);
+          item.suggestedResource = {
+            ...item.suggestedResource,
+            source: {
+              provider: "vendored",
+              path: v.destRel
+            },
+            versionPolicy: "vendored"
+          };
+          if (item.suggestedRecipe) {
+            item.suggestedRecipe = {
+              ...item.suggestedRecipe,
+              source: item.suggestedResource.source,
+              versionPolicy: "vendored",
+              targets: Object.fromEntries(Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
+                t,
+                tr ? {
+                  ...tr,
+                  sourcePaths: { skill: "." },
+                  requiredPaths: ["SKILL.md"],
+                  driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill"
+                } : tr
+              ]))
+            };
+          }
+        }
+        const prev = byId.get(item.suggestedResource.id);
+        if (prev) {
+          byId.set(item.suggestedResource.id, {
+            ...prev,
+            ...item.suggestedResource,
+            targets: {
+              ...prev.targets,
+              ...item.suggestedResource.targets
+            }
+          });
+        } else {
+          byId.set(item.suggestedResource.id, item.suggestedResource);
+        }
+        if (item.suggestedRecipe) {
+          const recipeRel = assertSafeRelPath(recipeRelPath(item.suggestedResource.id));
+          const recipeFileLive = safeJoin(configRepoPath, recipeRel);
+          const recipeFileStage = safeJoin(stagingRoot, recipeRel);
+          let baseTargets = item.suggestedRecipe.targets;
+          if (await pathExists(recipeFileLive)) {
+            try {
+              const existingRecipe = await loadRecipe(recipeFileLive);
+              baseTargets = {
+                ...existingRecipe.targets,
+                ...item.suggestedRecipe.targets
+              };
+            } catch {
+            }
+          }
+          const recipe = {
+            ...item.suggestedRecipe,
+            targets: baseTargets,
+            confirmedAt: now,
+            confirmedBy
+          };
+          RecipeSchema.parse(recipe);
+          await saveRecipe(recipeFileStage, recipe);
+          stagedRecipeRels.push(recipeRel);
+          recipePaths.push(recipeFileLive);
+        }
+      }
+      const stagedResources = import_node_path25.default.join(stagingRoot, "resources.yaml");
+      await saveResources(stagedResources, {
+        schemaVersion: 1,
+        resources: [...byId.values()]
+      });
+      await loadResources(stagedResources);
+      await trackPath("resources.yaml");
+      for (const rel of stagedRecipeRels)
+        await trackPath(rel);
+      for (const rel of stagedVendorRels)
+        await trackPath(rel);
+      for (const rel of stagedVendorRels) {
+        const from = import_node_path25.default.join(stagingRoot, rel);
+        const to = import_node_path25.default.join(configRepoPath, rel);
+        if (await pathExists(to)) {
+          await import_promises11.default.rm(to, { recursive: true, force: true });
+        }
+        await import_promises11.default.mkdir(import_node_path25.default.dirname(to), { recursive: true });
+        await import_promises11.default.rename(from, to).catch(async () => {
+          await import_promises11.default.cp(from, to, { recursive: true });
+          await import_promises11.default.rm(from, { recursive: true, force: true });
+        });
+        if (options.injectFailureAfter?.includes(rel)) {
+          throw new Error(`injectFailureAfter: ${rel}`);
+        }
+      }
+      for (const rel of stagedRecipeRels) {
+        const from = import_node_path25.default.join(stagingRoot, rel);
+        const to = import_node_path25.default.join(configRepoPath, rel);
+        if (await pathExists(to)) {
+          await import_promises11.default.rm(to, { recursive: true, force: true });
+        }
+        await import_promises11.default.mkdir(import_node_path25.default.dirname(to), { recursive: true });
+        await import_promises11.default.rename(from, to).catch(async () => {
+          await import_promises11.default.copyFile(from, to);
+          await import_promises11.default.rm(from, { force: true });
+        });
+        if (options.injectFailureAfter?.includes(rel)) {
+          throw new Error(`injectFailureAfter: ${rel}`);
+        }
+      }
+      {
+        const from = stagedResources;
+        const to = resourcesPath;
+        if (await pathExists(to)) {
+          await import_promises11.default.rm(to, { force: true });
+        }
+        await import_promises11.default.rename(from, to).catch(async () => {
+          await import_promises11.default.copyFile(from, to);
+          await import_promises11.default.rm(from, { force: true });
+        });
+        if (options.injectFailureAfter?.includes("resources.yaml")) {
+          throw new Error("injectFailureAfter: resources.yaml");
+        }
+      }
+      await import_promises11.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
+      });
+      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+      });
+      const changedRelPaths = [
+        "resources.yaml",
+        ...stagedRecipeRels,
+        ...stagedVendorRels
+      ];
+      const seen = /* @__PURE__ */ new Set();
+      const uniqueChanged = changedRelPaths.filter((p) => {
+        if (seen.has(p))
+          return false;
+        seen.add(p);
+        return true;
+      });
+      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+    } catch (e) {
+      try {
+        await rollbackCaptureTransaction({
+          id: txId,
+          stagingRoot,
+          backupRoot,
+          entries: txEntries
+        }, configRepoPath);
+      } catch {
+      }
+      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+      });
+      throw e;
+    }
+    if (options.afterWrite)
+      await options.afterWrite(completed);
+    return completed;
+  } finally {
+    await releaseFileLock(lockPath);
+  }
+}
+
 // packages/recipe-engine/dist/capture.js
-var FORBIDDEN_LOCAL_SOURCE_BASENAMES = /* @__PURE__ */ new Set([
-  "settings.json",
-  "installed_plugins.json",
-  "known_marketplaces.json",
-  "config.toml",
-  "hooks.json"
-]);
-function isForbiddenLocalSourcePath(p) {
-  if (!p)
-    return false;
-  const base = import_node_path21.default.basename(p).toLowerCase();
-  if (FORBIDDEN_LOCAL_SOURCE_BASENAMES.has(base))
-    return true;
-  const norm = p.replace(/\\/g, "/").toLowerCase();
-  return norm.endsWith("/.claude/settings.json") || norm.includes("/.claude/plugins/installed_plugins.json") || norm.includes("/.claude/plugins/known_marketplaces.json") || norm.endsWith("/.codex/config.toml") || norm.endsWith("/.codex/hooks.json");
-}
-function metaString(meta, key) {
-  const v = meta?.[key];
-  return typeof v === "string" && v.length > 0 ? v : void 0;
-}
-function pluginIdentity(s) {
-  const pluginName = metaString(s.metadata, "pluginName") || (s.id.includes("@") ? s.id.slice(0, s.id.lastIndexOf("@")) : void 0);
-  const marketplace = metaString(s.metadata, "marketplace") || (s.id.includes("@") ? s.id.slice(s.id.lastIndexOf("@") + 1) : void 0);
-  const marketplaceRepository = metaString(s.metadata, "marketplaceRepository") || s.sourceCandidate;
-  return { pluginName, marketplace, marketplaceRepository };
-}
-function logicalId(s) {
-  if (s.kind === "skill")
-    return s.id;
-  if (s.kind === "plugin") {
-    const { pluginName, marketplace } = pluginIdentity(s);
-    if (pluginName && marketplace)
-      return `${pluginName}@${marketplace}`;
-    if (pluginName)
-      return pluginName;
-    if (s.id.includes("@"))
-      return s.id;
-  }
-  if (s.sourceCandidate) {
-    const repo = s.sourceCandidate.replace(/\.git$/i, "");
-    const short = repo.includes("/") ? repo.split("/").pop() : repo;
-    if (s.id.includes("@"))
-      return s.id;
-    return short || s.id;
-  }
-  return s.id;
-}
-function validateCaptureProposal(item) {
-  if (isNeverCapturableResource(item.scanned)) {
-    return { ok: false, reason: "system-resource-not-capturable" };
-  }
-  if (item.scanned.kind === "plugin") {
-    const { pluginName, marketplace, marketplaceRepository } = pluginIdentity(item.scanned);
-    const src = item.suggestedResource.source;
-    if (src?.provider === "local" && isForbiddenLocalSourcePath(src.path)) {
-      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
-    }
-    if (!pluginName) {
-      return { ok: false, reason: "plugin-name-missing" };
-    }
-    const claude = item.suggestedRecipe?.targets?.claude;
-    if (claude?.driver === "claude-marketplace") {
-      if (!marketplace && !marketplaceRepository && !claude.marketplace && !claude.marketplaceRepository) {
-        return { ok: false, reason: "plugin-marketplace-source-unresolved" };
-      }
-    }
-    if (!marketplaceRepository && !marketplace && metaString(item.scanned.metadata, "sourceResolutionStatus") === "unresolved") {
-      return { ok: false, reason: "plugin-marketplace-source-unresolved" };
-    }
-    if (!item.scanned.sourceCandidate && !marketplaceRepository && item.scanned.kind === "plugin") {
-      const evidence = item.scanned.metadata?.evidence;
-      const onlySettings = Array.isArray(evidence) && evidence.length > 0 && evidence.every((e) => typeof e === "object" && e !== null && e.from === "settings.json");
-      if (onlySettings || !item.scanned.sourceCandidate) {
-        return { ok: false, reason: "plugin-marketplace-source-unresolved" };
-      }
-    }
-  }
-  if (item.suggestedResource.source?.provider === "local" && isForbiddenLocalSourcePath(item.suggestedResource.source.path)) {
-    return { ok: false, reason: "forbidden-local-source" };
-  }
-  return { ok: true };
-}
-function groupKey(s) {
-  const name = logicalId(s);
-  const repo = s.sourceCandidate?.replace(/\.git$/i, "") ?? "local";
-  return `${repo}::${name}::${s.kind}`;
-}
 async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
-  const existing = await loadResources(import_node_path21.default.join(configRepoPath, "resources.yaml"));
+  const existing = await loadResources(import_node_path26.default.join(configRepoPath, "resources.yaml"));
   const existingIds = new Set(existing.resources.map((r) => r.id));
   const groups = /* @__PURE__ */ new Map();
   for (const s of scanned) {
@@ -20736,7 +21049,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     let suggestedRecipe;
     if (Object.keys(targetRecipes).length > 0) {
       let existingTargets = {};
-      const recipeFile = import_node_path21.default.join(configRepoPath, recipeRelPath(id));
+      const recipeFile = import_node_path26.default.join(configRepoPath, recipeRelPath(id));
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -20783,294 +21096,9 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
   }
   return items;
 }
-async function entryType(abs) {
-  try {
-    const st = await import_promises11.default.stat(abs);
-    return st.isDirectory() ? "directory" : "file";
-  } catch {
-    return "file";
-  }
-}
-async function rollbackCaptureTransaction(tx, configRepoPath) {
-  for (const entry of tx.entries) {
-    const live = import_node_path21.default.join(configRepoPath, entry.path);
-    try {
-      if (!entry.existedBefore) {
-        if (await pathExists(live)) {
-          await import_promises11.default.rm(live, { recursive: true, force: true });
-        }
-        continue;
-      }
-      if (await pathExists(live)) {
-        await import_promises11.default.rm(live, { recursive: true, force: true });
-      }
-      if (entry.backupPath && await pathExists(entry.backupPath)) {
-        await ensureDir(import_node_path21.default.dirname(live));
-        await import_promises11.default.cp(entry.backupPath, live, { recursive: true });
-      }
-    } catch {
-    }
-  }
-}
-async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", options = {}) {
-  const home = options.home ?? import_node_os3.default.homedir();
-  const txBase = captureTransactionsDir(home);
-  await ensureDir(txBase);
-  const lockPath = lockFilePath(txBase, "config-repo", configRepoPath);
-  const lockPayload = {
-    pid: process.pid,
-    startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    target: import_node_path21.default.resolve(configRepoPath),
-    scope: "config-repo",
-    command: "commitCaptureItems"
-  };
-  await acquireFileLock(lockPath, lockPayload, {
-    maxAttempts: 60,
-    injectThrowAfterAcquire: options.injectFailureAfter?.includes("__throw-after-lock__")
-  });
-  try {
-    if (options.injectDelayMs && options.injectDelayMs > 0) {
-      await new Promise((r) => setTimeout(r, options.injectDelayMs));
-    }
-    const resourcesPath = import_node_path21.default.join(configRepoPath, "resources.yaml");
-    const existing = await loadResources(resourcesPath);
-    const byId = new Map(existing.resources.map((r) => [r.id, r]));
-    const recipePaths = [];
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    const batchById = /* @__PURE__ */ new Map();
-    for (const item of items) {
-      if (isSelfManagedResourceId(item.suggestedResource.id))
-        continue;
-      const prev = batchById.get(item.suggestedResource.id);
-      if (!prev) {
-        batchById.set(item.suggestedResource.id, item);
-        continue;
-      }
-      const mergedResource = {
-        ...prev.suggestedResource,
-        ...item.suggestedResource,
-        targets: {
-          ...prev.suggestedResource.targets,
-          ...item.suggestedResource.targets
-        }
-      };
-      let mergedRecipe = prev.suggestedRecipe;
-      if (item.suggestedRecipe) {
-        mergedRecipe = RecipeSchema.parse({
-          ...item.suggestedRecipe,
-          targets: {
-            ...prev.suggestedRecipe?.targets ?? {},
-            ...item.suggestedRecipe.targets
-          }
-        });
-      }
-      batchById.set(item.suggestedResource.id, {
-        ...item,
-        suggestedResource: mergedResource,
-        suggestedRecipe: mergedRecipe,
-        needsAi: prev.needsAi && item.needsAi,
-        usedAi: prev.usedAi || item.usedAi
-      });
-    }
-    const txId = import_node_crypto7.default.randomUUID();
-    const stagingRoot = import_node_path21.default.join(txBase, `${txId}-staging`);
-    const backupRoot = import_node_path21.default.join(txBase, `${txId}-backup`);
-    const stagedRecipeRels = [];
-    const stagedVendorRels = [];
-    const txEntries = [];
-    const trackPath = async (rel) => {
-      if (txEntries.some((e) => e.path === rel))
-        return;
-      const live = import_node_path21.default.join(configRepoPath, rel);
-      const existedBefore = await pathExists(live);
-      const type = existedBefore ? await entryType(live) : "file";
-      let backupPath;
-      if (existedBefore) {
-        backupPath = import_node_path21.default.join(backupRoot, rel);
-        await ensureDir(import_node_path21.default.dirname(backupPath));
-        await import_promises11.default.cp(live, backupPath, { recursive: true });
-      }
-      txEntries.push({ path: rel, existedBefore, backupPath, type });
-    };
-    let completed;
-    try {
-      await import_promises11.default.mkdir(import_node_path21.default.join(stagingRoot, "recipes"), { recursive: true });
-      await import_promises11.default.mkdir(backupRoot, { recursive: true });
-      for (const item of batchById.values()) {
-        if (item.status === "blocked" || item.status === "system-excluded") {
-          continue;
-        }
-        const validation = validateCaptureProposal(item);
-        if (!validation.ok) {
-          continue;
-        }
-        if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path21.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
-          const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id, { stagingRoot });
-          if (!v.ok) {
-            throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
-          }
-          stagedVendorRels.push(v.destRel);
-          item.suggestedResource = {
-            ...item.suggestedResource,
-            source: {
-              provider: "vendored",
-              path: v.destRel
-            },
-            versionPolicy: "vendored"
-          };
-          if (item.suggestedRecipe) {
-            item.suggestedRecipe = {
-              ...item.suggestedRecipe,
-              source: item.suggestedResource.source,
-              versionPolicy: "vendored",
-              targets: Object.fromEntries(Object.entries(item.suggestedRecipe.targets).map(([t, tr]) => [
-                t,
-                tr ? {
-                  ...tr,
-                  sourcePaths: { skill: "." },
-                  requiredPaths: ["SKILL.md"],
-                  driver: tr.driver === "claude-marketplace" ? tr.driver : "generic-skill"
-                } : tr
-              ]))
-            };
-          }
-        }
-        const prev = byId.get(item.suggestedResource.id);
-        if (prev) {
-          byId.set(item.suggestedResource.id, {
-            ...prev,
-            ...item.suggestedResource,
-            targets: {
-              ...prev.targets,
-              ...item.suggestedResource.targets
-            }
-          });
-        } else {
-          byId.set(item.suggestedResource.id, item.suggestedResource);
-        }
-        if (item.suggestedRecipe) {
-          const recipeRel = assertSafeRelPath(recipeRelPath(item.suggestedResource.id));
-          const recipeFileLive = safeJoin(configRepoPath, recipeRel);
-          const recipeFileStage = safeJoin(stagingRoot, recipeRel);
-          let baseTargets = item.suggestedRecipe.targets;
-          if (await pathExists(recipeFileLive)) {
-            try {
-              const existingRecipe = await loadRecipe(recipeFileLive);
-              baseTargets = {
-                ...existingRecipe.targets,
-                ...item.suggestedRecipe.targets
-              };
-            } catch {
-            }
-          }
-          const recipe = {
-            ...item.suggestedRecipe,
-            targets: baseTargets,
-            confirmedAt: now,
-            confirmedBy
-          };
-          RecipeSchema.parse(recipe);
-          await saveRecipe(recipeFileStage, recipe);
-          stagedRecipeRels.push(recipeRel);
-          recipePaths.push(recipeFileLive);
-        }
-      }
-      const stagedResources = import_node_path21.default.join(stagingRoot, "resources.yaml");
-      await saveResources(stagedResources, {
-        schemaVersion: 1,
-        resources: [...byId.values()]
-      });
-      await loadResources(stagedResources);
-      await trackPath("resources.yaml");
-      for (const rel of stagedRecipeRels)
-        await trackPath(rel);
-      for (const rel of stagedVendorRels)
-        await trackPath(rel);
-      for (const rel of stagedVendorRels) {
-        const from = import_node_path21.default.join(stagingRoot, rel);
-        const to = import_node_path21.default.join(configRepoPath, rel);
-        if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { recursive: true, force: true });
-        }
-        await import_promises11.default.mkdir(import_node_path21.default.dirname(to), { recursive: true });
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.cp(from, to, { recursive: true });
-          await import_promises11.default.rm(from, { recursive: true, force: true });
-        });
-        if (options.injectFailureAfter?.includes(rel)) {
-          throw new Error(`injectFailureAfter: ${rel}`);
-        }
-      }
-      for (const rel of stagedRecipeRels) {
-        const from = import_node_path21.default.join(stagingRoot, rel);
-        const to = import_node_path21.default.join(configRepoPath, rel);
-        if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { recursive: true, force: true });
-        }
-        await import_promises11.default.mkdir(import_node_path21.default.dirname(to), { recursive: true });
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.copyFile(from, to);
-          await import_promises11.default.rm(from, { force: true });
-        });
-        if (options.injectFailureAfter?.includes(rel)) {
-          throw new Error(`injectFailureAfter: ${rel}`);
-        }
-      }
-      {
-        const from = stagedResources;
-        const to = resourcesPath;
-        if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { force: true });
-        }
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.copyFile(from, to);
-          await import_promises11.default.rm(from, { force: true });
-        });
-        if (options.injectFailureAfter?.includes("resources.yaml")) {
-          throw new Error("injectFailureAfter: resources.yaml");
-        }
-      }
-      await import_promises11.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
-      });
-      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
-      });
-      const changedRelPaths = [
-        "resources.yaml",
-        ...stagedRecipeRels,
-        ...stagedVendorRels
-      ];
-      const seen = /* @__PURE__ */ new Set();
-      const uniqueChanged = changedRelPaths.filter((p) => {
-        if (seen.has(p))
-          return false;
-        seen.add(p);
-        return true;
-      });
-      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
-    } catch (e) {
-      try {
-        await rollbackCaptureTransaction({
-          id: txId,
-          stagingRoot,
-          backupRoot,
-          entries: txEntries
-        }, configRepoPath);
-      } catch {
-      }
-      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
-      });
-      throw e;
-    }
-    if (options.afterWrite)
-      await options.afterWrite(completed);
-    return completed;
-  } finally {
-    await releaseFileLock(lockPath);
-  }
-}
 
 // packages/recipe-engine/dist/doctor.js
-var import_node_path22 = __toESM(require("node:path"), 1);
+var import_node_path27 = __toESM(require("node:path"), 1);
 init_dist();
 async function runDoctor(options) {
   const findings = [];
@@ -21178,7 +21206,7 @@ async function runDoctor(options) {
           });
         }
       }
-      const resourcesPath = import_node_path22.default.join(repo, "resources.yaml");
+      const resourcesPath = import_node_path27.default.join(repo, "resources.yaml");
       if (!await pathExists(resourcesPath)) {
         findings.push({
           severity: "warn",
@@ -21278,7 +21306,7 @@ async function runDoctor(options) {
   }
   if (options.configRepoPath) {
     try {
-      const res = await loadResources(import_node_path22.default.join(options.configRepoPath, "resources.yaml"));
+      const res = await loadResources(import_node_path27.default.join(options.configRepoPath, "resources.yaml"));
       const refs = collectSecretRefs(res);
       if (refs.length > 0) {
         const checks = await checkSecrets(refs, "env");
@@ -21315,17 +21343,16 @@ function formatDoctor(report) {
   return lines.join("\n");
 }
 
-// packages/cli/src/setup.ts
-var import_node_path23 = __toESM(require("node:path"), 1);
+// packages/cli/src/setup-discovery.ts
+var import_node_path28 = __toESM(require("node:path"), 1);
 var import_promises12 = __toESM(require("node:fs/promises"), 1);
-var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
 var SELF_PLUGIN_NAMES = /* @__PURE__ */ new Set(["ai-config-sync", "config-sync"]);
 async function looksLikePackageRoot(dir) {
   return pathExists(
-    import_node_path23.default.join(
+    import_node_path28.default.join(
       dir,
       "integrations",
       "claude-plugin",
@@ -21335,7 +21362,7 @@ async function looksLikePackageRoot(dir) {
   );
 }
 async function readPluginManifestName(pluginRoot) {
-  const manifest = import_node_path23.default.join(pluginRoot, ".claude-plugin", "plugin.json");
+  const manifest = import_node_path28.default.join(pluginRoot, ".claude-plugin", "plugin.json");
   if (!await pathExists(manifest)) return void 0;
   try {
     const raw = await readJsonFile(manifest);
@@ -21346,15 +21373,15 @@ async function readPluginManifestName(pluginRoot) {
 }
 async function detectPluginRoot(explicit) {
   const candidates = [];
-  if (explicit) candidates.push(import_node_path23.default.resolve(explicit));
+  if (explicit) candidates.push(import_node_path28.default.resolve(explicit));
   if (process.env.CLAUDE_PLUGIN_ROOT) {
-    candidates.push(import_node_path23.default.resolve(process.env.CLAUDE_PLUGIN_ROOT));
+    candidates.push(import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT));
   }
   try {
     const argv1 = process.argv[1];
     if (argv1) {
-      const binDir = import_node_path23.default.dirname(import_node_path23.default.resolve(argv1));
-      candidates.push(import_node_path23.default.resolve(binDir, ".."));
+      const binDir = import_node_path28.default.dirname(import_node_path28.default.resolve(argv1));
+      candidates.push(import_node_path28.default.resolve(binDir, ".."));
     }
   } catch {
   }
@@ -21362,20 +21389,20 @@ async function detectPluginRoot(explicit) {
     if (!await pathExists(c)) continue;
     const name = await readPluginManifestName(c);
     if (name && SELF_PLUGIN_NAMES.has(name)) return c;
-    if (await pathExists(import_node_path23.default.join(c, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path23.default.join(c, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path23.default.join(c, "bin", "ai-config-sync")))) {
+    if (await pathExists(import_node_path28.default.join(c, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path28.default.join(c, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path28.default.join(c, "bin", "ai-config-sync")))) {
       return c;
     }
   }
   return void 0;
 }
 async function isRunningInsideSelfPlugin(pluginRoot) {
-  const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT ? import_node_path23.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) : void 0);
+  const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT ? import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) : void 0);
   if (!root) return false;
   const name = await readPluginManifestName(root);
   if (name && SELF_PLUGIN_NAMES.has(name)) return true;
-  if (await pathExists(import_node_path23.default.join(root, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path23.default.join(root, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path23.default.join(root, "bin", "ai-config-sync")))) {
+  if (await pathExists(import_node_path28.default.join(root, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path28.default.join(root, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path28.default.join(root, "bin", "ai-config-sync")))) {
     if (name) return SELF_PLUGIN_NAMES.has(name);
-    if (process.env.CLAUDE_PLUGIN_ROOT && import_node_path23.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root) {
+    if (process.env.CLAUDE_PLUGIN_ROOT && import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root) {
       return false;
     }
   }
@@ -21383,16 +21410,16 @@ async function isRunningInsideSelfPlugin(pluginRoot) {
 }
 async function detectPackageRoot(explicit) {
   if (explicit && await pathExists(explicit)) {
-    const resolved = import_node_path23.default.resolve(explicit);
+    const resolved = import_node_path28.default.resolve(explicit);
     if (await looksLikePackageRoot(resolved)) return resolved;
     return resolved;
   }
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
     const candidates = [
-      import_node_path23.default.resolve(pluginRoot, ".."),
-      import_node_path23.default.resolve(pluginRoot, "../.."),
-      import_node_path23.default.resolve(pluginRoot, "../../.."),
+      import_node_path28.default.resolve(pluginRoot, ".."),
+      import_node_path28.default.resolve(pluginRoot, "../.."),
+      import_node_path28.default.resolve(pluginRoot, "../../.."),
       pluginRoot
     ];
     for (const c of candidates) {
@@ -21400,13 +21427,13 @@ async function detectPackageRoot(explicit) {
     }
   }
   try {
-    const here = import_node_path23.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
+    const here = import_node_path28.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
     const candidates = [
-      import_node_path23.default.resolve(here, "../../.."),
+      import_node_path28.default.resolve(here, "../../.."),
       // monorepo packages/cli/src
-      import_node_path23.default.resolve(here, ".."),
+      import_node_path28.default.resolve(here, ".."),
       // npm package dist/
-      import_node_path23.default.resolve(here, "../..")
+      import_node_path28.default.resolve(here, "../..")
     ];
     for (const c of candidates) {
       if (await looksLikePackageRoot(c)) return c;
@@ -21416,13 +21443,13 @@ async function detectPackageRoot(explicit) {
   try {
     const argv1 = process.argv[1];
     if (argv1) {
-      const binDir = import_node_path23.default.dirname(import_node_path23.default.resolve(argv1));
+      const binDir = import_node_path28.default.dirname(import_node_path28.default.resolve(argv1));
       const candidates = [
-        import_node_path23.default.resolve(binDir, ".."),
+        import_node_path28.default.resolve(binDir, ".."),
         // package root from dist/ai-config-sync.cjs
-        import_node_path23.default.resolve(binDir, "../.."),
-        import_node_path23.default.resolve(binDir, "../../.."),
-        import_node_path23.default.resolve(binDir, "../../../..")
+        import_node_path28.default.resolve(binDir, "../.."),
+        import_node_path28.default.resolve(binDir, "../../.."),
+        import_node_path28.default.resolve(binDir, "../../../..")
       ];
       for (const c of candidates) {
         if (await looksLikePackageRoot(c)) return c;
@@ -21433,7 +21460,7 @@ async function detectPackageRoot(explicit) {
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     if (await looksLikePackageRoot(dir)) return dir;
-    const parent = import_node_path23.default.dirname(dir);
+    const parent = import_node_path28.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -21449,7 +21476,7 @@ async function detectConfigRepo(options, home) {
     }
   }
   if (options.configPath) {
-    const localPath = import_node_path23.default.resolve(expandHome(options.configPath, home));
+    const localPath = import_node_path28.default.resolve(expandHome(options.configPath, home));
     return {
       localPath,
       remote: options.repo ?? existingLink?.configRepository.remote,
@@ -21479,7 +21506,7 @@ async function detectConfigRepo(options, home) {
         blocked: `Already linked to ${existingLink.configRepository.localPath}` + (existingLink.configRepository.remote ? ` (${existingLink.configRepository.remote})` : "") + `. Requested --repo ${options.repo}. Use --reconfigure to switch, or --config-path for a different directory.`
       };
     }
-    const defaultPath = import_node_path23.default.join(home, "ai-config", "my-ai-config");
+    const defaultPath = import_node_path28.default.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
@@ -21499,13 +21526,13 @@ async function detectConfigRepo(options, home) {
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
       return {
-        localPath: import_node_path23.default.join(home, "ai-config", "my-ai-config"),
+        localPath: import_node_path28.default.join(home, "ai-config", "my-ai-config"),
         remote: envRepo,
         reason: "AI_CONFIG_SYNC_REPO"
       };
     }
     return {
-      localPath: import_node_path23.default.resolve(expandHome(envRepo, home)),
+      localPath: import_node_path28.default.resolve(expandHome(envRepo, home)),
       reason: "AI_CONFIG_SYNC_REPO path"
     };
   }
@@ -21515,14 +21542,14 @@ async function detectConfigRepo(options, home) {
     if (isConfigRepository(files)) {
       return { localPath: dir, reason: "cwd walk" };
     }
-    const parent = import_node_path23.default.dirname(dir);
+    const parent = import_node_path28.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   const candidates = [
-    import_node_path23.default.join(home, "ai-config", "my-ai-config"),
-    import_node_path23.default.join(home, "Git", "my-ai-config"),
-    import_node_path23.default.join(home, "git", "my-ai-config")
+    import_node_path28.default.join(home, "ai-config", "my-ai-config"),
+    import_node_path28.default.join(home, "Git", "my-ai-config"),
+    import_node_path28.default.join(home, "git", "my-ai-config")
   ];
   for (const c of candidates) {
     if (!await pathExists(c)) continue;
@@ -21536,18 +21563,18 @@ async function detectConfigRepo(options, home) {
 async function ensureMinimalConfigRepo(localPath) {
   const actions = [];
   await ensureDir(localPath);
-  const configYaml = import_node_path23.default.join(localPath, "config.yaml");
+  const configYaml = import_node_path28.default.join(localPath, "config.yaml");
   if (!await pathExists(configYaml)) {
     await writeYamlFile(
       configYaml,
       ConfigRepoSchema.parse({
-        name: import_node_path23.default.basename(localPath),
+        name: import_node_path28.default.basename(localPath),
         defaultProfile: "home"
       })
     );
     actions.push(`CREATE ${configYaml}`);
   }
-  const resources = import_node_path23.default.join(localPath, "resources.yaml");
+  const resources = import_node_path28.default.join(localPath, "resources.yaml");
   if (!await pathExists(resources)) {
     await writeYamlFile(resources, { schemaVersion: 1, resources: [] });
     actions.push(`CREATE ${resources}`);
@@ -21563,13 +21590,13 @@ async function ensureMinimalConfigRepo(localPath) {
     "instructions/claude",
     "instructions/codex"
   ]) {
-    const full = import_node_path23.default.join(localPath, d);
+    const full = import_node_path28.default.join(localPath, d);
     if (!await pathExists(full)) {
       await ensureDir(full);
       actions.push(`CREATE dir ${d}`);
     }
   }
-  const baseProfile = import_node_path23.default.join(localPath, "profiles", "base.yaml");
+  const baseProfile = import_node_path28.default.join(localPath, "profiles", "base.yaml");
   if (!await pathExists(baseProfile)) {
     await writeYamlFile(baseProfile, {
       profile: "base",
@@ -21578,7 +21605,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/base.yaml");
   }
-  const homeProfile = import_node_path23.default.join(localPath, "profiles", "home.yaml");
+  const homeProfile = import_node_path28.default.join(localPath, "profiles", "home.yaml");
   if (!await pathExists(homeProfile)) {
     await writeYamlFile(homeProfile, {
       profile: "home",
@@ -21593,7 +21620,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/home.yaml");
   }
-  const gitignore = import_node_path23.default.join(localPath, ".gitignore");
+  const gitignore = import_node_path28.default.join(localPath, ".gitignore");
   const requiredIgnore = [
     ".ai-config-sync-staging-*",
     ".ai-config-sync-backup-*"
@@ -21624,6 +21651,11 @@ async function ensureMinimalConfigRepo(localPath) {
   }
   return actions;
 }
+
+// packages/cli/src/setup-integrations.ts
+var import_node_path29 = __toESM(require("node:path"), 1);
+var import_promises13 = __toESM(require("node:fs/promises"), 1);
+init_dist();
 async function installClaudePlugin(home, programRoot, options = {}) {
   const actions = [];
   const warnings = [];
@@ -21638,10 +21670,10 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   }
   let pluginSrc;
   if (programRoot) {
-    const nested = import_node_path23.default.join(programRoot, "integrations", "claude-plugin");
-    if (await pathExists(import_node_path23.default.join(nested, ".claude-plugin", "plugin.json"))) {
+    const nested = import_node_path29.default.join(programRoot, "integrations", "claude-plugin");
+    if (await pathExists(import_node_path29.default.join(nested, ".claude-plugin", "plugin.json"))) {
       pluginSrc = nested;
-    } else if (await pathExists(import_node_path23.default.join(programRoot, ".claude-plugin", "plugin.json"))) {
+    } else if (await pathExists(import_node_path29.default.join(programRoot, ".claude-plugin", "plugin.json"))) {
       pluginSrc = programRoot;
     }
   }
@@ -21672,12 +21704,12 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     warnings.push(msg);
     actions.push(`WARN ${msg}`);
     if (!options.forbidSkillFallback) {
-      const skillSrc = import_node_path23.default.join(pluginSrc, "skills", "config-sync");
-      const skillDest = import_node_path23.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path23.default.join(skillDest, "SKILL.md");
+      const skillSrc = import_node_path29.default.join(pluginSrc, "skills", "config-sync");
+      const skillDest = import_node_path29.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path29.default.join(skillDest, "SKILL.md");
       if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-        await ensureDir(import_node_path23.default.dirname(skillDest));
-        await import_promises12.default.cp(skillSrc, skillDest, { recursive: true });
+        await ensureDir(import_node_path29.default.dirname(skillDest));
+        await import_promises13.default.cp(skillSrc, skillDest, { recursive: true });
         actions.push(
           "INSTALL Claude user skill: config-sync (fallback, no claude CLI)"
         );
@@ -21704,7 +21736,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
       actions.push("claude marketplace already has ai-config-sync");
     } else if (options.allowLocalPluginInstall) {
       const marketplaceSrc = programRoot && await pathExists(
-        import_node_path23.default.join(programRoot, ".claude-plugin", "marketplace.json")
+        import_node_path29.default.join(programRoot, ".claude-plugin", "marketplace.json")
       ) ? programRoot : pluginSrc;
       try {
         await invokeClaude(["plugin", "marketplace", "add", marketplaceSrc]);
@@ -21826,11 +21858,11 @@ async function installStableCliShim(home, sources) {
   let changed = false;
   const candidates = [];
   if (sources.pluginRoot) {
-    candidates.push(import_node_path23.default.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
+    candidates.push(import_node_path29.default.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
   }
   if (sources.programRoot) {
     candidates.push(
-      import_node_path23.default.join(
+      import_node_path29.default.join(
         sources.programRoot,
         "integrations",
         "claude-plugin",
@@ -21838,12 +21870,12 @@ async function installStableCliShim(home, sources) {
         "ai-config-sync.cjs"
       )
     );
-    candidates.push(import_node_path23.default.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
+    candidates.push(import_node_path29.default.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
   }
   try {
     const argv1 = process.argv[1];
     if (argv1 && (argv1.endsWith(".cjs") || argv1.endsWith(".js"))) {
-      candidates.push(import_node_path23.default.resolve(argv1));
+      candidates.push(import_node_path29.default.resolve(argv1));
     }
   } catch {
   }
@@ -21861,11 +21893,11 @@ async function installStableCliShim(home, sources) {
   const destCjs = stableCliCjs(home);
   const destCmd = stableCliCmd(home);
   const destSh = stableCliSh(home);
-  const srcBuf = await import_promises12.default.readFile(sourceCjs);
+  const srcBuf = await import_promises13.default.readFile(sourceCjs);
   let needCopy = true;
   if (await pathExists(destCjs)) {
     try {
-      const destBuf = await import_promises12.default.readFile(destCjs);
+      const destBuf = await import_promises13.default.readFile(destCjs);
       if (srcBuf.equals(destBuf)) needCopy = false;
     } catch {
       needCopy = true;
@@ -21873,17 +21905,17 @@ async function installStableCliShim(home, sources) {
   }
   if (needCopy) {
     const tmp = `${destCjs}.${process.pid}.${Date.now()}.tmp`;
-    const fh = await import_promises12.default.open(tmp, "w");
+    const fh = await import_promises13.default.open(tmp, "w");
     try {
       await fh.writeFile(srcBuf);
       await fh.sync();
     } finally {
       await fh.close();
     }
-    await import_promises12.default.rename(tmp, destCjs).catch(async () => {
-      await import_promises12.default.rm(destCjs, { force: true }).catch(() => {
+    await import_promises13.default.rename(tmp, destCjs).catch(async () => {
+      await import_promises13.default.rm(destCjs, { force: true }).catch(() => {
       });
-      await import_promises12.default.rename(tmp, destCjs);
+      await import_promises13.default.rename(tmp, destCjs);
     });
     actions.push(`INSTALL stable CLI shim \u2192 ${destCjs}`);
     changed = true;
@@ -21920,7 +21952,7 @@ exec "${process.execPath}" "$(dirname "$0")/ai-config-sync.cjs" "$@"
   if (needSh) {
     await writeText(destSh, shBody);
     try {
-      await import_promises12.default.chmod(destSh, 493);
+      await import_promises13.default.chmod(destSh, 493);
     } catch {
     }
     actions.push(`INSTALL stable CLI shell \u2192 ${destSh}`);
@@ -21942,10 +21974,10 @@ async function installCodexIntegration(home, programRoot, pluginRoot, options = 
   const stableCjs = shim.cjs ?? (await pathExists(stableCliCjs(home)) ? stableCliCjs(home) : void 0);
   const cliAbsoluteCommand = stableCjs ? `"${process.execPath}" "${stableCjs}"` : void 0;
   const skillCliHint = stableCjs ? `"${process.execPath}" "${stableCjs}"` : "ai-config-sync";
-  const skillDest = import_node_path23.default.join(agentsSkillsDir(home), "config-sync");
+  const skillDest = import_node_path29.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
-    const p = import_node_path23.default.join(
+    const p = import_node_path29.default.join(
       programRoot,
       "integrations",
       "codex",
@@ -21954,7 +21986,7 @@ async function installCodexIntegration(home, programRoot, pluginRoot, options = 
     );
     if (await pathExists(p)) skillSrc = p;
   }
-  const skillMd = import_node_path23.default.join(skillDest, "SKILL.md");
+  const skillMd = import_node_path29.default.join(skillDest, "SKILL.md");
   const skillBody = `---
 name: config-sync
 description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u540C\u6B65\u914D\u7F6E\u300D\u300C\u626B\u63CF\u6280\u80FD\u300D\u300C\u6062\u590D\u73AF\u5883\u300D\u65F6\u4F7F\u7528\u3002
@@ -21992,7 +22024,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
   if (skillNeedsWrite) {
     await ensureDir(skillDest);
     if (skillSrc && !await pathExists(skillMd)) {
-      await import_promises12.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises13.default.cp(skillSrc, skillDest, { recursive: true });
     }
     await writeText(skillMd, skillBody);
     actions.push(`INSTALL agents skill: config-sync \u2192 ${skillDest}`);
@@ -22015,7 +22047,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      await import_promises12.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      await import_promises13.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
       changed = true;
@@ -22025,7 +22057,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     cliAbsoluteCommand
   });
   if (hooksChanged || !hasManagedCodexSessionStart(base)) {
-    await ensureDir(import_node_path23.default.dirname(hooksPath));
+    await ensureDir(import_node_path29.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push(
       cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + stable commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
@@ -22038,7 +22070,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     toml = mergeTomlText(toml, [
       { section: "features", key: "hooks", value: true }
     ]);
-    await ensureDir(import_node_path23.default.dirname(cfgPath));
+    await ensureDir(import_node_path29.default.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
     changed = true;
@@ -22053,6 +22085,11 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
   }
   return { ok: true, changed, warnings, errors, actions };
 }
+
+// packages/cli/src/setup-orchestrator.ts
+var import_node_path30 = __toESM(require("node:path"), 1);
+var import_node_os4 = __toESM(require("node:os"), 1);
+init_dist();
 async function runSetup(options = {}) {
   const home = options.home ?? import_node_os4.default.homedir();
   const mode = options.mode ?? "default";
@@ -22076,10 +22113,10 @@ async function runSetup(options = {}) {
     };
   }
   if (detected.existingLink && mode !== "reconfigure" && options.configPath) {
-    const existingPath = import_node_path23.default.resolve(
+    const existingPath = import_node_path30.default.resolve(
       detected.existingLink.configRepository.localPath
     );
-    const requested = import_node_path23.default.resolve(expandHome(options.configPath, home));
+    const requested = import_node_path30.default.resolve(expandHome(options.configPath, home));
     if (existingPath !== requested) {
       return {
         status: "planned",
@@ -22217,7 +22254,7 @@ async function runSetup(options = {}) {
   if (await pathExists(cfgPath) && mode !== "reconfigure") {
     try {
       const prev = await loadLocalConfig(cfgPath);
-      const samePath = import_node_path23.default.resolve(prev.configRepository.localPath) === import_node_path23.default.resolve(localPath);
+      const samePath = import_node_path30.default.resolve(prev.configRepository.localPath) === import_node_path30.default.resolve(localPath);
       const sameProfile = prev.profile === profile;
       if (samePath && sameProfile && mode === "default") {
         status = "no-changes";
@@ -22235,7 +22272,7 @@ async function runSetup(options = {}) {
     if (await pathExists(cfgPath) && mode !== "reconfigure") {
       try {
         const prev = await loadLocalConfig(cfgPath);
-        if (import_node_path23.default.resolve(prev.configRepository.localPath) === import_node_path23.default.resolve(localPath) && prev.profile === profile) {
+        if (import_node_path30.default.resolve(prev.configRepository.localPath) === import_node_path30.default.resolve(localPath) && prev.profile === profile) {
           shouldWrite = false;
         }
       } catch {
@@ -22293,8 +22330,8 @@ async function runSetup(options = {}) {
         );
       }
     } else if (!insideSelf) {
-      const skillDir = import_node_path23.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path23.default.join(skillDir, "SKILL.md");
+      const skillDir = import_node_path30.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path30.default.join(skillDir, "SKILL.md");
       if (!await pathExists(skillMd)) {
         await ensureDir(skillDir);
         await writeText(
@@ -22357,13 +22394,13 @@ user-invocable: true
 }
 
 // packages/cli/src/index.ts
-var import_node_path24 = __toESM(require("node:path"), 1);
+var import_node_path31 = __toESM(require("node:path"), 1);
 init_dist();
 var program2 = new Command();
 program2.name("ai-config-sync").description(
   "AI Agent config sync \u2014 private config repo + Claude Code / Codex integrations"
 ).version(
-  true ? "0.4.2" : process.env.npm_package_version || "0.4.1"
+  true ? "0.5.0" : process.env.npm_package_version || "0.4.1"
 );
 function homeOpt(cmd) {
   return expandHome(cmd.opts().home ?? import_node_os5.default.homedir());
@@ -22793,9 +22830,9 @@ program2.command("update").description("Fetch sources per versionPolicy and re-a
   if (!requireLinked(ctx, "update")) return;
   const { localConfig, configRepoPath } = ctx;
   const resources = await loadResources(
-    import_node_path24.default.join(configRepoPath, "resources.yaml")
+    import_node_path31.default.join(configRepoPath, "resources.yaml")
   );
-  const lock = await loadLock(import_node_path24.default.join(configRepoPath, "lock.yaml"));
+  const lock = await loadLock(import_node_path31.default.join(configRepoPath, "lock.yaml"));
   for (const r of resources.resources) {
     const locked = lock.entries.find((e) => e.resourceId === r.id);
     const check = await checkVersionPolicy({
@@ -22919,7 +22956,7 @@ program2.command("secret").description("Check or document secretRef resolution (
     }
     if (ctx.configRepoPath && (action === "scan" || !ref)) {
       const resources = await loadResources(
-        import_node_path24.default.join(ctx.configRepoPath, "resources.yaml")
+        import_node_path31.default.join(ctx.configRepoPath, "resources.yaml")
       );
       const refs = collectSecretRefs(resources);
       if (refs.length === 0) {

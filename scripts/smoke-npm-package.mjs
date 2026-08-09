@@ -69,6 +69,19 @@ if (!tgz) {
 
 // Isolate install completely: copy only the tarball into a temp dir
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "acs-smoke-"));
+const cleanupTemp = () => {
+  try {
+    fs.rmSync(tmp, {
+      recursive: true,
+      force: true,
+      maxRetries: process.platform === "win32" ? 8 : 2,
+      retryDelay: 125,
+    });
+  } catch {
+    /* best-effort cleanup after smoke failure */
+  }
+};
+process.once("exit", cleanupTemp);
 const home = path.join(tmp, "home");
 const repo = path.join(tmp, "cfg");
 const tgzLocal = path.join(tmp, "ai-config-sync.tgz");

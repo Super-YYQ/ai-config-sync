@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runSetup } from "../../packages/cli/src/setup.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
+import { runIsolatedSetup as runSetup } from "../helpers/setup.js";
 import {
   buildPlan,
   applyPlan,
@@ -40,7 +41,7 @@ describe("setup + empty template", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
+    await removeTempDir(home);
   });
 
   it("setup is idempotent and plan is No changes", async () => {
@@ -113,7 +114,7 @@ describe("setup + demo restore", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
+    await removeTempDir(home);
   });
 
   it("plans and applies demo-skill to both tools", async () => {

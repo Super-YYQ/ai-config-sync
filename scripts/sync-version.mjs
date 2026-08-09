@@ -70,11 +70,22 @@ if (fs.existsSync(readme)) {
 }
 
 console.log("Refreshing package-lock.json…");
-const lock = spawnSync("npm", ["install", "--package-lock-only"], {
-  cwd: root,
-  encoding: "utf8",
-  shell: process.platform === "win32",
-});
+const npmArgs = ["install", "--package-lock-only"];
+const lock = process.platform === "win32"
+  ? spawnSync(
+      process.env.ComSpec || "cmd.exe",
+      ["/d", "/s", "/c", ["npm.cmd", ...npmArgs].join(" ")],
+      {
+        cwd: root,
+        encoding: "utf8",
+        shell: false,
+      },
+    )
+  : spawnSync("npm", npmArgs, {
+      cwd: root,
+      encoding: "utf8",
+      shell: false,
+    });
 if (lock.status !== 0) {
   console.error(lock.stdout || "");
   console.error(lock.stderr || "");

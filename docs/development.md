@@ -6,6 +6,7 @@
 npm install
 npm run build
 npm test
+npm run test:coverage
 ```
 
 ## 包依赖
@@ -31,6 +32,8 @@ cli → scanner
 
 ## 测试策略
 
-- 单元：合并、密钥、Schema、远程 URL 归一化
-- Driver：临时 HOME 下幂等 copy
-- 集成：模板仓库 setup → plan → apply → 双工具独立副本 → 二次 setup No changes
+- `npm run test:unit`：合并、密钥、Schema、锁、远程 URL 与 Driver
+- `npm run test:integration`：隔离 HOME 下的 Setup、Capture、Plan、Apply、Rollback
+- 集成夹具保留 Claude/Codex 两个目标，但禁止发现或调用宿主机插件安装流程
+- Windows 文件系统套件单工作器执行，并对短暂占用的临时目录做有界重试
+- `npm run test:coverage`：全套测试并执行全局及关键安全模块覆盖率门槛

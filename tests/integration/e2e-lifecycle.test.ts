@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runSetup } from "../../packages/cli/src/setup.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
+import { runIsolatedSetup as runSetup } from "../helpers/setup.js";
 import {
   applyPlan,
   buildPlan,
@@ -84,7 +85,7 @@ describe("E2E: isolated-HOME full lifecycle", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
+    await removeTempDir(home);
   });
 
   it("Setup -> Capture -> Restore -> Rollback end to end", async () => {
@@ -233,7 +234,7 @@ describe("E2E: isolated-HOME full lifecycle", () => {
         await pathExists(path.join(home2, ".claude", "skills", "e2e-skill")),
       ).toBe(false);
     } finally {
-      await fs.rm(home2, { recursive: true, force: true });
+      await removeTempDir(home2);
     }
   });
 

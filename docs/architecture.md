@@ -36,3 +36,18 @@ core           schemas, paths, merge, secrets, codex-hooks
 
 Today: `claude` | `codex` enum.  
 Future: Target Adapter registry (see ROADMAP v0.4).
+
+## Internal orchestration boundaries
+
+- Setup: `setup-discovery` locates package/plugin/config roots;
+  `setup-integrations` installs Claude/Codex integration assets;
+  `setup-orchestrator` owns the user-visible setup workflow.
+- Planning: `plan-builder` produces immutable plans and snapshots;
+  `planning-helpers` resolves profiles, recipes, and sources.
+- Apply: `apply-executor` owns confirmation, locks, transactions, driver calls,
+  state commit, and compensating rollback; `drift-report` remains read-only.
+- Capture: `capture-policy` classifies proposals; `capture-transaction` owns the
+  locked stage/backup/replace transaction; `capture-types` is dependency-free.
+
+The historic `setup.ts`, `plan-apply.ts`, and `capture.ts` paths remain thin
+facades so package consumers do not need to change imports.

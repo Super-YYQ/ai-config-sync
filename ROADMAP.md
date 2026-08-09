@@ -28,7 +28,7 @@
 - [x] CI matrix (OS × Node)
 - [x] Version sync script
 - [ ] docs/architecture.md full set
-- [ ] Release workflow + npm publish automation
+- [x] Release workflow + npm trusted publishing with provenance
 - [ ] Broader multi-OS manual smoke checklist automation
 
 ## v0.6 Extended

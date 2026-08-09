@@ -7,16 +7,16 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  unit:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [18, 20, 22]
+        node: [18, 20, 22, 24]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -31,21 +31,63 @@ jobs:
         # and CR-at-EOL for Windows .cmd shims rewritten by the build.
         run: git -c core.fileMode=false diff --exit-code --ignore-cr-at-eol
         shell: bash
-      - name: Test
-        run: npm test
-      - name: Pack dry-run
-        run: npm pack --dry-run
+      - name: Unit tests
+        run: npm run test:unit
+
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Integration and E2E tests
+        run: npm run test:integration
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Enforce coverage thresholds
+        run: npm run test:coverage
+
+  package-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
       - name: Validate Claude plugin manifests
         run: npm run validate:plugin
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest') && matrix.node == '20'
+      - name: Pack dry-run
+        run: npm run pack:check
       - name: Smoke npm package (isolated tarball)
         run: npm run smoke:npm
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest') && matrix.node == '20'
 
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Block obvious secrets in repo
         run: |
           set -euo pipefail

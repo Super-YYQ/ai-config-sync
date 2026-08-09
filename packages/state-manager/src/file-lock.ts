@@ -107,10 +107,20 @@ export async function acquireFileLock(
           await fs.rm(lockPath, { force: true });
           continue;
         }
-      } catch {
-        // unreadable / corrupt lock — break and retry
-        await fs.rm(lockPath, { force: true }).catch(() => {});
-        continue;
+      } catch (readError) {
+        // Another process can observe the O_EXCL-created file before its owner
+        // finishes writing JSON. A fresh unreadable file is therefore busy,
+        // not corrupt. Only break it after the same stale-age policy applies.
+        if ((readError as NodeJS.ErrnoException).code === "ENOENT") continue;
+        try {
+          const stat = await fs.stat(lockPath);
+          if (Date.now() - stat.mtimeMs > staleMs) {
+            await fs.rm(lockPath, { force: true });
+            continue;
+          }
+        } catch (statError) {
+          if ((statError as NodeJS.ErrnoException).code === "ENOENT") continue;
+        }
       }
       await new Promise((r) => setTimeout(r, baseDelay + attempt * stepDelay));
     }
@@ -133,7 +143,9 @@ export async function releaseFileLock(lockPath: string): Promise<void> {
   } catch {
     /* ignore — released or already gone */
   } finally {
-    ownedLocks.delete(key);
+    // A waiter in this process may acquire the path immediately after our
+    // unlink. Do not erase that replacement owner's token from the map.
+    if (ownedLocks.get(key) === ownerId) ownedLocks.delete(key);
   }
 }
 

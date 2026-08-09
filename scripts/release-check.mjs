@@ -6,11 +6,13 @@
  *   2. build                  (npm run build)
  *   3. version consistency    (check-version-consistency)
  *   4. plugin validate        (validate-plugin)
- *   5. unit + integration tests (vitest)
- *   6. npm smoke (package-isolated)
- *   7. pack inspection        (npm pack --dry-run; assert no stray files)
- *   8. secret scan            (scanTextForSecrets over repo text files)
- *   9. git status clean       (no uncommitted/untracked files left behind)
+ *   5. unit tests
+ *   6. integration + E2E tests
+ *   7. coverage thresholds
+ *   8. npm smoke (package-isolated)
+ *   9. pack inspection        (npm pack --dry-run; assert no stray files)
+ *  10. secret scan            (scanTextForSecrets over repo text files)
+ *  11. git status clean       (no uncommitted/untracked files left behind)
  *
  * Exit non-zero if any gate fails. Usage: node scripts/release-check.mjs
  */
@@ -39,11 +41,28 @@ function gate(name, fn) {
   }
 }
 
+function quoteCmdArg(arg) {
+  if (arg.length === 0) return '""';
+  if (!/[\s"&|<>^()%!"]/u.test(arg)) return arg;
+  return `"${arg.replace(/"/g, '""')}"`;
+}
+
+function spawnPortable(cmd, args, opts) {
+  if (process.platform !== "win32" || !["npm", "npx"].includes(cmd)) {
+    return spawnSync(cmd, args, { ...opts, shell: false });
+  }
+  const commandLine = [`${cmd}.cmd`, ...args].map(quoteCmdArg).join(" ");
+  return spawnSync(
+    process.env.ComSpec || "cmd.exe",
+    ["/d", "/s", "/c", commandLine],
+    { ...opts, shell: false },
+  );
+}
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, {
+  const r = spawnPortable(cmd, args, {
     cwd: root,
     encoding: "utf8",
-    shell: process.platform === "win32",
     stdio: ["ignore", "pipe", "pipe"],
     ...opts,
   });
@@ -79,19 +98,31 @@ gate("plugin-validate", () => {
   return true;
 });
 
-// 5. tests (unit + integration)
-gate("tests", () => {
-  run("npx", ["vitest", "run"]);
+// 5. unit tests
+gate("unit-tests", () => {
+  run("npm", ["run", "test:unit"]);
   return true;
 });
 
-// 6. npm smoke (package-isolated)
+// 6. integration + E2E tests
+gate("integration-tests", () => {
+  run("npm", ["run", "test:integration"]);
+  return true;
+});
+
+// 7. coverage thresholds
+gate("coverage", () => {
+  run("npm", ["run", "test:coverage"]);
+  return true;
+});
+
+// 8. npm smoke (package-isolated)
 gate("npm-smoke", () => {
   run("node", ["scripts/smoke-npm-package.mjs"]);
   return true;
 });
 
-// 7. pack inspection
+// 9. pack inspection
 gate("pack-inspection", () => {
   const out = run("npm", ["pack", "--dry-run", "--json"]);
   // npm pack may print build log lines before/after the JSON array; extract
@@ -146,7 +177,7 @@ gate("pack-inspection", () => {
   return true;
 });
 
-// 8. secret scan over tracked text files (uses project's scanTextForSecrets)
+// 10. secret scan over tracked text files (uses project's scanTextForSecrets)
 gate("secret-scan", () => {
   // Use the bundled CLI's secret scan against the config template + docs.
   // We scan all text files under repo (excluding node_modules/dist/.git).
@@ -221,7 +252,7 @@ gate("secret-scan", () => {
   return true;
 });
 
-// 9. git status clean (after all gates, working tree must be clean)
+// 11. git status clean (after all gates, working tree must be clean)
 gate("git-status-clean", () => {
   const status = spawnSync("git", ["status", "--porcelain"], {
     cwd: root,

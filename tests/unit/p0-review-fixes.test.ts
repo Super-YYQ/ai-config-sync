@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runSetup } from "../../packages/cli/src/setup.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
+import { runIsolatedSetup as runSetup } from "../helpers/setup.js";
 import { commitCaptureItems, buildCaptureProposals } from "@ai-config-sync/recipe-engine";
 import { loadRecipe, loadResources, pathExists, writeText, ensureDir } from "@ai-config-sync/core";
 import type { ScannedResource } from "@ai-config-sync/scanner";
@@ -22,7 +23,7 @@ describe("P0 review fixes", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
+    await removeTempDir(home);
   });
 
   it("setup --repo does not clone when already linked to another path", async () => {

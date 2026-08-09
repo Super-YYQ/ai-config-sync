@@ -30,6 +30,9 @@ Requirements: Node.js ≥ 18, Git.
 4. Update `CHANGELOG.md` for user-visible changes.
 5. Keep versions in sync with `node scripts/sync-version.mjs <ver>` when cutting a release.
 
+Maintainers should follow [`docs/releasing.md`](docs/releasing.md) for versioned
+publishing; releases are created only from matching `vX.Y.Z` tags.
+
 ## Code style
 
 - TypeScript strict

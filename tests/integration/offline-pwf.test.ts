@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runSetup } from "../../packages/cli/src/setup.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
+import { runIsolatedSetup as runSetup } from "../helpers/setup.js";
 import {
   applyPlan,
   buildDriftReport,
@@ -34,7 +35,7 @@ describe("offline vendored planning-with-files", () => {
   });
 
   afterEach(async () => {
-    await fs.rm(home, { recursive: true, force: true });
+    await removeTempDir(home);
   });
 
   it("restores Claude skill + Codex skill/hooks/toml without network", async () => {

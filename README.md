@@ -2,14 +2,14 @@
 
 在 **Claude Code / Codex** 中管理 Skill、Plugin，并同步到私有 Git 仓库。
 
-> **状态：v0.4.2 Stable Beta Gate**（检查点 tag：`v0.4.2-stable-beta.1`）  
+> **状态：v0.5.0 Public Beta**
 > Claude Plugin 已内置 CLI（无需单独 `npm i -g` 也可在插件 PATH 中调用）。  
 > npm 包使用打包后的单文件 `dist/ai-config-sync.cjs`。  
 > 本版完成 5 项 P0 安全加固（Plan 快照确认、配置仓写锁、Source Resolver 加固、Skill 原子部署、配置字段策略）+ Apply 锁 + 完整 release:check。  
-> CI：跨平台 Build/Test + 隔离 tarball Smoke + Plugin Validate。  
+> CI：Node 18/20/22/24 单测 + 跨平台集成/E2E + 覆盖率门槛 + 隔离 tarball Smoke。
 > **真实 Claude Code / Codex E2E 仍未覆盖** — 请先在隔离 HOME / 测试环境验证，再用于公司真机。  
 > 跨电脑继续开发：见 [`docs/DEVELOPMENT_CHECKPOINT.md`](docs/DEVELOPMENT_CHECKPOINT.md)。  
-> 下一阶段主题（未开始）：Stage B — Skill Inventory / Adopt / Deployment Model。
+> 后续主题：Target Adapter、Source Provider、项目级 Skill 与更完整的 Drift。
 
 ---
 
@@ -111,7 +111,7 @@ npx ai-config-sync --help
 
 ## Known Limitations
 
-- 阶段仍为 Alpha→Beta：真实 Claude/Codex 端到端未进 CI  
+- 仓库内隔离 HOME 的 Setup/Capture/Restore/Rollback 已进 CI；真实已登录 Claude/Codex 客户端冒烟仍需手动执行
 - Codex Hook 可能需用户首次信任（实验性）  
 - 外部 `claude plugin` 安装的补偿卸载仍有限  
 - 非标准仓库：用 `capture --analyze` 启发式分析；`--ai` 仅为别名，真实 LLM 需配置 provider  
@@ -124,6 +124,7 @@ npx ai-config-sync --help
 ```bash
 npm install && npm run build   # includes plugin CLI bundle
 npm test
+npm run test:coverage
 npm run demo:offline-pwf       # uses examples/demo-config
 npm run smoke:npm
 ```
@@ -131,6 +132,6 @@ npm run smoke:npm
 - 空用户模板：`examples/private-config-template/`  
 - 演示数据：`examples/demo-config/`  
 - 变更：`CHANGELOG.md`  
-- 计划基线：v0.3 Alpha Hardening（审查2 + 后续优化计划）
+- 计划基线：v0.5 Public Beta（见 `ROADMAP.md`）
 
-MIT · v0.4.2
+MIT · v0.5.0

@@ -1,6 +1,24 @@
 # Changelog
 
-## Unreleased — Practical Readiness Hardening
+## 0.5.0 — Public Beta
+
+- Split Setup, Plan/Apply, and Capture into focused discovery, integration,
+  orchestration, planning, execution, policy, and transaction modules while
+  preserving the public API facades.
+- Split unit and integration/E2E test gates; Windows runs filesystem-heavy
+  suites serially with bounded cleanup retries and platform-aware timeouts.
+  Isolated suites preserve both targets without invoking the operator's real
+  Claude plugin installer.
+- Added V8 coverage reporting with global and security-critical module
+  thresholds enforced in CI and by `release:check`.
+- CI now includes Node 24, runs integration/E2E separately on all three
+  operating systems, and isolates package/plugin smoke checks from the matrix.
+- Lock contenders no longer break fresh, partially written lock files, and an
+  old releaser cannot erase a replacement owner's in-process token.
+- Added tag/version/changelog validation and a trusted-publishing release
+  workflow that publishes npm provenance and creates the GitHub Release.
+  Windows release/version subprocesses use explicit portable launchers instead
+  of deprecated shell argument concatenation.
 
 - Plan snapshots all mutable config inputs (`resources.yaml`, `lock.yaml`, `config.yaml`, and the full profile chain), including uncommitted edits.
 - Apply now requires `--yes` for every real write and revalidates the Plan while holding both config-repo and HOME locks.
