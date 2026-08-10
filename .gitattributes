@@ -2,5 +2,6 @@
 
 # Windows command shims must retain CRLF; bundled JavaScript stays LF.
 integrations/claude-plugin/bin/*.cmd text eol=crlf
+*.cmd text eol=crlf
 integrations/claude-plugin/bin/*.cjs text eol=lf
 dist/*.cjs text eol=lf

@@ -35,16 +35,43 @@ ai-config-sync capture --yes --commit --push  # 写入、提交、推送在同�
 
 `--ai` 是 `--analyze` 的别名；**默认不调用真实 LLM**。只有配置了 `localConfig.ai` provider 时才可能走模型。
 
+启用 Hook 后，SessionStart 会自动轻量扫描并把未纳管资源写成
+`pending-review` 待确认项。这个默认流程不会自动 capture、commit 或 push；
+源仓库识别不明确的资源仍保持 `NEEDS-REVIEW`，由用户确认处理方式。
+
 ## 第二台电脑：恢复
 
-1. 安装同一程序（Claude Plugin 或 npm CLI）
-2. Clone 私有仓，或：
+第二台电脑无需再次用 AI 分析，也不要求先安装 Skill / Plugin。只需 Node.js 与
+独立 CLI；Skill / Plugin 是进入 AI 工具后的可选入口。
+
+### 本地 Web 页面（推荐）
+
+```bash
+npx ai-config-sync ui
+```
+
+浏览器页面仅监听 `127.0.0.1`。输入一次私有仓库地址，确认目标与 Profile，
+查看 Plan 后点击一次确认。Windows 全局安装后，也可双击 npm 包中的
+`AI Config Sync.cmd` 启动页面。
+
+### CLI
+
+一条命令完成连接、Plan 与确认：
+
+```bash
+ai-config-sync bootstrap --repo git@github.com:you/my-ai-config.git --profile home
+```
+
+交互终端会显示 Plan 后询问；无人值守场景必须显式加 `--yes`。也可以沿用分步
+命令：
+
+1. Clone 私有仓，或：
 
 ```bash
 ai-config-sync setup --repo git@github.com:you/my-ai-config.git --config-path ~/ai-config/my-ai-config
 ```
 
-3. 预览并应用：
+2. 预览并应用：
 
 ```bash
 ai-config-sync plan

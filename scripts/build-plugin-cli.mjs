@@ -17,6 +17,7 @@ const outPlugin = path.join(
   "integrations/claude-plugin/bin/ai-config-sync.cjs",
 );
 const outDist = path.join(root, "dist/ai-config-sync.cjs");
+const outUi = path.join(root, "dist/ai-config-sync-ui.cjs");
 const outCmd = path.join(
   root,
   "integrations/claude-plugin/bin/ai-config-sync.cmd",
@@ -65,6 +66,14 @@ function withShebang(file) {
 withShebang(outPlugin);
 withShebang(outDist);
 
+// Tiny second executable: npm creates ai-config-sync-ui(.cmd) from this file.
+// It reuses the main bundle and only injects the `ui` subcommand.
+fs.writeFileSync(
+  outUi,
+  `#!/usr/bin/env node\nprocess.argv.splice(2, 0, "ui");\nrequire("./ai-config-sync.cjs");\n`,
+  "utf8",
+);
+
 // Windows cmd shim for plugin bin — write only when content changes
 // (keeps git tree clean across LF/CRLF checkouts).
 const cmdBody = `@echo off\r\nnode "%~dp0ai-config-sync.cjs" %*\r\n`;
@@ -83,6 +92,7 @@ if (normalizeEol(existingCmd) !== normalizeEol(cmdBody)) {
 try {
   fs.chmodSync(outPlugin, 0o755);
   fs.chmodSync(outDist, 0o755);
+  fs.chmodSync(outUi, 0o755);
 } catch {
   /* windows */
 }
@@ -90,4 +100,5 @@ try {
 console.log(`Bundled CLI v${appVersion}`);
 console.log(`  → ${path.relative(root, outPlugin)}`);
 console.log(`  → ${path.relative(root, outDist)}`);
+console.log(`  → ${path.relative(root, outUi)}`);
 console.log(`  → ${path.relative(root, outCmd)}`);

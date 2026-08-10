@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "ai-config-sync": "dist/ai-config-sync.cjs",
-    "agent-sync": "dist/ai-config-sync.cjs"
+    "agent-sync": "dist/ai-config-sync.cjs",
+    "ai-config-sync-ui": "dist/ai-config-sync-ui.cjs"
   },
   "files": [
     "dist",
@@ -16,7 +17,8 @@
     "README.md",
     "docs/USER_GUIDE.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "AI Config Sync.cmd"
   ],
   "scripts": {
     "build": "npm run build -w @ai-config-sync/core && npm run build -w @ai-config-sync/scanner && npm run build -w @ai-config-sync/state-manager && npm run build -w @ai-config-sync/git-sync && npm run build -w @ai-config-sync/drivers && npm run build -w @ai-config-sync/recipe-engine && npm run build -w @ai-config-sync/cli && node scripts/build-plugin-cli.mjs",

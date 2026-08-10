@@ -40,7 +40,13 @@ function run() {
   const resolved = resolveCli();
   if (!resolved) return;
 
-  const args = [...resolved.argsPrefix, "scan", "--light", "--json"];
+  const args = [
+    ...resolved.argsPrefix,
+    "scan",
+    "--light",
+    "--write-pending",
+    "--json",
+  ];
   const r = spawnSync(resolved.cmd, args, {
     encoding: "utf8",
     timeout: 15000,

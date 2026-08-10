@@ -106,6 +106,8 @@ if (!fs.existsSync(template)) {
 }
 // integrations + root marketplace manifest must also ship
 for (const rel of [
+  "dist/ai-config-sync-ui.cjs",
+  "AI Config Sync.cmd",
   "integrations/claude-plugin/.claude-plugin/plugin.json",
   "integrations/codex/skills/config-sync/SKILL.md",
   ".claude-plugin/marketplace.json",
