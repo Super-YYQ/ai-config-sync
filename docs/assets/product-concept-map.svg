@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="680" viewBox="0 0 1280 680" role="img" aria-labelledby="title desc">
+  <title id="title">AI Config Sync 整体产品形态</title>
+  <desc id="desc">Claude Code 和 Codex 的资产经扫描与确认进入私有配置仓库，仓库提供只读资产目录，并由确定性恢复引擎恢复到另一台电脑。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f9fd"/>
+      <stop offset="0.52" stop-color="#f4f1ff"/>
+      <stop offset="1" stop-color="#eef7ff"/>
+    </linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171a2f"/>
+      <stop offset="1" stop-color="#30205b"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b5bd6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#252857" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7475a7"/>
+    </marker>
+    <style>
+      .font{font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+      .title{font-size:28px;font-weight:750;fill:#172033}
+      .sub{font-size:14px;fill:#667085}
+      .card-title{font-size:18px;font-weight:720;fill:#172033}
+      .card-sub{font-size:12px;fill:#667085}
+      .label{font-size:13px;font-weight:650;fill:#283148}
+      .small{font-size:11px;fill:#6b7280}
+      .white{fill:#fff}
+    </style>
+  </defs>
+  <rect width="1280" height="680" rx="28" fill="url(#bg)"/>
+  <g class="font">
+    <text x="56" y="62" class="title">AI Config Sync · 整体产品形态</text>
+    <text x="56" y="88" class="sub">A 机可选择性借助 AI 消除扫描歧义；私有仓库是声明式真源；B 机恢复完全确定性、先 Plan 后 Apply。</text>
+
+    <g filter="url(#shadow)">
+      <rect x="56" y="132" width="244" height="448" rx="22" fill="url(#dark)"/>
+      <rect x="80" y="158" width="46" height="46" rx="14" fill="url(#brand)"/>
+      <text x="103" y="188" text-anchor="middle" font-size="20" class="white">A</text>
+      <text x="140" y="178" font-size="17" font-weight="720" class="white">电脑 A</text>
+      <text x="140" y="198" font-size="11" fill="#aeb7d6">已有 Claude Code / Codex 环境</text>
+
+      <rect x="78" y="232" width="200" height="72" rx="14" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
+      <text x="96" y="258" font-size="13" font-weight="650" class="white">Agent 资产</text>
+      <text x="96" y="281" font-size="11" fill="#cdd4ed">Skills · Plugins · Hooks · Config</text>
+
+      <rect x="78" y="320" width="200" height="104" rx="14" fill="#7774df" fill-opacity="0.17" stroke="#9a97ef" stroke-opacity="0.28"/>
+      <text x="96" y="346" font-size="13" font-weight="650" class="white">Claude 插件 / CLI</text>
+      <text x="96" y="369" font-size="11" fill="#cdd4ed">scan → capture proposal</text>
+      <text x="96" y="389" font-size="11" fill="#cdd4ed">规则先行 · 不确定项批量确认</text>
+      <text x="96" y="409" font-size="11" fill="#cdd4ed">密钥只记录 secretRef</text>
+
+      <rect x="78" y="440" width="200" height="112" rx="14" fill="#ffffff" fill-opacity="0.07"/>
+      <text x="96" y="468" font-size="13" font-weight="650" class="white">可选 AI 边界</text>
+      <text x="96" y="491" font-size="11" fill="#cdd4ed">仅分析 NEEDS-REVIEW</text>
+      <text x="96" y="511" font-size="11" fill="#cdd4ed">不能替用户批准、写仓库或恢复</text>
+      <rect x="96" y="526" width="83" height="20" rx="10" fill="#fbbf24" fill-opacity="0.18"/>
+      <text x="137" y="540" text-anchor="middle" font-size="10" fill="#fde68a">Human confirms</text>
+    </g>
+
+    <path d="M300 354 C340 354 344 354 382 354" fill="none" stroke="#7475a7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="382" y="132" width="510" height="448" rx="22" fill="#fff" stroke="#e3e6ef"/>
+      <text x="414" y="173" class="card-title">私有配置仓库 · 声明式真源</text>
+      <text x="414" y="196" class="card-sub">纯 Git、可审计、可克隆；程序与个人备份数据分离。</text>
+
+      <g>
+        <rect x="414" y="226" width="214" height="126" rx="16" fill="#f5f4ff" stroke="#dddafb"/>
+        <text x="436" y="255" class="label">恢复契约</text>
+        <text x="436" y="281" class="small">resources.yaml · profiles/</text>
+        <text x="436" y="302" class="small">recipes/ · lock.yaml</text>
+        <text x="436" y="323" class="small">sources/ · version policy</text>
+        <rect x="436" y="331" width="95" height="18" rx="9" fill="#e8e7ff"/>
+        <text x="483" y="344" text-anchor="middle" font-size="9" fill="#5554ba">Capture transaction</text>
+      </g>
+
+      <g>
+        <rect x="646" y="226" width="214" height="126" rx="16" fill="#f1fbf7" stroke="#cceee0"/>
+        <text x="668" y="255" class="label">轻量资产目录</text>
+        <text x="668" y="281" class="small">ASSETS.md · GitHub 原生查看</text>
+        <text x="668" y="302" class="small">catalog/index.html · 搜索筛选</text>
+        <text x="668" y="323" class="small">只读 · 自包含 · 无后端</text>
+        <rect x="668" y="331" width="78" height="18" rx="9" fill="#dff7ed"/>
+        <text x="707" y="344" text-anchor="middle" font-size="9" fill="#087f5b">Implemented</text>
+      </g>
+
+      <g>
+        <rect x="414" y="372" width="446" height="84" rx="16" fill="#fafbfc" stroke="#e4e7ec"/>
+        <text x="436" y="400" class="label">仓库服务（目标形态）</text>
+        <text x="436" y="424" class="small">关联已有远端 · 授权创建私有远端 · Commit / Push · 版本历史</text>
+        <text x="436" y="444" class="small">冲突保留本机 / 使用远端 / 两者保留；所有决策前创建安全快照</text>
+      </g>
+
+      <g>
+        <rect x="414" y="476" width="446" height="72" rx="16" fill="#fff8ed" stroke="#f4ddbd"/>
+        <text x="436" y="505" class="label">安全边界</text>
+        <text x="436" y="529" class="small">不迁移 OAuth、登录态、聊天记录或明文密钥 · 所有环境写入先显示 Plan</text>
+      </g>
+    </g>
+
+    <path d="M892 354 C928 354 932 354 966 354" fill="none" stroke="#7475a7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="966" y="132" width="258" height="448" rx="22" fill="#fff" stroke="#e3e6ef"/>
+      <rect x="990" y="158" width="46" height="46" rx="14" fill="#e9e9ff"/>
+      <text x="1013" y="188" text-anchor="middle" font-size="20" fill="#5554ba">B</text>
+      <text x="1050" y="178" class="card-title">电脑 B</text>
+      <text x="1050" y="198" class="card-sub">新环境 · 不需要 AI</text>
+
+      <rect x="990" y="232" width="210" height="68" rx="14" fill="#f7f8fc" stroke="#e6e9f0"/>
+      <text x="1008" y="258" class="label">1 · Clone / Link</text>
+      <text x="1008" y="280" class="small">拉取同一个私有仓库</text>
+
+      <rect x="990" y="314" width="210" height="84" rx="14" fill="#f5f4ff" stroke="#dddafb"/>
+      <text x="1008" y="340" class="label">2 · Bootstrap（目标）</text>
+      <text x="1008" y="362" class="small">双击启动器 · 检查 CLI / 登录 / secrets</text>
+      <text x="1008" y="382" class="small">不把完整二进制塞入配置仓库</text>
+
+      <rect x="990" y="412" width="210" height="114" rx="14" fill="#effbf6" stroke="#cceee0"/>
+      <text x="1008" y="438" class="label">3 · Deterministic Restore</text>
+      <text x="1008" y="461" class="small">pull → plan → conflict decision</text>
+      <text x="1008" y="482" class="small">confirm → apply → verify</text>
+      <text x="1008" y="503" class="small">失败自动 rollback</text>
+      <rect x="1008" y="510" width="74" height="18" rx="9" fill="#dff7ed"/>
+      <text x="1045" y="523" text-anchor="middle" font-size="9" fill="#087f5b">No AI calls</text>
+    </g>
+
+    <text x="56" y="634" class="small">当前里程碑：仓库目录视图已实现；自动创建远端、交互式冲突中心与跨平台恢复启动器按 Roadmap 推进。</text>
+  </g>
+</svg>

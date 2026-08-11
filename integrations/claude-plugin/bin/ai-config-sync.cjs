@@ -975,8 +975,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path32 = require("node:path");
-    var fs15 = require("node:fs");
+    var path33 = require("node:path");
+    var fs16 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1908,11 +1908,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path32.resolve(baseDir, baseName);
-          if (fs15.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path32.extname(baseName))) return void 0;
+          const localBin = path33.resolve(baseDir, baseName);
+          if (fs16.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path33.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs15.existsSync(`${localBin}${ext}`)
+            (ext) => fs16.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -1924,21 +1924,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs15.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs16.realpathSync(this._scriptPath);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path32.resolve(
-            path32.dirname(resolvedScriptPath),
+          executableDir = path33.resolve(
+            path33.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path32.basename(
+            const legacyName = path33.basename(
               this._scriptPath,
-              path32.extname(this._scriptPath)
+              path33.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1949,7 +1949,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path32.extname(executableFile));
+        launchWithNode = sourceExt.includes(path33.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2789,7 +2789,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path32.basename(filename, path32.extname(filename));
+        this._name = path33.basename(filename, path33.extname(filename));
         return this;
       }
       /**
@@ -2803,9 +2803,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path33) {
-        if (path33 === void 0) return this._executableDir;
-        this._executableDir = path33;
+      executableDir(path34) {
+        if (path34 === void 0) return this._executableDir;
+        this._executableDir = path34;
         return this;
       }
       /**
@@ -3447,8 +3447,8 @@ var init_parseUtil = __esm({
     init_errors();
     init_en();
     makeIssue = (params) => {
-      const { data, path: path32, errorMaps, issueData } = params;
-      const fullPath = [...path32, ...issueData.path || []];
+      const { data, path: path33, errorMaps, issueData } = params;
+      const fullPath = [...path33, ...issueData.path || []];
       const fullIssue = {
         ...issueData,
         path: fullPath
@@ -3756,11 +3756,11 @@ var init_types = __esm({
     init_parseUtil();
     init_util();
     ParseInputLazyPath = class {
-      constructor(parent, value, path32, key) {
+      constructor(parent, value, path33, key) {
         this._cachedPath = [];
         this.parent = parent;
         this.data = value;
-        this._path = path32;
+        this._path = path33;
         this._key = key;
       }
       get path() {
@@ -7142,7 +7142,7 @@ var init_zod = __esm({
 });
 
 // packages/core/dist/schemas.js
-var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, ProfileNameSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, ResourceIdSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, PlanActionSchema, PlanSnapshotSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
+var SCHEMA_VERSION, TargetToolSchema, ResourceKindSchema, VersionPolicySchema, RiskLevelSchema, ProfileNameSchema, DriverNameSchema, SourceProviderSchema, SourceSchema, OperationTypeSchema, RecipeOperationSchema, RecipeEvidenceSchema, TargetRecipeSchema, ResourceIdSchema, RecipeSchema, ResourceTargetConfigSchema, ResourceSchema, ResourcesFileSchema, ProfileSchema, ConfigRepoSchema, LockEntrySchema, LockFileSchema, LocalConfigSchema, InstalledTargetStateSchema, StateFileSchema, PendingEventSchema, PendingBatchSchema, PlanActionTypeSchema, TargetStateSnapshotSchema, PlanActionSchema, PlanSnapshotSchema, PlanSchema, CandidateRecipeSchema, SecretRefSchema;
 var init_schemas = __esm({
   "packages/core/dist/schemas.js"() {
     "use strict";
@@ -7412,6 +7412,12 @@ var init_schemas = __esm({
       "MANUAL",
       "SKIP"
     ]);
+    TargetStateSnapshotSchema = external_exports.object({
+      path: external_exports.string(),
+      existed: external_exports.boolean(),
+      hash: external_exports.string().optional(),
+      ownership: external_exports.enum(["absent", "managed"])
+    });
     PlanActionSchema = external_exports.object({
       id: external_exports.string(),
       type: PlanActionTypeSchema,
@@ -7428,7 +7434,9 @@ var init_schemas = __esm({
       /** Hash of that recipe file contents when the plan was built. */
       recipeHash: external_exports.string().optional(),
       /** Source commit the action targeted (for git sources). */
-      sourceCommit: external_exports.string().optional()
+      sourceCommit: external_exports.string().optional(),
+      /** Target filesystem state approved by this plan. Revalidated under HOME lock. */
+      targetSnapshot: TargetStateSnapshotSchema.optional()
     });
     PlanSnapshotSchema = external_exports.object({
       configRepoCommit: external_exports.string().optional(),
@@ -7681,17 +7689,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path32) {
-      const ctrl = callVisitor(key, node, visitor, path32);
+    function visit_(key, node, visitor, path33) {
+      const ctrl = callVisitor(key, node, visitor, path33);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path32, ctrl);
-        return visit_(key, ctrl, visitor, path32);
+        replaceNode(key, path33, ctrl);
+        return visit_(key, ctrl, visitor, path33);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path32 = Object.freeze(path32.concat(node));
+          path33 = Object.freeze(path33.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path32);
+            const ci = visit_(i, node.items[i], visitor, path33);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7702,13 +7710,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path32 = Object.freeze(path32.concat(node));
-          const ck = visit_("key", node.key, visitor, path32);
+          path33 = Object.freeze(path33.concat(node));
+          const ck = visit_("key", node.key, visitor, path33);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path32);
+          const cv = visit_("value", node.value, visitor, path33);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7729,17 +7737,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path32) {
-      const ctrl = await callVisitor(key, node, visitor, path32);
+    async function visitAsync_(key, node, visitor, path33) {
+      const ctrl = await callVisitor(key, node, visitor, path33);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path32, ctrl);
-        return visitAsync_(key, ctrl, visitor, path32);
+        replaceNode(key, path33, ctrl);
+        return visitAsync_(key, ctrl, visitor, path33);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path32 = Object.freeze(path32.concat(node));
+          path33 = Object.freeze(path33.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path32);
+            const ci = await visitAsync_(i, node.items[i], visitor, path33);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -7750,13 +7758,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path32 = Object.freeze(path32.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path32);
+          path33 = Object.freeze(path33.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path33);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path32);
+          const cv = await visitAsync_("value", node.value, visitor, path33);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -7783,23 +7791,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path32) {
+    function callVisitor(key, node, visitor, path33) {
       if (typeof visitor === "function")
-        return visitor(key, node, path32);
+        return visitor(key, node, path33);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path32);
+        return visitor.Map?.(key, node, path33);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path32);
+        return visitor.Seq?.(key, node, path33);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path32);
+        return visitor.Pair?.(key, node, path33);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path32);
+        return visitor.Scalar?.(key, node, path33);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path32);
+        return visitor.Alias?.(key, node, path33);
       return void 0;
     }
-    function replaceNode(key, path32, node) {
-      const parent = path32[path32.length - 1];
+    function replaceNode(key, path33, node) {
+      const parent = path33[path33.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -8409,10 +8417,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path32, value) {
+    function collectionFromPath(schema, path33, value) {
       let v = value;
-      for (let i = path32.length - 1; i >= 0; --i) {
-        const k = path32[i];
+      for (let i = path33.length - 1; i >= 0; --i) {
+        const k = path33[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -8431,7 +8439,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path32) => path32 == null || typeof path32 === "object" && !!path32[Symbol.iterator]().next().done;
+    var isEmptyPath = (path33) => path33 == null || typeof path33 === "object" && !!path33[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -8461,11 +8469,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path32, value) {
-        if (isEmptyPath(path32))
+      addIn(path33, value) {
+        if (isEmptyPath(path33))
           this.add(value);
         else {
-          const [key, ...rest] = path32;
+          const [key, ...rest] = path33;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -8479,8 +8487,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path32) {
-        const [key, ...rest] = path32;
+      deleteIn(path33) {
+        const [key, ...rest] = path33;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -8494,8 +8502,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path32, keepScalar) {
-        const [key, ...rest] = path32;
+      getIn(path33, keepScalar) {
+        const [key, ...rest] = path33;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -8513,8 +8521,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path32) {
-        const [key, ...rest] = path32;
+      hasIn(path33) {
+        const [key, ...rest] = path33;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -8524,8 +8532,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path32, value) {
-        const [key, ...rest] = path32;
+      setIn(path33, value) {
+        const [key, ...rest] = path33;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -11040,9 +11048,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path32, value) {
+      addIn(path33, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path32, value);
+          this.contents.addIn(path33, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -11117,14 +11125,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path32) {
-        if (Collection.isEmptyPath(path32)) {
+      deleteIn(path33) {
+        if (Collection.isEmptyPath(path33)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path32) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path33) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -11139,10 +11147,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path32, keepScalar) {
-        if (Collection.isEmptyPath(path32))
+      getIn(path33, keepScalar) {
+        if (Collection.isEmptyPath(path33))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path32, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path33, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -11153,10 +11161,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path32) {
-        if (Collection.isEmptyPath(path32))
+      hasIn(path33) {
+        if (Collection.isEmptyPath(path33))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path32) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path33) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -11173,13 +11181,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path32, value) {
-        if (Collection.isEmptyPath(path32)) {
+      setIn(path33, value) {
+        if (Collection.isEmptyPath(path33)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path32), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path33), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path32, value);
+          this.contents.setIn(path33, value);
         }
       }
       /**
@@ -13139,9 +13147,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path32) => {
+    visit.itemAtPath = (cst, path33) => {
       let item = cst;
-      for (const [field, index] of path32) {
+      for (const [field, index] of path33) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -13150,23 +13158,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path32) => {
-      const parent = visit.itemAtPath(cst, path32.slice(0, -1));
-      const field = path32[path32.length - 1][0];
+    visit.parentCollection = (cst, path33) => {
+      const parent = visit.itemAtPath(cst, path33.slice(0, -1));
+      const field = path33[path33.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path32, item, visitor) {
-      let ctrl = visitor(item, path32);
+    function _visit(path33, item, visitor) {
+      let ctrl = visitor(item, path33);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path32.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path33.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -13177,10 +13185,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path32);
+            ctrl = ctrl(item, path33);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path32) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path33) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -14482,14 +14490,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs15 = this.flowScalar(this.type);
+              const fs16 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs15, sep: [] });
+                map.items.push({ start, key: fs16, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs15);
+                this.stack.push(fs16);
               } else {
-                Object.assign(it, { key: fs15, sep: [] });
+                Object.assign(it, { key: fs16, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -14617,13 +14625,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs15 = this.flowScalar(this.type);
+              const fs16 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs15, sep: [] });
+                fc.items.push({ start: [], key: fs16, sep: [] });
               else if (it.sep)
-                this.stack.push(fs15);
+                this.stack.push(fs16);
               else
-                Object.assign(it, { key: fs15, sep: [] });
+                Object.assign(it, { key: fs16, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -15185,10 +15193,10 @@ function isPlainObject(v) {
 function hasId(v) {
   return isPlainObject(v) && typeof v.id === "string";
 }
-function pathAllowed(path32, owned) {
+function pathAllowed(path33, owned) {
   if (!owned || owned.length === 0)
     return true;
-  return owned.some((o) => path32 === o || path32.startsWith(`${o}.`) || o.startsWith(`${path32}.`));
+  return owned.some((o) => path33 === o || path33.startsWith(`${o}.`) || o.startsWith(`${path33}.`));
 }
 function mergeJson(base, managed, options = {}, currentPath = "") {
   const preferManaged = options.preferManaged ?? true;
@@ -15477,7 +15485,7 @@ function redact(match) {
     return "***";
   return `${match.slice(0, 4)}\u2026${match.slice(-4)} (len=${match.length})`;
 }
-function scanTextForSecrets(text, path32) {
+function scanTextForSecrets(text, path33) {
   const findings = [];
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -15490,7 +15498,7 @@ function scanTextForSecrets(text, path32) {
           rule: rule.name,
           line: i + 1,
           preview: redact(m[0]),
-          path: path32
+          path: path33
         });
       }
     }
@@ -16515,6 +16523,7 @@ __export(dist_exports, {
   SourceSchema: () => SourceSchema,
   StateFileSchema: () => StateFileSchema,
   TargetRecipeSchema: () => TargetRecipeSchema,
+  TargetStateSnapshotSchema: () => TargetStateSnapshotSchema,
   TargetToolSchema: () => TargetToolSchema,
   VersionPolicySchema: () => VersionPolicySchema,
   agentsSkillsDir: () => agentsSkillsDir,
@@ -19565,6 +19574,16 @@ async function resolveRecipe(configRepoPath, resource, target, registry) {
 }
 
 // packages/recipe-engine/dist/plan-builder.js
+function sameResolvedPath(left, right) {
+  if (!left)
+    return false;
+  const a = import_node_path19.default.resolve(left);
+  const b = import_node_path19.default.resolve(right);
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+function skillTargetPath(home, target, resourceId) {
+  return target === "claude" ? import_node_path19.default.join(claudeSkillsDir(home), resourceId) : import_node_path19.default.join(codexSkillsDir(home), resourceId);
+}
 async function buildPlan(ctx) {
   const resourcesFile = await loadResources(import_node_path19.default.join(ctx.configRepoPath, "resources.yaml"));
   const { profile, parents, files: profileFiles } = await loadResolvedProfile(ctx.configRepoPath, ctx.profileName);
@@ -19575,6 +19594,7 @@ async function buildPlan(ctx) {
   const riskRankLocal = (r) => r === "low" ? 1 : r === "medium" ? 2 : 3;
   const registry = await loadRecipeRegistry(import_node_path19.default.join(ctx.configRepoPath, "recipes"));
   const actions = [];
+  const machineState = await getState(ctx.home);
   const repoSourceDirs = /* @__PURE__ */ new Set();
   let actionSeq = 0;
   const enabledTargets = [];
@@ -19690,6 +19710,46 @@ async function buildPlan(ctx) {
           continue;
         }
       }
+      let targetSnapshot;
+      if (targetRecipe.driver === "generic-skill" || targetRecipe.driver === "repository-layout") {
+        const targetPath = skillTargetPath(ctx.home, target, resource.id);
+        if (!await pathExists(targetPath)) {
+          targetSnapshot = {
+            path: targetPath,
+            existed: false,
+            ownership: "absent"
+          };
+        } else {
+          let actualHash;
+          try {
+            actualHash = shortHash(await hashDirectory(targetPath));
+          } catch {
+          }
+          const recorded = machineState.installed[resource.id]?.[target];
+          const owned = recorded?.status === "installed" && sameResolvedPath(recorded.path, targetPath) && !!recorded.hash && !!actualHash && recorded.hash === actualHash;
+          if (!owned) {
+            const reason = recorded ? "existing target no longer matches the recorded deployment" : "existing target has no AI Config Sync ownership record";
+            actions.push({
+              id: `a${++actionSeq}`,
+              type: "MANUAL",
+              target,
+              resourceId: resource.id,
+              description: `MANUAL collision-unmanaged: ${targetPath} (${reason}). Adopt it explicitly or move it aside; no files will be replaced.`,
+              risk: "high",
+              driver: targetRecipe.driver,
+              paths: [targetPath],
+              requiresConfirmation: true
+            });
+            continue;
+          }
+          targetSnapshot = {
+            path: targetPath,
+            existed: true,
+            hash: actualHash,
+            ownership: "managed"
+          };
+        }
+      }
       if (targetRecipe.driver === "generic-skill" || targetRecipe.driver === "repository-layout") {
         const drift = await computeResourceDrift({
           home: ctx.home,
@@ -19707,7 +19767,8 @@ async function buildPlan(ctx) {
             risk: "low",
             driver: targetRecipe.driver,
             paths: drift.path ? [drift.path] : [],
-            requiresConfirmation: false
+            requiresConfirmation: false,
+            targetSnapshot
           });
           continue;
         }
@@ -19754,7 +19815,8 @@ async function buildPlan(ctx) {
           requiresConfirmation,
           recipeRef: recipeFileRel,
           recipeHash,
-          sourceCommit
+          sourceCommit,
+          targetSnapshot
         });
       }
     }
@@ -19920,6 +19982,28 @@ async function detectConfigRepoDrift(ctx, plan) {
   }
   return void 0;
 }
+async function detectTargetStateDrift(action) {
+  const snapshot = action?.targetSnapshot;
+  if (!snapshot)
+    return void 0;
+  const exists = await pathExists(snapshot.path);
+  if (!snapshot.existed) {
+    return exists ? `target appeared after plan: ${snapshot.path}` : void 0;
+  }
+  if (!exists)
+    return `managed target disappeared after plan: ${snapshot.path}`;
+  if (!snapshot.hash)
+    return "managed target snapshot has no ownership hash";
+  try {
+    const current = shortHash(await hashDirectory(snapshot.path));
+    if (current !== snapshot.hash) {
+      return `managed target changed after plan: ${snapshot.path} (${snapshot.hash} \u2192 ${current})`;
+    }
+  } catch (error) {
+    return `managed target cannot be verified: ${snapshot.path} (${error.message})`;
+  }
+  return void 0;
+}
 async function applyPlan(ctx, plan) {
   const activePlan = plan ?? await buildPlan(ctx);
   const repoDrift = await detectConfigRepoDrift(ctx, activePlan);
@@ -20050,6 +20134,17 @@ async function runApplyBody(ctx, activePlan, actionable, paths) {
         failed.push({
           actionId: group[0].id,
           error: `Plan is stale (${drifted}). Run plan again before apply. No files modified for ${resourceId}@${target}.`
+        });
+        hardFailure = true;
+        break;
+      }
+    }
+    {
+      const targetDrifted = await detectTargetStateDrift(group[0]);
+      if (targetDrifted) {
+        failed.push({
+          actionId: group[0].id,
+          error: `Target state changed (${targetDrifted}). Run plan again; no files modified for ${resourceId}@${target}.`
         });
         hardFailure = true;
         break;
@@ -20265,7 +20360,7 @@ async function buildDriftReport(ctx) {
 }
 
 // packages/recipe-engine/dist/capture.js
-var import_node_path26 = __toESM(require("node:path"), 1);
+var import_node_path27 = __toESM(require("node:path"), 1);
 init_dist();
 
 // packages/recipe-engine/dist/ai-assistant.js
@@ -20276,15 +20371,15 @@ var heuristicAiProvider = {
   async analyze({ target, tree }) {
     const skillMds = tree.filter((f) => f.endsWith("SKILL.md"));
     const out = [];
-    for (const md of skillMds.slice(0, 5)) {
-      const dir = import_node_path22.default.posix.dirname(md);
+    for (const md2 of skillMds.slice(0, 5)) {
+      const dir = import_node_path22.default.posix.dirname(md2);
       out.push(CandidateRecipeSchema.parse({
         target,
         driver: "generic-skill",
         sourcePaths: { skill: dir === "." ? "." : dir },
         operations: [{ type: "copy-skill", from: dir === "." ? "." : dir }],
-        requiredPaths: [md],
-        evidence: [{ path: md, section: "heuristic" }],
+        requiredPaths: [md2],
+        evidence: [{ path: md2, section: "heuristic" }],
         confidence: 0.55,
         risk: "low",
         requiresApproval: true,
@@ -20439,8 +20534,8 @@ function groupKey(s) {
 }
 
 // packages/recipe-engine/dist/capture-transaction.js
-var import_node_path25 = __toESM(require("node:path"), 1);
-var import_promises11 = __toESM(require("node:fs/promises"), 1);
+var import_node_path26 = __toESM(require("node:path"), 1);
+var import_promises12 = __toESM(require("node:fs/promises"), 1);
 var import_node_os3 = __toESM(require("node:os"), 1);
 var import_node_crypto7 = __toESM(require("node:crypto"), 1);
 init_dist();
@@ -20546,10 +20641,569 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, optio
   };
 }
 
+// packages/recipe-engine/dist/catalog.js
+var import_promises11 = __toESM(require("node:fs/promises"), 1);
+var import_node_path25 = __toESM(require("node:path"), 1);
+init_dist();
+var ASSET_CATALOG_MARKDOWN_REL = "ASSETS.md";
+var ASSET_CATALOG_HTML_REL = "catalog/index.html";
+var ASSETS_BEGIN = "<!-- ai-config-sync:assets:start -->";
+var ASSETS_END = "<!-- ai-config-sync:assets:end -->";
+var HTML_GENERATOR_MARKER = '<meta name="generator" content="ai-config-sync asset-catalog/v1">';
+var ALL_KINDS = [
+  "skill",
+  "plugin",
+  "integration",
+  "hook",
+  "mcp",
+  "instruction"
+];
+function stableCompare(left, right) {
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+function cleanText(value, max = 240, hideAbsolutePaths = true) {
+  if (!value)
+    return void 0;
+  let sanitized = sanitizeForAi(value);
+  if (hideAbsolutePaths) {
+    sanitized = sanitized.replace(/[A-Za-z]:[\\/][^\s<>"']+/g, "[local path hidden]").replace(/(^|[\s("'=])\/(?!\/)[A-Za-z0-9._-]+(?:\/[^\s<>"']*)?/g, "$1[local path hidden]");
+  }
+  const cleaned = sanitized.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  if (!cleaned)
+    return void 0;
+  return cleaned.slice(0, max);
+}
+function safeRepoRelativePath(value) {
+  if (!value)
+    return void 0;
+  const file = value.split("#", 1)[0]?.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!file || import_node_path25.default.posix.isAbsolute(file) || /^[A-Za-z]:/.test(file))
+    return void 0;
+  const parts = file.split("/");
+  if (parts.some((part) => !part || part === "." || part === ".."))
+    return void 0;
+  return file;
+}
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:")
+      return void 0;
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return void 0;
+  }
+}
+function cleanRemote(value) {
+  const cleaned = cleanText(value, 300, false);
+  if (!cleaned)
+    return {};
+  const http = safeHttpUrl(cleaned);
+  if (http) {
+    const parsed = new URL(http);
+    return {
+      label: `${parsed.host}${parsed.pathname}`.replace(/\.git$/i, ""),
+      href: http
+    };
+  }
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/.test(cleaned)) {
+    const slug = cleaned.replace(/\.git$/i, "");
+    return { label: slug, href: `https://github.com/${slug}` };
+  }
+  if (/^git@[A-Za-z0-9.-]+:[A-Za-z0-9_./-]+(?:\.git)?$/.test(cleaned)) {
+    return { label: cleaned.replace(/\.git$/i, "") };
+  }
+  return { label: "remote source (details hidden)" };
+}
+function catalogSource(source) {
+  const provider = source?.provider ?? "unknown";
+  if (!source)
+    return { provider, label: "unknown source" };
+  if (provider === "github" || provider === "git") {
+    const remote = cleanRemote(source.repository ?? source.url);
+    return {
+      provider,
+      label: remote.label ?? `${provider} source`,
+      href: remote.href
+    };
+  }
+  if (provider === "marketplace") {
+    const name = cleanText(source.marketplace ?? source.repository);
+    return { provider, label: name ? `Marketplace \xB7 ${name}` : "Marketplace" };
+  }
+  if (provider === "npx") {
+    const packageName = cleanText(source.package);
+    return { provider, label: packageName ? `npm \xB7 ${packageName}` : "npm package" };
+  }
+  if (provider === "vendored") {
+    const repoPath = safeRepoRelativePath(source.path);
+    return {
+      provider,
+      label: repoPath ? `Repository copy \xB7 ${repoPath}` : "Repository copy",
+      repoPath
+    };
+  }
+  if (provider === "local") {
+    return { provider, label: "Local source \xB7 machine path hidden" };
+  }
+  return { provider, label: "Unknown source \xB7 review required" };
+}
+function portabilityFor(source) {
+  if (source.provider === "vendored")
+    return "portable";
+  if (source.provider === "github" || source.provider === "git" || source.provider === "marketplace" || source.provider === "npx") {
+    return "referenced";
+  }
+  return "needs-review";
+}
+function lockedRevisionFor(resource, locks) {
+  const matches = locks.filter((entry) => entry.resourceId === resource.id);
+  const values = matches.map((entry) => entry.version ?? entry.commit ?? entry.hash).filter((value) => !!value).map((value) => cleanText(value, 80)).filter(Boolean);
+  return [...new Set(values)].sort().join(", ") || void 0;
+}
+function targetList(resource) {
+  const targets = [];
+  for (const name of ["claude", "codex"]) {
+    const config = resource.targets[name];
+    if (!config?.enabled)
+      continue;
+    const recipeRef = cleanText(config.recipeRef, 300);
+    targets.push({
+      name,
+      scope: config.scope ?? "user",
+      recipeRef,
+      recipePath: safeRepoRelativePath(recipeRef)
+    });
+  }
+  return targets;
+}
+async function loadProfiles(configRepoPath) {
+  const profilesDir = import_node_path25.default.join(configRepoPath, "profiles");
+  if (!await pathExists(profilesDir))
+    return [];
+  const entries = await import_promises11.default.readdir(profilesDir, { withFileTypes: true });
+  const profiles = [];
+  for (const entry of entries.sort((a, b) => stableCompare(a.name, b.name))) {
+    if (!entry.isFile() || !/\.ya?ml$/i.test(entry.name))
+      continue;
+    profiles.push(await loadProfile(import_node_path25.default.join(profilesDir, entry.name)));
+  }
+  return profiles;
+}
+async function loadRepositoryConfig(configRepoPath) {
+  const configPath = import_node_path25.default.join(configRepoPath, "config.yaml");
+  if (!await pathExists(configPath))
+    return ConfigRepoSchema.parse({});
+  return loadConfigRepo(configPath);
+}
+async function buildAssetCatalog(configRepoPath) {
+  const [config, resourcesFile, lockFile, profiles] = await Promise.all([
+    loadRepositoryConfig(configRepoPath),
+    loadResources(import_node_path25.default.join(configRepoPath, "resources.yaml")),
+    loadLock(import_node_path25.default.join(configRepoPath, "lock.yaml")),
+    loadProfiles(configRepoPath)
+  ]);
+  const assets = resourcesFile.resources.map((resource) => {
+    const source = catalogSource(resource.source);
+    return {
+      id: cleanText(resource.id, 180) ?? "unnamed-resource",
+      kind: resource.kind,
+      profiles: [...new Set(resource.profiles.map((p) => cleanText(p, 80) ?? "base"))].sort(stableCompare),
+      targets: targetList(resource),
+      source,
+      versionPolicy: resource.versionPolicy,
+      lockedRevision: lockedRevisionFor(resource, lockFile.entries),
+      portability: portabilityFor(source),
+      notes: cleanText(resource.notes)
+    };
+  }).sort((a, b) => stableCompare(a.kind, b.kind) || stableCompare(a.id, b.id));
+  const byKind = Object.fromEntries(ALL_KINDS.map((kind) => [kind, 0]));
+  const byTarget = { claude: 0, codex: 0 };
+  for (const asset of assets) {
+    byKind[asset.kind] += 1;
+    for (const target of asset.targets)
+      byTarget[target.name] += 1;
+  }
+  return {
+    schemaVersion: 1,
+    repository: {
+      name: cleanText(config.name, 120) ?? "AI Config Repository",
+      defaultProfile: cleanText(config.defaultProfile, 80) ?? "home",
+      targets: config.targets
+    },
+    assets,
+    profiles: profiles.map((profile) => ({
+      name: profile.profile,
+      extends: [...profile.extends].sort(stableCompare),
+      includeCount: profile.include.resources.length,
+      excludeCount: profile.exclude.resources.length,
+      maxRisk: profile.security.maxRisk,
+      isDefault: profile.profile === config.defaultProfile
+    })).sort((a, b) => stableCompare(a.name, b.name)),
+    summary: {
+      total: assets.length,
+      portable: assets.filter((asset) => asset.portability === "portable").length,
+      referenced: assets.filter((asset) => asset.portability === "referenced").length,
+      needsReview: assets.filter((asset) => asset.portability === "needs-review").length,
+      byKind,
+      byTarget
+    }
+  };
+}
+function md(value) {
+  if (!value)
+    return "\u2014";
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+function mdCode(value) {
+  if (!value)
+    return "\u2014";
+  return `\`${value.replace(/`/g, "\\`")}\``;
+}
+function mdLink(label, rel) {
+  if (!rel)
+    return md(label);
+  const encoded = rel.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return `[${md(label)}](${encoded})`;
+}
+function targetMarkdown(targets) {
+  if (!targets.length)
+    return "\u2014";
+  return targets.map((target) => {
+    const label = `${target.name}${target.scope === "user" ? "" : ` \xB7 ${target.scope}`}`;
+    return target.recipePath ? mdLink(label, target.recipePath) : md(label);
+  }).join("<br>");
+}
+function sourceMarkdown(source) {
+  if (source.repoPath)
+    return mdLink(source.label, source.repoPath);
+  if (source.href)
+    return `[${md(source.label)}](${source.href})`;
+  return md(source.label);
+}
+function versionMarkdown(asset) {
+  const lock = asset.lockedRevision ? `<br>\u9501\u5B9A\uFF1A${mdCode(asset.lockedRevision.length > 20 ? asset.lockedRevision.slice(0, 12) : asset.lockedRevision)}` : "";
+  return `${mdCode(asset.versionPolicy)}${lock}`;
+}
+var KIND_TITLES = {
+  skill: "Skills",
+  plugin: "Plugins",
+  integration: "Integrations",
+  hook: "Hooks",
+  mcp: "MCP Servers",
+  instruction: "Instructions"
+};
+function renderAssetCatalogMarkdown(catalog) {
+  const lines = [
+    "# AI Config \u5907\u4EFD\u8D44\u4EA7\u76EE\u5F55",
+    "",
+    "> [!NOTE]",
+    "> \u6B64\u76EE\u5F55\u7531 `ai-config-sync` \u6839\u636E\u4ED3\u5E93\u4E2D\u7684 `resources.yaml`\u3001Profiles\u3001Recipes \u4E0E Lock \u786E\u5B9A\u6027\u751F\u6210\u3002\u8BF7\u52FF\u624B\u5DE5\u7F16\u8F91\u6807\u8BB0\u533A\uFF1B\u5B83\u4E0D\u5305\u542B\u5BC6\u94A5\u89E3\u6790\u503C\u3001\u767B\u5F55\u6001\u3001\u804A\u5929\u8BB0\u5F55\u6216\u672C\u673A\u7EDD\u5BF9\u8DEF\u5F84\u3002",
+    "",
+    "\u9700\u8981\u641C\u7D22\u548C\u7B5B\u9009\u65F6\uFF0C\u53EF\u4E0B\u8F7D\u5E76\u6253\u5F00 [`catalog/index.html`](catalog/index.html)\uFF1B\u82E5\u4ED3\u5E93\u914D\u7F6E\u4E86\u79C1\u6709\u9759\u6001\u7AD9\u70B9\uFF0C\u4E5F\u53EF\u76F4\u63A5\u6258\u7BA1\u8BE5\u81EA\u5305\u542B\u9875\u9762\u3002",
+    "",
+    "## \u6982\u89C8",
+    "",
+    "| \u4ED3\u5E93 | \u8D44\u4EA7 | \u53EF\u79BB\u7EBF\u643A\u5E26 | \u8FDC\u7A0B\u5F15\u7528 | \u9700\u68C0\u67E5 | Claude | Codex |",
+    "|---|---:|---:|---:|---:|---:|---:|",
+    `| ${md(catalog.repository.name)} | ${catalog.summary.total} | ${catalog.summary.portable} | ${catalog.summary.referenced} | ${catalog.summary.needsReview} | ${catalog.summary.byTarget.claude} | ${catalog.summary.byTarget.codex} |`,
+    ""
+  ];
+  for (const kind of ALL_KINDS) {
+    const assets = catalog.assets.filter((asset) => asset.kind === kind);
+    if (!assets.length)
+      continue;
+    lines.push(`## ${KIND_TITLES[kind]} (${assets.length})`, "");
+    lines.push("| \u8D44\u4EA7 | \u76EE\u6807 / Recipe | Profiles | \u6765\u6E90 | \u7248\u672C\u7B56\u7565 | \u8BF4\u660E |");
+    lines.push("|---|---|---|---|---|---|");
+    for (const asset of assets) {
+      lines.push(`| ${mdCode(asset.id)} | ${targetMarkdown(asset.targets)} | ${asset.profiles.map(mdCode).join(" ") || "\u2014"} | ${sourceMarkdown(asset.source)} | ${versionMarkdown(asset)} | ${md(asset.notes)} |`);
+    }
+    lines.push("");
+  }
+  lines.push("## Profiles", "");
+  if (!catalog.profiles.length) {
+    lines.push("\u5C1A\u672A\u53D1\u73B0 Profile \u6587\u4EF6\u3002", "");
+  } else {
+    lines.push("| Profile | \u7EE7\u627F | Include | Exclude | \u6700\u5927\u98CE\u9669 | \u9ED8\u8BA4 |", "|---|---|---:|---:|---|---|");
+    for (const profile of catalog.profiles) {
+      lines.push(`| ${mdCode(profile.name)} | ${profile.extends.map(mdCode).join(" ") || "\u2014"} | ${profile.includeCount} | ${profile.excludeCount} | ${mdCode(profile.maxRisk)} | ${profile.isDefault ? "\u2713" : ""} |`);
+    }
+    lines.push("");
+  }
+  lines.push("---", "", "\u8BE5\u9875\u9762\u53EA\u63CF\u8FF0**\u5DF2\u7ECF\u8FDB\u5165\u6B64\u5907\u4EFD\u4ED3\u5E93**\u7684\u8D44\u4EA7\uFF1B\u4E00\u6B21\u672C\u673A `scan` \u4E2D\u5C1A\u672A\u786E\u8BA4\u6216\u5C1A\u672A Capture \u7684\u9879\u76EE\u4E0D\u4F1A\u88AB\u8BEF\u6807\u4E3A\u5DF2\u5907\u4EFD\u3002");
+  return `${lines.join("\n").trim()}
+`;
+}
+function jsonForHtml(value) {
+  return JSON.stringify(value).replace(/&/g, "\\u0026").replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+function renderAssetCatalogHtml(catalog) {
+  const data = jsonForHtml(catalog);
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  ${HTML_GENERATOR_MARKER}
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>${catalog.repository.name.replace(/[<>&"]/g, "")} \xB7 AI Config Assets</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#667085; --line:#e7eaf0; --panel:#fff; --soft:#f5f7fb; --brand:#5b5bd6; --brand2:#7c3aed; --good:#087f5b; --warn:#b45309; --shadow:0 14px 36px rgba(31,42,68,.09); }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f7f8fc 0%,#f4f1ff 48%,#eef6ff 100%); font:14px/1.5 Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
+    button,input,select { font:inherit; }
+    .shell { display:grid; grid-template-columns:238px minmax(0,1fr); min-height:100vh; }
+    .sidebar { position:sticky; top:0; height:100vh; padding:26px 18px; color:#eef2ff; background:linear-gradient(180deg,#171a2f 0%,#242447 68%,#30205b 100%); }
+    .brand { display:flex; align-items:center; gap:12px; padding:0 8px 24px; }
+    .brand-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; font-size:19px; background:linear-gradient(135deg,#7c83ff,#a855f7); box-shadow:0 10px 24px rgba(124,88,255,.35); }
+    .brand strong { display:block; font-size:15px; letter-spacing:.2px; }
+    .brand span { color:#aeb7d6; font-size:11px; }
+    .nav-title { margin:15px 10px 8px; color:#8f99bc; font-size:10px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; border-radius:10px; color:#cdd4ed; }
+    .nav-item.active { color:white; background:rgba(135,124,255,.19); box-shadow:inset 0 0 0 1px rgba(167,157,255,.16); }
+    .repo-card { position:absolute; left:18px; right:18px; bottom:22px; padding:14px; border:1px solid rgba(205,212,237,.13); border-radius:13px; background:rgba(255,255,255,.07); }
+    .repo-card small { color:#aeb7d6; }
+    .repo-name { margin:4px 0 10px; overflow:hidden; color:white; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+    .repo-meta { display:flex; gap:6px; flex-wrap:wrap; }
+    .main { min-width:0; padding:28px clamp(20px,4vw,58px) 60px; }
+    .topbar { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-bottom:24px; }
+    h1 { margin:0 0 5px; font-size:28px; letter-spacing:-.7px; }
+    .subtitle { margin:0; color:var(--muted); }
+    .readonly { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border:1px solid #dadcfb; border-radius:999px; color:#4c4bb1; background:#f3f2ff; font-weight:650; white-space:nowrap; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:22px; }
+    .stat { padding:17px 18px; border:1px solid rgba(231,234,240,.9); border-radius:16px; background:rgba(255,255,255,.86); box-shadow:0 8px 28px rgba(35,45,78,.05); backdrop-filter:blur(10px); }
+    .stat-label { color:var(--muted); font-size:12px; }
+    .stat-value { display:block; margin-top:5px; font-size:25px; font-weight:760; letter-spacing:-.5px; }
+    .toolbar { display:grid; grid-template-columns:minmax(220px,1fr) auto auto; gap:10px; padding:12px; margin-bottom:14px; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.82); box-shadow:var(--shadow); }
+    .search-wrap { position:relative; }
+    .search-wrap span { position:absolute; left:12px; top:9px; color:#8b93a7; }
+    input,select { width:100%; min-height:38px; border:1px solid #dde1ea; border-radius:10px; color:var(--ink); background:white; outline:none; }
+    input { padding:8px 12px 8px 36px; }
+    select { min-width:150px; padding:7px 32px 7px 11px; }
+    input:focus,select:focus { border-color:#918ff1; box-shadow:0 0 0 3px rgba(91,91,214,.12); }
+    .chips { display:flex; gap:8px; overflow:auto; padding:3px 1px 15px; scrollbar-width:none; }
+    .filter-chip { border:1px solid #dfe3ed; border-radius:999px; padding:7px 12px; color:#566074; background:rgba(255,255,255,.84); cursor:pointer; white-space:nowrap; }
+    .filter-chip:hover { border-color:#aaa8ee; color:#4d4bb2; }
+    .filter-chip.active { border-color:#5b5bd6; color:white; background:linear-gradient(135deg,#5b5bd6,#7653d6); box-shadow:0 6px 15px rgba(91,91,214,.22); }
+    .result-row { display:flex; justify-content:space-between; align-items:center; margin:3px 2px 12px; color:var(--muted); font-size:12px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .asset { min-width:0; padding:17px; border:1px solid var(--line); border-radius:17px; background:rgba(255,255,255,.9); box-shadow:0 9px 28px rgba(35,45,78,.055); transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease; }
+    .asset:hover { transform:translateY(-2px); border-color:#cfcef8; box-shadow:0 16px 34px rgba(45,44,120,.1); }
+    .asset-head { display:flex; gap:12px; align-items:flex-start; }
+    .asset-icon { flex:0 0 auto; display:grid; place-items:center; width:40px; height:40px; border-radius:12px; color:#4d4bb2; font-size:18px; background:linear-gradient(135deg,#eeeefe,#f4eefe); }
+    .asset-title { min-width:0; flex:1; }
+    .asset-title h2 { margin:1px 0 2px; overflow:hidden; font-size:15px; text-overflow:ellipsis; white-space:nowrap; }
+    .asset-kind { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 10px; }
+    .badge { display:inline-flex; align-items:center; min-height:24px; padding:3px 8px; border:1px solid #e0e4ed; border-radius:999px; color:#586174; background:#f8f9fc; font-size:11px; }
+    .badge.target { border-color:#d9d8fb; color:#4f4eb5; background:#f4f3ff; }
+    .badge.good { border-color:#bde9d9; color:var(--good); background:#effbf6; }
+    .badge.warn { border-color:#f3d7ae; color:var(--warn); background:#fff8eb; }
+    .source { display:flex; align-items:center; gap:7px; min-width:0; color:#566074; font-size:12px; }
+    .source-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    details { margin-top:12px; padding-top:10px; border-top:1px solid #edf0f5; }
+    summary { color:#5b5bd6; cursor:pointer; font-size:12px; font-weight:650; }
+    .detail-list { display:grid; gap:7px; margin-top:10px; color:#5f687b; font-size:12px; }
+    .detail-list a { color:#5150b8; text-decoration:none; }
+    .detail-list a:hover { text-decoration:underline; }
+    .empty { grid-column:1/-1; padding:54px 24px; border:1px dashed #cfd4e1; border-radius:17px; color:var(--muted); text-align:center; background:rgba(255,255,255,.55); }
+    .footer { margin-top:28px; padding-top:18px; border-top:1px solid rgba(210,215,226,.8); color:#7b8497; font-size:12px; }
+    @media (max-width:950px) { .shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;padding:16px 20px}.sidebar .nav-title,.sidebar .nav-item,.repo-card{display:none}.brand{padding:0}.main{padding-top:22px}.stats{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:680px) { .topbar{align-items:stretch;flex-direction:column}.grid{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr}.stats{gap:9px}.stat{padding:14px}.main{padding-left:14px;padding-right:14px} }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">\u25C7</div><div><strong>AI Config Sync</strong><span>Repository Catalog</span></div></div>
+      <div class="nav-title">Workspace</div>
+      <div class="nav-item active">\u25A6 <span>\u5907\u4EFD\u8D44\u4EA7</span></div>
+      <div class="nav-item">\u2301 <span>Profiles</span></div>
+      <div class="nav-item">\u21BA <span>\u6062\u590D\u8BF4\u660E</span></div>
+      <div class="repo-card"><small>Private config repository</small><div class="repo-name" id="repo-name"></div><div class="repo-meta"><span class="badge" id="default-profile"></span><span class="badge good">\u53EA\u8BFB</span></div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><h1>\u5907\u4EFD\u8D44\u4EA7</h1><p class="subtitle">\u67E5\u770B\u5DF2\u7ECF\u8FDB\u5165\u79C1\u6709\u914D\u7F6E\u4ED3\u5E93\u3001\u53EF\u4F9B\u53E6\u4E00\u53F0\u7535\u8111\u6062\u590D\u7684\u8D44\u4EA7\u3002</p></div><div class="readonly">\u25CF Repository view</div></header>
+      <section class="stats" aria-label="\u8D44\u4EA7\u7EDF\u8BA1">
+        <div class="stat"><span class="stat-label">\u5168\u90E8\u8D44\u4EA7</span><strong class="stat-value" id="stat-total">0</strong></div>
+        <div class="stat"><span class="stat-label">\u4ED3\u5E93\u5185\u526F\u672C</span><strong class="stat-value" id="stat-portable">0</strong></div>
+        <div class="stat"><span class="stat-label">\u8FDC\u7A0B\u5F15\u7528</span><strong class="stat-value" id="stat-referenced">0</strong></div>
+        <div class="stat"><span class="stat-label">\u9700\u8981\u68C0\u67E5</span><strong class="stat-value" id="stat-review">0</strong></div>
+      </section>
+      <section class="toolbar" aria-label="\u7B5B\u9009\u8D44\u4EA7">
+        <label class="search-wrap"><span>\u2315</span><input id="search" type="search" placeholder="\u641C\u7D22\u540D\u79F0\u3001\u6765\u6E90\u6216\u8BF4\u660E\u2026" autocomplete="off"></label>
+        <label><select id="target-filter" aria-label="\u6309\u76EE\u6807\u7B5B\u9009"><option value="all">\u5168\u90E8\u76EE\u6807</option><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
+        <label><select id="profile-filter" aria-label="\u6309 Profile \u7B5B\u9009"><option value="all">\u5168\u90E8 Profiles</option></select></label>
+      </section>
+      <div class="chips" id="kind-filters" aria-label="\u6309\u8D44\u4EA7\u7C7B\u578B\u7B5B\u9009"></div>
+      <div class="result-row"><span id="result-count"></span><span>\u6570\u636E\u6E90\uFF1Aresources.yaml \xB7 profiles \xB7 lock</span></div>
+      <section class="grid" id="asset-grid" aria-live="polite"></section>
+      <footer class="footer">\u7531 ai-config-sync \u786E\u5B9A\u6027\u751F\u6210\u3002\u9875\u9762\u4E0D\u5305\u542B\u5BC6\u94A5\u89E3\u6790\u503C\u3001OAuth\u3001\u804A\u5929\u8BB0\u5F55\u6216\u672C\u673A\u7EDD\u5BF9\u8DEF\u5F84\uFF1B\u6062\u590D\u64CD\u4F5C\u5FC5\u987B\u5728 CLI \u4E2D\u5148\u67E5\u770B Plan \u518D\u786E\u8BA4\u3002</footer>
+    </main>
+  </div>
+  <script id="catalog-data" type="application/json">${data}</script>
+  <script>
+    (function () {
+      "use strict";
+      var catalog = JSON.parse(document.getElementById("catalog-data").textContent || "{}");
+      var state = { query: "", kind: "all", target: "all", profile: "all" };
+      var kindLabels = { all:"\u5168\u90E8", skill:"Skills", plugin:"Plugins", integration:"Integrations", hook:"Hooks", mcp:"MCP", instruction:"Instructions" };
+      var kindIcons = { skill:"\u2726", plugin:"\u2318", integration:"\u25C7", hook:"\u21AF", mcp:"\u21C4", instruction:"\xB6" };
+      var portabilityLabels = { portable:"\u4ED3\u5E93\u5185\u526F\u672C", referenced:"\u8FDC\u7A0B\u5F15\u7528", "needs-review":"\u9700\u8981\u68C0\u67E5" };
+
+      function make(tag, className, text) {
+        var element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+      function badge(text, extra) { return make("span", "badge" + (extra ? " " + extra : ""), text); }
+      function addDetail(container, label, value) {
+        if (!value) return;
+        var row = make("div", "", "");
+        row.append(make("strong", "", label + "\uFF1A"), document.createTextNode(value));
+        container.appendChild(row);
+      }
+      function addLink(container, label, href) {
+        if (!href) return;
+        var row = make("div", "", "");
+        row.appendChild(make("strong", "", label + "\uFF1A"));
+        var link = make("a", "", href);
+        link.href = href;
+        if (/^https?:/.test(href)) { link.target = "_blank"; link.rel = "noreferrer"; }
+        row.appendChild(link);
+        container.appendChild(row);
+      }
+      function createCard(asset) {
+        var card = make("article", "asset");
+        var head = make("div", "asset-head");
+        head.appendChild(make("div", "asset-icon", kindIcons[asset.kind] || "\u2022"));
+        var title = make("div", "asset-title");
+        title.append(make("h2", "", asset.id), make("div", "asset-kind", kindLabels[asset.kind] || asset.kind));
+        head.appendChild(title);
+        card.appendChild(head);
+
+        var badges = make("div", "badges");
+        (asset.targets || []).forEach(function (target) { badges.appendChild(badge(target.name + (target.scope === "user" ? "" : " \xB7 " + target.scope), "target")); });
+        (asset.profiles || []).forEach(function (profile) { badges.appendChild(badge(profile)); });
+        badges.appendChild(badge(portabilityLabels[asset.portability], asset.portability === "needs-review" ? "warn" : "good"));
+        card.appendChild(badges);
+
+        var source = make("div", "source");
+        source.append(make("span", "", "\u2301"), make("span", "source-text", asset.source.label));
+        card.appendChild(source);
+
+        var details = document.createElement("details");
+        details.appendChild(make("summary", "", "\u67E5\u770B\u6765\u6E90\u4E0E\u6062\u590D\u5143\u6570\u636E"));
+        var list = make("div", "detail-list");
+        addDetail(list, "\u7248\u672C\u7B56\u7565", asset.versionPolicy);
+        addDetail(list, "\u9501\u5B9A\u7248\u672C", asset.lockedRevision);
+        addDetail(list, "\u8BF4\u660E", asset.notes);
+        if (asset.source.href) addLink(list, "\u6765\u6E90", asset.source.href);
+        if (asset.source.repoPath) addLink(list, "\u4ED3\u5E93\u6587\u4EF6", "../" + asset.source.repoPath);
+        (asset.targets || []).forEach(function (target) { if (target.recipePath) addLink(list, target.name + " Recipe", "../" + target.recipePath); });
+        details.appendChild(list);
+        card.appendChild(details);
+        return card;
+      }
+      function matches(asset) {
+        if (state.kind !== "all" && asset.kind !== state.kind) return false;
+        if (state.target !== "all" && !(asset.targets || []).some(function (target) { return target.name === state.target; })) return false;
+        if (state.profile !== "all" && !(asset.profiles || []).includes(state.profile)) return false;
+        if (!state.query) return true;
+        var haystack = [asset.id, asset.kind, asset.notes || "", asset.source.label]
+          .concat(asset.profiles || [])
+          .concat((asset.targets || []).map(function (target) { return target.name; }))
+          .join(" ").toLocaleLowerCase();
+        return haystack.includes(state.query);
+      }
+      function render() {
+        var grid = document.getElementById("asset-grid");
+        var assets = (catalog.assets || []).filter(matches);
+        grid.replaceChildren();
+        if (!assets.length) {
+          var empty = make("div", "empty");
+          empty.append(make("div", "asset-icon", "\u2315"), make("h2", "", "\u6CA1\u6709\u5339\u914D\u7684\u5907\u4EFD\u8D44\u4EA7"), make("p", "", "\u8C03\u6574\u641C\u7D22\u6216\u7B5B\u9009\u6761\u4EF6\u540E\u518D\u8BD5\u3002"));
+          grid.appendChild(empty);
+        } else {
+          assets.forEach(function (asset) { grid.appendChild(createCard(asset)); });
+        }
+        document.getElementById("result-count").textContent = "\u663E\u793A " + assets.length + " / " + (catalog.assets || []).length + " \u9879";
+      }
+      function initFilters() {
+        var kinds = document.getElementById("kind-filters");
+        ["all","skill","plugin","integration","hook","mcp","instruction"].forEach(function (kind) {
+          if (kind !== "all" && !(catalog.summary.byKind[kind] > 0)) return;
+          var count = kind === "all" ? catalog.summary.total : catalog.summary.byKind[kind];
+          var button = make("button", "filter-chip" + (kind === "all" ? " active" : ""), kindLabels[kind] + " " + count);
+          button.type = "button";
+          button.addEventListener("click", function () {
+            state.kind = kind;
+            kinds.querySelectorAll("button").forEach(function (item) { item.classList.toggle("active", item === button); });
+            render();
+          });
+          kinds.appendChild(button);
+        });
+        var profile = document.getElementById("profile-filter");
+        (catalog.profiles || []).forEach(function (item) {
+          var option = document.createElement("option"); option.value = item.name; option.textContent = item.name; profile.appendChild(option);
+        });
+      }
+      document.getElementById("repo-name").textContent = catalog.repository.name;
+      document.getElementById("default-profile").textContent = "\u9ED8\u8BA4 \xB7 " + catalog.repository.defaultProfile;
+      document.getElementById("stat-total").textContent = catalog.summary.total;
+      document.getElementById("stat-portable").textContent = catalog.summary.portable;
+      document.getElementById("stat-referenced").textContent = catalog.summary.referenced;
+      document.getElementById("stat-review").textContent = catalog.summary.needsReview;
+      document.getElementById("search").addEventListener("input", function (event) { state.query = event.target.value.trim().toLocaleLowerCase(); render(); });
+      document.getElementById("target-filter").addEventListener("change", function (event) { state.target = event.target.value; render(); });
+      document.getElementById("profile-filter").addEventListener("change", function (event) { state.profile = event.target.value; render(); });
+      initFilters(); render();
+    }());
+  </script>
+</body>
+</html>
+`;
+}
+async function writeAssetCatalog(configRepoPath) {
+  const catalog = await buildAssetCatalog(configRepoPath);
+  const markdownPath = import_node_path25.default.join(configRepoPath, ASSET_CATALOG_MARKDOWN_REL);
+  const htmlPath = import_node_path25.default.join(configRepoPath, ASSET_CATALOG_HTML_REL);
+  const changedRelPaths = [];
+  const markdownBody = renderAssetCatalogMarkdown(catalog);
+  const existingMarkdown = await pathExists(markdownPath) ? await readText(markdownPath) : "";
+  const merged = mergeManagedMarkdown(existingMarkdown, markdownBody, {
+    begin: ASSETS_BEGIN,
+    end: ASSETS_END
+  });
+  const html = renderAssetCatalogHtml(catalog);
+  let existingHtml;
+  if (await pathExists(htmlPath)) {
+    existingHtml = await readText(htmlPath);
+    if (!existingHtml.includes(HTML_GENERATOR_MARKER)) {
+      throw new Error(`Refusing to replace non-generated catalog page: ${ASSET_CATALOG_HTML_REL}`);
+    }
+  }
+  if (merged.changed) {
+    await writeText(markdownPath, merged.content);
+    changedRelPaths.push(ASSET_CATALOG_MARKDOWN_REL);
+  }
+  if (existingHtml !== html) {
+    await writeText(htmlPath, html);
+    changedRelPaths.push(ASSET_CATALOG_HTML_REL);
+  }
+  return { catalog, markdownPath, htmlPath, changedRelPaths };
+}
+
 // packages/recipe-engine/dist/capture-transaction.js
 async function entryType(abs) {
   try {
-    const st = await import_promises11.default.stat(abs);
+    const st = await import_promises12.default.stat(abs);
     return st.isDirectory() ? "directory" : "file";
   } catch {
     return "file";
@@ -20557,20 +21211,20 @@ async function entryType(abs) {
 }
 async function rollbackCaptureTransaction(tx, configRepoPath) {
   for (const entry of tx.entries) {
-    const live = import_node_path25.default.join(configRepoPath, entry.path);
+    const live = import_node_path26.default.join(configRepoPath, entry.path);
     try {
       if (!entry.existedBefore) {
         if (await pathExists(live)) {
-          await import_promises11.default.rm(live, { recursive: true, force: true });
+          await import_promises12.default.rm(live, { recursive: true, force: true });
         }
         continue;
       }
       if (await pathExists(live)) {
-        await import_promises11.default.rm(live, { recursive: true, force: true });
+        await import_promises12.default.rm(live, { recursive: true, force: true });
       }
       if (entry.backupPath && await pathExists(entry.backupPath)) {
-        await ensureDir(import_node_path25.default.dirname(live));
-        await import_promises11.default.cp(entry.backupPath, live, { recursive: true });
+        await ensureDir(import_node_path26.default.dirname(live));
+        await import_promises12.default.cp(entry.backupPath, live, { recursive: true });
       }
     } catch {
     }
@@ -20584,7 +21238,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
   const lockPayload = {
     pid: process.pid,
     startedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    target: import_node_path25.default.resolve(configRepoPath),
+    target: import_node_path26.default.resolve(configRepoPath),
     scope: "config-repo",
     command: "commitCaptureItems"
   };
@@ -20596,7 +21250,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
     if (options.injectDelayMs && options.injectDelayMs > 0) {
       await new Promise((r) => setTimeout(r, options.injectDelayMs));
     }
-    const resourcesPath = import_node_path25.default.join(configRepoPath, "resources.yaml");
+    const resourcesPath = import_node_path26.default.join(configRepoPath, "resources.yaml");
     const existing = await loadResources(resourcesPath);
     const byId = new Map(existing.resources.map((r) => [r.id, r]));
     const recipePaths = [];
@@ -20637,29 +21291,29 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
       });
     }
     const txId = import_node_crypto7.default.randomUUID();
-    const stagingRoot = import_node_path25.default.join(txBase, `${txId}-staging`);
-    const backupRoot = import_node_path25.default.join(txBase, `${txId}-backup`);
+    const stagingRoot = import_node_path26.default.join(txBase, `${txId}-staging`);
+    const backupRoot = import_node_path26.default.join(txBase, `${txId}-backup`);
     const stagedRecipeRels = [];
     const stagedVendorRels = [];
     const txEntries = [];
     const trackPath = async (rel) => {
       if (txEntries.some((e) => e.path === rel))
         return;
-      const live = import_node_path25.default.join(configRepoPath, rel);
+      const live = import_node_path26.default.join(configRepoPath, rel);
       const existedBefore = await pathExists(live);
       const type = existedBefore ? await entryType(live) : "file";
       let backupPath;
       if (existedBefore) {
-        backupPath = import_node_path25.default.join(backupRoot, rel);
-        await ensureDir(import_node_path25.default.dirname(backupPath));
-        await import_promises11.default.cp(live, backupPath, { recursive: true });
+        backupPath = import_node_path26.default.join(backupRoot, rel);
+        await ensureDir(import_node_path26.default.dirname(backupPath));
+        await import_promises12.default.cp(live, backupPath, { recursive: true });
       }
       txEntries.push({ path: rel, existedBefore, backupPath, type });
     };
     let completed;
     try {
-      await import_promises11.default.mkdir(import_node_path25.default.join(stagingRoot, "recipes"), { recursive: true });
-      await import_promises11.default.mkdir(backupRoot, { recursive: true });
+      await import_promises12.default.mkdir(import_node_path26.default.join(stagingRoot, "recipes"), { recursive: true });
+      await import_promises12.default.mkdir(backupRoot, { recursive: true });
       for (const item of batchById.values()) {
         if (item.status === "blocked" || item.status === "system-excluded") {
           continue;
@@ -20668,7 +21322,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         if (!validation.ok) {
           continue;
         }
-        if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path25.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
+        if (item.suggestedResource.source?.provider === "local" && item.suggestedResource.source.path && import_node_path26.default.isAbsolute(item.suggestedResource.source.path) && item.scanned.kind === "skill") {
           const v = await vendorSkillDirectory(item.suggestedResource.source.path, configRepoPath, item.suggestedResource.id, { stagingRoot });
           if (!v.ok) {
             throw new Error(`Cannot capture ${item.suggestedResource.id}: ${v.message}` + (v.blockedSecrets.length ? ` secrets=${v.blockedSecrets.map((s) => s.path + ":" + s.rule).join(",")}` : ""));
@@ -20739,7 +21393,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
           recipePaths.push(recipeFileLive);
         }
       }
-      const stagedResources = import_node_path25.default.join(stagingRoot, "resources.yaml");
+      const stagedResources = import_node_path26.default.join(stagingRoot, "resources.yaml");
       await saveResources(stagedResources, {
         schemaVersion: 1,
         resources: [...byId.values()]
@@ -20750,31 +21404,33 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         await trackPath(rel);
       for (const rel of stagedVendorRels)
         await trackPath(rel);
+      await trackPath(ASSET_CATALOG_MARKDOWN_REL);
+      await trackPath(ASSET_CATALOG_HTML_REL);
       for (const rel of stagedVendorRels) {
-        const from = import_node_path25.default.join(stagingRoot, rel);
-        const to = import_node_path25.default.join(configRepoPath, rel);
+        const from = import_node_path26.default.join(stagingRoot, rel);
+        const to = import_node_path26.default.join(configRepoPath, rel);
         if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { recursive: true, force: true });
+          await import_promises12.default.rm(to, { recursive: true, force: true });
         }
-        await import_promises11.default.mkdir(import_node_path25.default.dirname(to), { recursive: true });
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.cp(from, to, { recursive: true });
-          await import_promises11.default.rm(from, { recursive: true, force: true });
+        await import_promises12.default.mkdir(import_node_path26.default.dirname(to), { recursive: true });
+        await import_promises12.default.rename(from, to).catch(async () => {
+          await import_promises12.default.cp(from, to, { recursive: true });
+          await import_promises12.default.rm(from, { recursive: true, force: true });
         });
         if (options.injectFailureAfter?.includes(rel)) {
           throw new Error(`injectFailureAfter: ${rel}`);
         }
       }
       for (const rel of stagedRecipeRels) {
-        const from = import_node_path25.default.join(stagingRoot, rel);
-        const to = import_node_path25.default.join(configRepoPath, rel);
+        const from = import_node_path26.default.join(stagingRoot, rel);
+        const to = import_node_path26.default.join(configRepoPath, rel);
         if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { recursive: true, force: true });
+          await import_promises12.default.rm(to, { recursive: true, force: true });
         }
-        await import_promises11.default.mkdir(import_node_path25.default.dirname(to), { recursive: true });
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.copyFile(from, to);
-          await import_promises11.default.rm(from, { force: true });
+        await import_promises12.default.mkdir(import_node_path26.default.dirname(to), { recursive: true });
+        await import_promises12.default.rename(from, to).catch(async () => {
+          await import_promises12.default.copyFile(from, to);
+          await import_promises12.default.rm(from, { force: true });
         });
         if (options.injectFailureAfter?.includes(rel)) {
           throw new Error(`injectFailureAfter: ${rel}`);
@@ -20784,24 +21440,32 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         const from = stagedResources;
         const to = resourcesPath;
         if (await pathExists(to)) {
-          await import_promises11.default.rm(to, { force: true });
+          await import_promises12.default.rm(to, { force: true });
         }
-        await import_promises11.default.rename(from, to).catch(async () => {
-          await import_promises11.default.copyFile(from, to);
-          await import_promises11.default.rm(from, { force: true });
+        await import_promises12.default.rename(from, to).catch(async () => {
+          await import_promises12.default.copyFile(from, to);
+          await import_promises12.default.rm(from, { force: true });
         });
         if (options.injectFailureAfter?.includes("resources.yaml")) {
           throw new Error("injectFailureAfter: resources.yaml");
         }
       }
-      await import_promises11.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
+      const catalogResult = await writeAssetCatalog(configRepoPath);
+      for (const rel of [ASSET_CATALOG_MARKDOWN_REL, ASSET_CATALOG_HTML_REL]) {
+        if (options.injectFailureAfter?.includes(rel)) {
+          throw new Error(`injectFailureAfter: ${rel}`);
+        }
+      }
+      await import_promises12.default.rm(backupRoot, { recursive: true, force: true }).catch(() => {
       });
-      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+      await import_promises12.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
       });
       const changedRelPaths = [
         "resources.yaml",
         ...stagedRecipeRels,
-        ...stagedVendorRels
+        ...stagedVendorRels,
+        ASSET_CATALOG_MARKDOWN_REL,
+        ASSET_CATALOG_HTML_REL
       ];
       const seen = /* @__PURE__ */ new Set();
       const uniqueChanged = changedRelPaths.filter((p) => {
@@ -20810,7 +21474,12 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         seen.add(p);
         return true;
       });
-      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+      completed = {
+        resourcesPath,
+        recipePaths,
+        catalogPaths: [catalogResult.markdownPath, catalogResult.htmlPath],
+        changedRelPaths: uniqueChanged
+      };
     } catch (e) {
       try {
         await rollbackCaptureTransaction({
@@ -20821,7 +21490,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         }, configRepoPath);
       } catch {
       }
-      await import_promises11.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
+      await import_promises12.default.rm(stagingRoot, { recursive: true, force: true }).catch(() => {
       });
       throw e;
     }
@@ -20835,7 +21504,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
 
 // packages/recipe-engine/dist/capture.js
 async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
-  const existing = await loadResources(import_node_path26.default.join(configRepoPath, "resources.yaml"));
+  const existing = await loadResources(import_node_path27.default.join(configRepoPath, "resources.yaml"));
   const existingIds = new Set(existing.resources.map((r) => r.id));
   const groups = /* @__PURE__ */ new Map();
   for (const s of scanned) {
@@ -21049,7 +21718,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     let suggestedRecipe;
     if (Object.keys(targetRecipes).length > 0) {
       let existingTargets = {};
-      const recipeFile = import_node_path26.default.join(configRepoPath, recipeRelPath(id));
+      const recipeFile = import_node_path27.default.join(configRepoPath, recipeRelPath(id));
       if (await pathExists(recipeFile)) {
         try {
           const prev = await loadRecipe(recipeFile);
@@ -21098,7 +21767,7 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
 }
 
 // packages/recipe-engine/dist/doctor.js
-var import_node_path27 = __toESM(require("node:path"), 1);
+var import_node_path28 = __toESM(require("node:path"), 1);
 init_dist();
 async function runDoctor(options) {
   const findings = [];
@@ -21206,7 +21875,7 @@ async function runDoctor(options) {
           });
         }
       }
-      const resourcesPath = import_node_path27.default.join(repo, "resources.yaml");
+      const resourcesPath = import_node_path28.default.join(repo, "resources.yaml");
       if (!await pathExists(resourcesPath)) {
         findings.push({
           severity: "warn",
@@ -21306,7 +21975,7 @@ async function runDoctor(options) {
   }
   if (options.configRepoPath) {
     try {
-      const res = await loadResources(import_node_path27.default.join(options.configRepoPath, "resources.yaml"));
+      const res = await loadResources(import_node_path28.default.join(options.configRepoPath, "resources.yaml"));
       const refs = collectSecretRefs(res);
       if (refs.length > 0) {
         const checks = await checkSecrets(refs, "env");
@@ -21344,15 +22013,15 @@ function formatDoctor(report) {
 }
 
 // packages/cli/src/setup-discovery.ts
-var import_node_path28 = __toESM(require("node:path"), 1);
-var import_promises12 = __toESM(require("node:fs/promises"), 1);
+var import_node_path29 = __toESM(require("node:path"), 1);
+var import_promises13 = __toESM(require("node:fs/promises"), 1);
 var import_node_url2 = require("node:url");
 init_dist();
 var import_meta = {};
 var SELF_PLUGIN_NAMES = /* @__PURE__ */ new Set(["ai-config-sync", "config-sync"]);
 async function looksLikePackageRoot(dir) {
   return pathExists(
-    import_node_path28.default.join(
+    import_node_path29.default.join(
       dir,
       "integrations",
       "claude-plugin",
@@ -21362,7 +22031,7 @@ async function looksLikePackageRoot(dir) {
   );
 }
 async function readPluginManifestName(pluginRoot) {
-  const manifest = import_node_path28.default.join(pluginRoot, ".claude-plugin", "plugin.json");
+  const manifest = import_node_path29.default.join(pluginRoot, ".claude-plugin", "plugin.json");
   if (!await pathExists(manifest)) return void 0;
   try {
     const raw = await readJsonFile(manifest);
@@ -21373,15 +22042,15 @@ async function readPluginManifestName(pluginRoot) {
 }
 async function detectPluginRoot(explicit) {
   const candidates = [];
-  if (explicit) candidates.push(import_node_path28.default.resolve(explicit));
+  if (explicit) candidates.push(import_node_path29.default.resolve(explicit));
   if (process.env.CLAUDE_PLUGIN_ROOT) {
-    candidates.push(import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT));
+    candidates.push(import_node_path29.default.resolve(process.env.CLAUDE_PLUGIN_ROOT));
   }
   try {
     const argv1 = process.argv[1];
     if (argv1) {
-      const binDir = import_node_path28.default.dirname(import_node_path28.default.resolve(argv1));
-      candidates.push(import_node_path28.default.resolve(binDir, ".."));
+      const binDir = import_node_path29.default.dirname(import_node_path29.default.resolve(argv1));
+      candidates.push(import_node_path29.default.resolve(binDir, ".."));
     }
   } catch {
   }
@@ -21389,20 +22058,20 @@ async function detectPluginRoot(explicit) {
     if (!await pathExists(c)) continue;
     const name = await readPluginManifestName(c);
     if (name && SELF_PLUGIN_NAMES.has(name)) return c;
-    if (await pathExists(import_node_path28.default.join(c, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path28.default.join(c, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path28.default.join(c, "bin", "ai-config-sync")))) {
+    if (await pathExists(import_node_path29.default.join(c, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path29.default.join(c, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path29.default.join(c, "bin", "ai-config-sync")))) {
       return c;
     }
   }
   return void 0;
 }
 async function isRunningInsideSelfPlugin(pluginRoot) {
-  const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT ? import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) : void 0);
+  const root = pluginRoot ?? (process.env.CLAUDE_PLUGIN_ROOT ? import_node_path29.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) : void 0);
   if (!root) return false;
   const name = await readPluginManifestName(root);
   if (name && SELF_PLUGIN_NAMES.has(name)) return true;
-  if (await pathExists(import_node_path28.default.join(root, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path28.default.join(root, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path28.default.join(root, "bin", "ai-config-sync")))) {
+  if (await pathExists(import_node_path29.default.join(root, ".claude-plugin", "plugin.json")) && (await pathExists(import_node_path29.default.join(root, "bin", "ai-config-sync.cjs")) || await pathExists(import_node_path29.default.join(root, "bin", "ai-config-sync")))) {
     if (name) return SELF_PLUGIN_NAMES.has(name);
-    if (process.env.CLAUDE_PLUGIN_ROOT && import_node_path28.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root) {
+    if (process.env.CLAUDE_PLUGIN_ROOT && import_node_path29.default.resolve(process.env.CLAUDE_PLUGIN_ROOT) === root) {
       return false;
     }
   }
@@ -21410,16 +22079,16 @@ async function isRunningInsideSelfPlugin(pluginRoot) {
 }
 async function detectPackageRoot(explicit) {
   if (explicit && await pathExists(explicit)) {
-    const resolved = import_node_path28.default.resolve(explicit);
+    const resolved = import_node_path29.default.resolve(explicit);
     if (await looksLikePackageRoot(resolved)) return resolved;
     return resolved;
   }
   const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
   if (pluginRoot) {
     const candidates = [
-      import_node_path28.default.resolve(pluginRoot, ".."),
-      import_node_path28.default.resolve(pluginRoot, "../.."),
-      import_node_path28.default.resolve(pluginRoot, "../../.."),
+      import_node_path29.default.resolve(pluginRoot, ".."),
+      import_node_path29.default.resolve(pluginRoot, "../.."),
+      import_node_path29.default.resolve(pluginRoot, "../../.."),
       pluginRoot
     ];
     for (const c of candidates) {
@@ -21427,13 +22096,13 @@ async function detectPackageRoot(explicit) {
     }
   }
   try {
-    const here = import_node_path28.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
+    const here = import_node_path29.default.dirname((0, import_node_url2.fileURLToPath)(import_meta.url));
     const candidates = [
-      import_node_path28.default.resolve(here, "../../.."),
+      import_node_path29.default.resolve(here, "../../.."),
       // monorepo packages/cli/src
-      import_node_path28.default.resolve(here, ".."),
+      import_node_path29.default.resolve(here, ".."),
       // npm package dist/
-      import_node_path28.default.resolve(here, "../..")
+      import_node_path29.default.resolve(here, "../..")
     ];
     for (const c of candidates) {
       if (await looksLikePackageRoot(c)) return c;
@@ -21443,13 +22112,13 @@ async function detectPackageRoot(explicit) {
   try {
     const argv1 = process.argv[1];
     if (argv1) {
-      const binDir = import_node_path28.default.dirname(import_node_path28.default.resolve(argv1));
+      const binDir = import_node_path29.default.dirname(import_node_path29.default.resolve(argv1));
       const candidates = [
-        import_node_path28.default.resolve(binDir, ".."),
+        import_node_path29.default.resolve(binDir, ".."),
         // package root from dist/ai-config-sync.cjs
-        import_node_path28.default.resolve(binDir, "../.."),
-        import_node_path28.default.resolve(binDir, "../../.."),
-        import_node_path28.default.resolve(binDir, "../../../..")
+        import_node_path29.default.resolve(binDir, "../.."),
+        import_node_path29.default.resolve(binDir, "../../.."),
+        import_node_path29.default.resolve(binDir, "../../../..")
       ];
       for (const c of candidates) {
         if (await looksLikePackageRoot(c)) return c;
@@ -21460,7 +22129,7 @@ async function detectPackageRoot(explicit) {
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     if (await looksLikePackageRoot(dir)) return dir;
-    const parent = import_node_path28.default.dirname(dir);
+    const parent = import_node_path29.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
@@ -21476,7 +22145,7 @@ async function detectConfigRepo(options, home) {
     }
   }
   if (options.configPath) {
-    const localPath = import_node_path28.default.resolve(expandHome(options.configPath, home));
+    const localPath = import_node_path29.default.resolve(expandHome(options.configPath, home));
     return {
       localPath,
       remote: options.repo ?? existingLink?.configRepository.remote,
@@ -21506,7 +22175,7 @@ async function detectConfigRepo(options, home) {
         blocked: `Already linked to ${existingLink.configRepository.localPath}` + (existingLink.configRepository.remote ? ` (${existingLink.configRepository.remote})` : "") + `. Requested --repo ${options.repo}. Use --reconfigure to switch, or --config-path for a different directory.`
       };
     }
-    const defaultPath = import_node_path28.default.join(home, "ai-config", "my-ai-config");
+    const defaultPath = import_node_path29.default.join(home, "ai-config", "my-ai-config");
     return {
       localPath: defaultPath,
       remote: options.repo,
@@ -21526,34 +22195,34 @@ async function detectConfigRepo(options, home) {
   if (envRepo) {
     if (envRepo.includes("://") || envRepo.startsWith("git@")) {
       return {
-        localPath: import_node_path28.default.join(home, "ai-config", "my-ai-config"),
+        localPath: import_node_path29.default.join(home, "ai-config", "my-ai-config"),
         remote: envRepo,
         reason: "AI_CONFIG_SYNC_REPO"
       };
     }
     return {
-      localPath: import_node_path28.default.resolve(expandHome(envRepo, home)),
+      localPath: import_node_path29.default.resolve(expandHome(envRepo, home)),
       reason: "AI_CONFIG_SYNC_REPO path"
     };
   }
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
-    const files = await import_promises12.default.readdir(dir).catch(() => []);
+    const files = await import_promises13.default.readdir(dir).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: dir, reason: "cwd walk" };
     }
-    const parent = import_node_path28.default.dirname(dir);
+    const parent = import_node_path29.default.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   const candidates = [
-    import_node_path28.default.join(home, "ai-config", "my-ai-config"),
-    import_node_path28.default.join(home, "Git", "my-ai-config"),
-    import_node_path28.default.join(home, "git", "my-ai-config")
+    import_node_path29.default.join(home, "ai-config", "my-ai-config"),
+    import_node_path29.default.join(home, "Git", "my-ai-config"),
+    import_node_path29.default.join(home, "git", "my-ai-config")
   ];
   for (const c of candidates) {
     if (!await pathExists(c)) continue;
-    const files = await import_promises12.default.readdir(c).catch(() => []);
+    const files = await import_promises13.default.readdir(c).catch(() => []);
     if (isConfigRepository(files)) {
       return { localPath: c, reason: "default directory" };
     }
@@ -21563,18 +22232,18 @@ async function detectConfigRepo(options, home) {
 async function ensureMinimalConfigRepo(localPath) {
   const actions = [];
   await ensureDir(localPath);
-  const configYaml = import_node_path28.default.join(localPath, "config.yaml");
+  const configYaml = import_node_path29.default.join(localPath, "config.yaml");
   if (!await pathExists(configYaml)) {
     await writeYamlFile(
       configYaml,
       ConfigRepoSchema.parse({
-        name: import_node_path28.default.basename(localPath),
+        name: import_node_path29.default.basename(localPath),
         defaultProfile: "home"
       })
     );
     actions.push(`CREATE ${configYaml}`);
   }
-  const resources = import_node_path28.default.join(localPath, "resources.yaml");
+  const resources = import_node_path29.default.join(localPath, "resources.yaml");
   if (!await pathExists(resources)) {
     await writeYamlFile(resources, { schemaVersion: 1, resources: [] });
     actions.push(`CREATE ${resources}`);
@@ -21590,13 +22259,13 @@ async function ensureMinimalConfigRepo(localPath) {
     "instructions/claude",
     "instructions/codex"
   ]) {
-    const full = import_node_path28.default.join(localPath, d);
+    const full = import_node_path29.default.join(localPath, d);
     if (!await pathExists(full)) {
       await ensureDir(full);
       actions.push(`CREATE dir ${d}`);
     }
   }
-  const baseProfile = import_node_path28.default.join(localPath, "profiles", "base.yaml");
+  const baseProfile = import_node_path29.default.join(localPath, "profiles", "base.yaml");
   if (!await pathExists(baseProfile)) {
     await writeYamlFile(baseProfile, {
       profile: "base",
@@ -21605,7 +22274,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/base.yaml");
   }
-  const homeProfile = import_node_path28.default.join(localPath, "profiles", "home.yaml");
+  const homeProfile = import_node_path29.default.join(localPath, "profiles", "home.yaml");
   if (!await pathExists(homeProfile)) {
     await writeYamlFile(homeProfile, {
       profile: "home",
@@ -21620,7 +22289,7 @@ async function ensureMinimalConfigRepo(localPath) {
     });
     actions.push("CREATE profiles/home.yaml");
   }
-  const gitignore = import_node_path28.default.join(localPath, ".gitignore");
+  const gitignore = import_node_path29.default.join(localPath, ".gitignore");
   const requiredIgnore = [
     ".ai-config-sync-staging-*",
     ".ai-config-sync-backup-*"
@@ -21653,8 +22322,8 @@ async function ensureMinimalConfigRepo(localPath) {
 }
 
 // packages/cli/src/setup-integrations.ts
-var import_node_path29 = __toESM(require("node:path"), 1);
-var import_promises13 = __toESM(require("node:fs/promises"), 1);
+var import_node_path30 = __toESM(require("node:path"), 1);
+var import_promises14 = __toESM(require("node:fs/promises"), 1);
 init_dist();
 async function installClaudePlugin(home, programRoot, options = {}) {
   const actions = [];
@@ -21670,10 +22339,10 @@ async function installClaudePlugin(home, programRoot, options = {}) {
   }
   let pluginSrc;
   if (programRoot) {
-    const nested = import_node_path29.default.join(programRoot, "integrations", "claude-plugin");
-    if (await pathExists(import_node_path29.default.join(nested, ".claude-plugin", "plugin.json"))) {
+    const nested = import_node_path30.default.join(programRoot, "integrations", "claude-plugin");
+    if (await pathExists(import_node_path30.default.join(nested, ".claude-plugin", "plugin.json"))) {
       pluginSrc = nested;
-    } else if (await pathExists(import_node_path29.default.join(programRoot, ".claude-plugin", "plugin.json"))) {
+    } else if (await pathExists(import_node_path30.default.join(programRoot, ".claude-plugin", "plugin.json"))) {
       pluginSrc = programRoot;
     }
   }
@@ -21704,12 +22373,12 @@ async function installClaudePlugin(home, programRoot, options = {}) {
     warnings.push(msg);
     actions.push(`WARN ${msg}`);
     if (!options.forbidSkillFallback) {
-      const skillSrc = import_node_path29.default.join(pluginSrc, "skills", "config-sync");
-      const skillDest = import_node_path29.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path29.default.join(skillDest, "SKILL.md");
+      const skillSrc = import_node_path30.default.join(pluginSrc, "skills", "config-sync");
+      const skillDest = import_node_path30.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path30.default.join(skillDest, "SKILL.md");
       if (await pathExists(skillSrc) && !await pathExists(skillMd)) {
-        await ensureDir(import_node_path29.default.dirname(skillDest));
-        await import_promises13.default.cp(skillSrc, skillDest, { recursive: true });
+        await ensureDir(import_node_path30.default.dirname(skillDest));
+        await import_promises14.default.cp(skillSrc, skillDest, { recursive: true });
         actions.push(
           "INSTALL Claude user skill: config-sync (fallback, no claude CLI)"
         );
@@ -21736,7 +22405,7 @@ async function installClaudePlugin(home, programRoot, options = {}) {
       actions.push("claude marketplace already has ai-config-sync");
     } else if (options.allowLocalPluginInstall) {
       const marketplaceSrc = programRoot && await pathExists(
-        import_node_path29.default.join(programRoot, ".claude-plugin", "marketplace.json")
+        import_node_path30.default.join(programRoot, ".claude-plugin", "marketplace.json")
       ) ? programRoot : pluginSrc;
       try {
         await invokeClaude(["plugin", "marketplace", "add", marketplaceSrc]);
@@ -21858,11 +22527,11 @@ async function installStableCliShim(home, sources) {
   let changed = false;
   const candidates = [];
   if (sources.pluginRoot) {
-    candidates.push(import_node_path29.default.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
+    candidates.push(import_node_path30.default.join(sources.pluginRoot, "bin", "ai-config-sync.cjs"));
   }
   if (sources.programRoot) {
     candidates.push(
-      import_node_path29.default.join(
+      import_node_path30.default.join(
         sources.programRoot,
         "integrations",
         "claude-plugin",
@@ -21870,12 +22539,12 @@ async function installStableCliShim(home, sources) {
         "ai-config-sync.cjs"
       )
     );
-    candidates.push(import_node_path29.default.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
+    candidates.push(import_node_path30.default.join(sources.programRoot, "dist", "ai-config-sync.cjs"));
   }
   try {
     const argv1 = process.argv[1];
     if (argv1 && (argv1.endsWith(".cjs") || argv1.endsWith(".js"))) {
-      candidates.push(import_node_path29.default.resolve(argv1));
+      candidates.push(import_node_path30.default.resolve(argv1));
     }
   } catch {
   }
@@ -21893,11 +22562,11 @@ async function installStableCliShim(home, sources) {
   const destCjs = stableCliCjs(home);
   const destCmd = stableCliCmd(home);
   const destSh = stableCliSh(home);
-  const srcBuf = await import_promises13.default.readFile(sourceCjs);
+  const srcBuf = await import_promises14.default.readFile(sourceCjs);
   let needCopy = true;
   if (await pathExists(destCjs)) {
     try {
-      const destBuf = await import_promises13.default.readFile(destCjs);
+      const destBuf = await import_promises14.default.readFile(destCjs);
       if (srcBuf.equals(destBuf)) needCopy = false;
     } catch {
       needCopy = true;
@@ -21905,17 +22574,17 @@ async function installStableCliShim(home, sources) {
   }
   if (needCopy) {
     const tmp = `${destCjs}.${process.pid}.${Date.now()}.tmp`;
-    const fh = await import_promises13.default.open(tmp, "w");
+    const fh = await import_promises14.default.open(tmp, "w");
     try {
       await fh.writeFile(srcBuf);
       await fh.sync();
     } finally {
       await fh.close();
     }
-    await import_promises13.default.rename(tmp, destCjs).catch(async () => {
-      await import_promises13.default.rm(destCjs, { force: true }).catch(() => {
+    await import_promises14.default.rename(tmp, destCjs).catch(async () => {
+      await import_promises14.default.rm(destCjs, { force: true }).catch(() => {
       });
-      await import_promises13.default.rename(tmp, destCjs);
+      await import_promises14.default.rename(tmp, destCjs);
     });
     actions.push(`INSTALL stable CLI shim \u2192 ${destCjs}`);
     changed = true;
@@ -21952,7 +22621,7 @@ exec "${process.execPath}" "$(dirname "$0")/ai-config-sync.cjs" "$@"
   if (needSh) {
     await writeText(destSh, shBody);
     try {
-      await import_promises13.default.chmod(destSh, 493);
+      await import_promises14.default.chmod(destSh, 493);
     } catch {
     }
     actions.push(`INSTALL stable CLI shell \u2192 ${destSh}`);
@@ -21974,10 +22643,10 @@ async function installCodexIntegration(home, programRoot, pluginRoot, options = 
   const stableCjs = shim.cjs ?? (await pathExists(stableCliCjs(home)) ? stableCliCjs(home) : void 0);
   const cliAbsoluteCommand = stableCjs ? `"${process.execPath}" "${stableCjs}"` : void 0;
   const skillCliHint = stableCjs ? `"${process.execPath}" "${stableCjs}"` : "ai-config-sync";
-  const skillDest = import_node_path29.default.join(agentsSkillsDir(home), "config-sync");
+  const skillDest = import_node_path30.default.join(agentsSkillsDir(home), "config-sync");
   let skillSrc;
   if (programRoot) {
-    const p = import_node_path29.default.join(
+    const p = import_node_path30.default.join(
       programRoot,
       "integrations",
       "codex",
@@ -21986,7 +22655,7 @@ async function installCodexIntegration(home, programRoot, pluginRoot, options = 
     );
     if (await pathExists(p)) skillSrc = p;
   }
-  const skillMd = import_node_path29.default.join(skillDest, "SKILL.md");
+  const skillMd = import_node_path30.default.join(skillDest, "SKILL.md");
   const skillBody = `---
 name: config-sync
 description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u540C\u6B65\u914D\u7F6E\u300D\u300C\u626B\u63CF\u6280\u80FD\u300D\u300C\u6062\u590D\u73AF\u5883\u300D\u65F6\u4F7F\u7528\u3002
@@ -22024,7 +22693,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
   if (skillNeedsWrite) {
     await ensureDir(skillDest);
     if (skillSrc && !await pathExists(skillMd)) {
-      await import_promises13.default.cp(skillSrc, skillDest, { recursive: true });
+      await import_promises14.default.cp(skillSrc, skillDest, { recursive: true });
     }
     await writeText(skillMd, skillBody);
     actions.push(`INSTALL agents skill: config-sync \u2192 ${skillDest}`);
@@ -22047,7 +22716,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     try {
       base = await readJsonFile(hooksPath);
     } catch {
-      await import_promises13.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
+      await import_promises14.default.copyFile(hooksPath, `${hooksPath}.bak-${Date.now()}`);
       base = {};
       actions.push(`BACKUP broken hooks.json \u2192 ${hooksPath}.bak-*`);
       changed = true;
@@ -22057,7 +22726,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     cliAbsoluteCommand
   });
   if (hooksChanged || !hasManagedCodexSessionStart(base)) {
-    await ensureDir(import_node_path29.default.dirname(hooksPath));
+    await ensureDir(import_node_path30.default.dirname(hooksPath));
     await writeJsonFile(hooksPath, next);
     actions.push(
       cliAbsoluteCommand ? "MERGE Codex hooks.json SessionStart (event-map + stable commandWindows)" : "MERGE Codex hooks.json SessionStart (event-map format)"
@@ -22070,7 +22739,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
     toml = mergeTomlText(toml, [
       { section: "features", key: "hooks", value: true }
     ]);
-    await ensureDir(import_node_path29.default.dirname(cfgPath));
+    await ensureDir(import_node_path30.default.dirname(cfgPath));
     await writeText(cfgPath, toml);
     actions.push("UPDATE Codex config.toml: features.hooks = true");
     changed = true;
@@ -22087,7 +22756,7 @@ description: \u540C\u6B65 AI Agent Skill/Plugin\u3002\u7528\u6237\u8BF4\u300C\u5
 }
 
 // packages/cli/src/setup-orchestrator.ts
-var import_node_path30 = __toESM(require("node:path"), 1);
+var import_node_path31 = __toESM(require("node:path"), 1);
 var import_node_os4 = __toESM(require("node:os"), 1);
 init_dist();
 async function runSetup(options = {}) {
@@ -22113,10 +22782,10 @@ async function runSetup(options = {}) {
     };
   }
   if (detected.existingLink && mode !== "reconfigure" && options.configPath) {
-    const existingPath = import_node_path30.default.resolve(
+    const existingPath = import_node_path31.default.resolve(
       detected.existingLink.configRepository.localPath
     );
-    const requested = import_node_path30.default.resolve(expandHome(options.configPath, home));
+    const requested = import_node_path31.default.resolve(expandHome(options.configPath, home));
     if (existingPath !== requested) {
       return {
         status: "planned",
@@ -22191,6 +22860,7 @@ async function runSetup(options = {}) {
   if (mode === "plan") {
     actions.push(`LINK ~/.ai-config-sync -> ${localPath}`);
     actions.push(`PROFILE ${options.profile ?? "home"}`);
+    actions.push("GENERATE ASSETS.md + catalog/index.html (read-only repository view)");
     actions.push("INSTALL Claude plugin ai-config-sync (skill + slash commands)");
     if (options.codex === true) {
       actions.push("INSTALL Codex skill config-sync");
@@ -22203,6 +22873,10 @@ async function runSetup(options = {}) {
     return { status: "planned", messages, actions };
   }
   actions.push(...await ensureMinimalConfigRepo(localPath));
+  const catalog = await writeAssetCatalog(localPath);
+  actions.push(
+    ...catalog.changedRelPaths.map((rel) => `GENERATE ${rel}`)
+  );
   const packageRootEarly = await detectPackageRoot(options.programRoot);
   const pluginRootEarly = await detectPluginRoot();
   const insideSelfEarly = !!options.skipSelfPluginInstall || await isRunningInsideSelfPlugin(pluginRootEarly);
@@ -22254,7 +22928,7 @@ async function runSetup(options = {}) {
   if (await pathExists(cfgPath) && mode !== "reconfigure") {
     try {
       const prev = await loadLocalConfig(cfgPath);
-      const samePath = import_node_path30.default.resolve(prev.configRepository.localPath) === import_node_path30.default.resolve(localPath);
+      const samePath = import_node_path31.default.resolve(prev.configRepository.localPath) === import_node_path31.default.resolve(localPath);
       const sameProfile = prev.profile === profile;
       if (samePath && sameProfile && mode === "default") {
         status = "no-changes";
@@ -22272,7 +22946,7 @@ async function runSetup(options = {}) {
     if (await pathExists(cfgPath) && mode !== "reconfigure") {
       try {
         const prev = await loadLocalConfig(cfgPath);
-        if (import_node_path30.default.resolve(prev.configRepository.localPath) === import_node_path30.default.resolve(localPath) && prev.profile === profile) {
+        if (import_node_path31.default.resolve(prev.configRepository.localPath) === import_node_path31.default.resolve(localPath) && prev.profile === profile) {
           shouldWrite = false;
         }
       } catch {
@@ -22330,8 +23004,8 @@ async function runSetup(options = {}) {
         );
       }
     } else if (!insideSelf) {
-      const skillDir = import_node_path30.default.join(home, ".claude", "skills", "config-sync");
-      const skillMd = import_node_path30.default.join(skillDir, "SKILL.md");
+      const skillDir = import_node_path31.default.join(home, ".claude", "skills", "config-sync");
+      const skillMd = import_node_path31.default.join(skillDir, "SKILL.md");
       if (!await pathExists(skillMd)) {
         await ensureDir(skillDir);
         await writeText(
@@ -22381,6 +23055,7 @@ user-invocable: true
     messages.push("\u63A5\u4E0B\u6765\u5728 Claude Code \u91CC\u53EF\u4EE5\uFF1A");
     messages.push("  \xB7 \u8F93\u5165 /ai-config-sync:scan   \u626B\u63CF\u672C\u673A\u6280\u80FD");
     messages.push("  \xB7 \u8F93\u5165 /ai-config-sync:capture \u628A\u65B0\u6280\u80FD\u5199\u5165\u79C1\u6709\u4ED3\u5E93");
+    messages.push("  \xB7 \u8F93\u5165 /ai-config-sync:inventory \u67E5\u770B\u4ED3\u5E93\u4E2D\u7684\u5907\u4EFD\u8D44\u4EA7");
     messages.push("  \xB7 \u6216\u76F4\u63A5\u8BF4\uFF1A\u300C\u5E2E\u6211\u626B\u63CF\u914D\u7F6E\u300D\u300C\u540C\u6B65\u914D\u7F6E\u5230\u4ED3\u5E93\u300D");
     messages.push("  \xB7 \u65B0\u5F00\u4F1A\u8BDD\u540E SessionStart \u4F1A\u8F7B\u91CF\u63D0\u793A\u672A\u7EB3\u7BA1\u8D44\u6E90");
   }
@@ -22394,7 +23069,7 @@ user-invocable: true
 }
 
 // packages/cli/src/index.ts
-var import_node_path31 = __toESM(require("node:path"), 1);
+var import_node_path32 = __toESM(require("node:path"), 1);
 init_dist();
 var program2 = new Command();
 program2.name("ai-config-sync").description(
@@ -22610,6 +23285,57 @@ program2.command("scan").description("Read-only scan of local Claude/Codex resou
     console.log("\u4E0B\u4E00\u6B65\uFF1A\u5173\u8054\u79C1\u6709\u914D\u7F6E\u4ED3\u5E93\u540E\uFF0C\u53EF\u7528 capture \u628A\u672A\u7EB3\u7BA1\u8D44\u6E90\u5199\u5165\u6E05\u5355\u3002");
   }
 });
+program2.command("inventory").description("View or generate the read-only asset catalog for a config repo").option("--home <path>", "Override home directory").option("--config-path <path>", "Config repository path (linked repo by default)").option("--write", "Write ASSETS.md and catalog/index.html").option("--json", "JSON output").action(async (opts) => {
+  const home = homeOpt({ opts: () => opts });
+  const ctx = await loadCtx(home);
+  const configRepoPath = opts.configPath ? import_node_path32.default.resolve(expandHome(opts.configPath, home)) : ctx.configRepoPath;
+  if (!configRepoPath) {
+    printNotLinkedHelp("inventory");
+    return;
+  }
+  if (!await pathExists(configRepoPath)) {
+    throw new Error(`Config repository path does not exist: ${configRepoPath}`);
+  }
+  const written = opts.write ? await writeAssetCatalog(configRepoPath) : void 0;
+  const catalog = written?.catalog ?? await buildAssetCatalog(configRepoPath);
+  if (opts.json) {
+    console.log(
+      JSON.stringify(
+        {
+          ...catalog,
+          ...written ? {
+            written: [written.markdownPath, written.htmlPath],
+            changed: written.changedRelPaths
+          } : {}
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  console.log(`Repository: ${catalog.repository.name}`);
+  console.log(
+    `Assets: ${catalog.summary.total} (skills=${catalog.summary.byKind.skill}, plugins=${catalog.summary.byKind.plugin}, hooks=${catalog.summary.byKind.hook}, integrations=${catalog.summary.byKind.integration})`
+  );
+  console.log(
+    `Portability: repository-copy=${catalog.summary.portable}, remote-reference=${catalog.summary.referenced}, review=${catalog.summary.needsReview}`
+  );
+  for (const asset of catalog.assets) {
+    const targets = asset.targets.map((target) => target.name).join(",") || "none";
+    console.log(`  ${asset.kind.padEnd(11)} ${asset.id} [${targets}]`);
+  }
+  if (written) {
+    console.log(`
+Catalog: ${written.markdownPath}`);
+    console.log(`HTML:    ${written.htmlPath}`);
+    console.log(
+      written.changedRelPaths.length ? `Updated: ${written.changedRelPaths.join(", ")}` : "Catalog already up to date."
+    );
+  } else {
+    console.log("\nRead-only preview. Re-run with --write to generate repository views.");
+  }
+});
 program2.command("capture").description("Propose managing local resources into the private config repo").option("--home <path>", "Override home directory").option("--yes", "Confirm and write proposals without prompt").option("--json", "JSON output of proposals").option("--commit", "Git commit after writing (secret-scanned)").option("--push", "Push after commit").option(
   "--analyze",
   "Enable heuristic recipe analysis for non-standard sources (no LLM required)"
@@ -22711,6 +23437,7 @@ program2.command("capture").description("Propose managing local resources into t
   );
   console.log(`Updated ${written.resourcesPath}`);
   for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
+  for (const c of written.catalogPaths) console.log(`  catalog: ${c}`);
   for (const s of skipped) {
     console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
   }
@@ -22830,9 +23557,9 @@ program2.command("update").description("Fetch sources per versionPolicy and re-a
   if (!requireLinked(ctx, "update")) return;
   const { localConfig, configRepoPath } = ctx;
   const resources = await loadResources(
-    import_node_path31.default.join(configRepoPath, "resources.yaml")
+    import_node_path32.default.join(configRepoPath, "resources.yaml")
   );
-  const lock = await loadLock(import_node_path31.default.join(configRepoPath, "lock.yaml"));
+  const lock = await loadLock(import_node_path32.default.join(configRepoPath, "lock.yaml"));
   for (const r of resources.resources) {
     const locked = lock.entries.find((e) => e.resourceId === r.id);
     const check = await checkVersionPolicy({
@@ -22956,7 +23683,7 @@ program2.command("secret").description("Check or document secretRef resolution (
     }
     if (ctx.configRepoPath && (action === "scan" || !ref)) {
       const resources = await loadResources(
-        import_node_path31.default.join(ctx.configRepoPath, "resources.yaml")
+        import_node_path32.default.join(ctx.configRepoPath, "resources.yaml")
       );
       const refs = collectSecretRefs(resources);
       if (refs.length === 0) {

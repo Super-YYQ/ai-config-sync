@@ -5,3 +5,4 @@ export * from "./doctor.js";
 export * from "./drift.js";
 export * from "./ai-assistant.js";
 export * from "./vendor.js";
+export * from "./catalog.js";

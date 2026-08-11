@@ -27,6 +27,8 @@ export interface CaptureItem {
 export interface CaptureCommitResult {
   resourcesPath: string;
   recipePaths: string[];
+  /** Generated read-only views of the assets stored in the config repository. */
+  catalogPaths: string[];
   /** Relative paths under config repo that this capture created or modified. */
   changedRelPaths: string[];
 }

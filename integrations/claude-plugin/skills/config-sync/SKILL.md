@@ -17,6 +17,7 @@ allowed-tools: "Bash Read Write Edit Glob Grep"
 | 状态 | `ai-config-sync status` |
 | 初始化 / 关联私有仓 | 问清路径或远程 URL → `ai-config-sync setup ...` |
 | 备份 / 同步到仓库 | 先确认已 setup → `capture` 预览 → 确认后 `capture --yes` |
+| 查看备份仓库资产 | `ai-config-sync inventory`（只读）；明确要求刷新时加 `--write` |
 | 恢复 / 新电脑 | `plan` → 确认后 `restore --yes --allow-risk medium` → `doctor` |
 | 体检 | `ai-config-sync doctor` |
 | 修复入口 | `ai-config-sync repair` |
@@ -35,7 +36,9 @@ allowed-tools: "Bash Read Write Edit Glob Grep"
 - 不把 API Key 写入配置仓  
 - 高风险需用户明确同意后再 `--yes --allow-risk`  
 - 脏仓库 / 分叉不要强行 pull/push  
+- setup/capture 成功后会自动刷新 `ASSETS.md` 与 `catalog/index.html`
+- `inventory` 默认只读；只有用户明确要求写入时才使用 `inventory --write`
 
 ## 斜杠命令（插件已启用时）
 
-`/ai-config-sync:status|scan|capture|restore|update|doctor|repair`
+`/ai-config-sync:status|scan|capture|inventory|restore|update|doctor|repair`

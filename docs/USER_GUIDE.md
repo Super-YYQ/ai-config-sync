@@ -24,6 +24,14 @@ ai-config-sync capture --yes --commit     # 可选：secret-scan 后 git commit
 ai-config-sync capture --yes --commit --push  # 写入、提交、推送在同一把锁内完成
 ```
 
+成功 Capture 会在同一事务中刷新私有仓库的 `ASSETS.md` 与 `catalog/index.html`。也可以独立预览或生成：
+
+```bash
+ai-config-sync inventory                  # 只读终端预览
+ai-config-sync inventory --write          # 刷新 Markdown + HTML
+ai-config-sync inventory --json           # 机器可读目录
+```
+
 ### Capture 提案状态
 
 | 状态 | 含义 | `--yes` 是否写入 |
@@ -65,6 +73,7 @@ Marketplace 类资源会走 `claude plugin marketplace add / install / enable`�
 - 私有仓请正常用 git：一端 push，另一端 pull 后再 capture/restore
 - `capture --commit` 会做 secret-scan；冲突时先 `git pull --rebase` 再操作
 - 不要把 `.env`、密钥、OAuth 写进私有仓
+- 当前 CLI 使用 fast-forward-only 拉取，不会自动改写分叉历史；资产级“保留本机 / 使用远端 / 两者保留”仍是目标能力
 
 ## Hook Trust
 
@@ -101,5 +110,9 @@ Marketplace 类资源会走 `claude plugin marketplace add / install / enable`�
 
 - 空模板：`examples/private-config-template`（默认无演示资源）  
 - 演示：`examples/demo-config`  
+- GitHub 原生目录：`ASSETS.md`
+- 自包含目录页：`catalog/index.html`
 
 `scan` 无需私有仓；`capture` / `restore` 需要。
+
+当前第二台电脑仍需安装可信的 AI Config Sync CLI。仓库内双击启动器、自动创建远端私有仓库和交互式冲突中心属于 [`PRODUCT_VISION.md`](PRODUCT_VISION.md) 中已经确认但尚未完成的目标。

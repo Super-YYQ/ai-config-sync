@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- Added a deterministic private-repository asset catalog with a GitHub-native
+  managed `ASSETS.md` view and a self-contained responsive HTML page with
+  search and Kind/Target/Profile filters.
+- Added `ai-config-sync inventory` for read-only inspection and explicit
+  `--write` generation against linked or existing config repositories.
+- Catalog refresh now runs inside the Capture transaction, participates in
+  rollback, and is included in the exact Capture commit pathspec.
+- Catalog generation hides machine-local paths and remote credentials, escapes
+  embedded JSON, preserves user Markdown outside its managed block, and refuses
+  to replace an unrelated HTML page.
+- Copy-based Skill plans now default to NoClobber: an existing target must have
+  a matching AI Config Sync state path/hash, and Apply revalidates the target
+  snapshot under the HOME lock before any Driver can replace it.
+- Documented the confirmed A-machine capture → private repository → no-AI
+  B-machine restore product shape, Skills Manager adoption decisions, product
+  concept map, and end-to-end flow diagram.
+
 ## 0.5.0 — Public Beta
 
 - Split Setup, Plan/Apply, and Capture into focused discovery, integration,

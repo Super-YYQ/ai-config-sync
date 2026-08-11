@@ -120,17 +120,24 @@ describe("offline vendored planning-with-files", () => {
       ),
     ).toBe(true);
 
-    const result2 = await applyPlan({
+    const plan2 = await buildPlan({
       home,
       configRepoPath: configRepo,
       localConfig,
       profileName: "offline-demo",
-      yes: true,
-      allowRisk: "medium",
       offline: true,
     });
-    expect(result2.failed.length).toBe(0);
-    const codexSkip = result2.plan.actions.find(
+    const claudeCollision = plan2.actions.find(
+      (a) =>
+        a.resourceId === "planning-with-files" &&
+        a.target === "claude" &&
+        a.type === "MANUAL" &&
+        /collision-unmanaged/.test(a.description),
+    );
+    expect(claudeCollision).toBeTruthy();
+    expect(await readText(claudeSkill)).toContain("only-claude");
+
+    const codexSkip = plan2.actions.find(
       (a) =>
         a.resourceId === "planning-with-files" &&
         a.target === "codex" &&

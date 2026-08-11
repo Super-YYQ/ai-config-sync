@@ -33,6 +33,7 @@ import {
   installCodexIntegration,
 } from "./setup-integrations.js";
 import type { SetupOptions, SetupResult } from "./setup-types.js";
+import { writeAssetCatalog } from "@ai-config-sync/recipe-engine";
 
 export async function runSetup(
   options: SetupOptions = {},
@@ -152,6 +153,7 @@ export async function runSetup(
   if (mode === "plan") {
     actions.push(`LINK ~/.ai-config-sync -> ${localPath}`);
     actions.push(`PROFILE ${options.profile ?? "home"}`);
+    actions.push("GENERATE ASSETS.md + catalog/index.html (read-only repository view)");
     actions.push("INSTALL Claude plugin ai-config-sync (skill + slash commands)");
     if (options.codex === true) {
       actions.push("INSTALL Codex skill config-sync");
@@ -165,6 +167,10 @@ export async function runSetup(
   }
 
   actions.push(...(await ensureMinimalConfigRepo(localPath)));
+  const catalog = await writeAssetCatalog(localPath);
+  actions.push(
+    ...catalog.changedRelPaths.map((rel) => `GENERATE ${rel}`),
+  );
 
   // Detect plugin early so defaults can prefer Claude-only inside plugin
   const packageRootEarly = await detectPackageRoot(options.programRoot);
@@ -381,6 +387,7 @@ user-invocable: true
     messages.push("接下来在 Claude Code 里可以：");
     messages.push("  · 输入 /ai-config-sync:scan   扫描本机技能");
     messages.push("  · 输入 /ai-config-sync:capture 把新技能写入私有仓库");
+    messages.push("  · 输入 /ai-config-sync:inventory 查看仓库中的备份资产");
     messages.push("  · 或直接说：「帮我扫描配置」「同步配置到仓库」");
     messages.push("  · 新开会话后 SessionStart 会轻量提示未纳管资源");
   }

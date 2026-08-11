@@ -186,6 +186,28 @@ async function detectConfigRepoDrift(
   return undefined;
 }
 
+async function detectTargetStateDrift(
+  action: PlanAction | undefined,
+): Promise<string | undefined> {
+  const snapshot = action?.targetSnapshot;
+  if (!snapshot) return undefined;
+  const exists = await pathExists(snapshot.path);
+  if (!snapshot.existed) {
+    return exists ? `target appeared after plan: ${snapshot.path}` : undefined;
+  }
+  if (!exists) return `managed target disappeared after plan: ${snapshot.path}`;
+  if (!snapshot.hash) return "managed target snapshot has no ownership hash";
+  try {
+    const current = shortHash(await hashDirectory(snapshot.path));
+    if (current !== snapshot.hash) {
+      return `managed target changed after plan: ${snapshot.path} (${snapshot.hash} → ${current})`;
+    }
+  } catch (error) {
+    return `managed target cannot be verified: ${snapshot.path} (${(error as Error).message})`;
+  }
+  return undefined;
+}
+
 export async function applyPlan(
   ctx: EngineContext,
   plan?: Plan,
@@ -397,6 +419,23 @@ async function runApplyBody(
         failed.push({
           actionId: group[0]!.id,
           error: `Plan is stale (${drifted}). Run plan again before apply. No files modified for ${resourceId}@${target}.`,
+        });
+        hardFailure = true;
+        break;
+      }
+    }
+
+    // NoClobber gate: the Plan records whether a copy target was absent or a
+    // hash-verified deployment owned by this tool. Re-check under HOME lock so
+    // a manually created/replaced directory cannot be removed after approval.
+    {
+      const targetDrifted = await detectTargetStateDrift(group[0]);
+      if (targetDrifted) {
+        failed.push({
+          actionId: group[0]!.id,
+          error:
+            `Target state changed (${targetDrifted}). Run plan again; ` +
+            `no files modified for ${resourceId}@${target}.`,
         });
         hardFailure = true;
         break;

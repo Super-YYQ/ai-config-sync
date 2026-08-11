@@ -15,6 +15,9 @@ ai-config-sync capture
 ai-config-sync capture --yes
 ```
 
+成功后说明仓库内的 `ASSETS.md` 与 `catalog/index.html` 已同步刷新，可用
+`ai-config-sync inventory` 查看摘要。
+
 4. 若用户要求提交 git：
 
 ```bash

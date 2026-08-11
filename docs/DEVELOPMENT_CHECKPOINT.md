@@ -38,7 +38,10 @@ Personal day-to-day use of Claude Code / Codex skill & plugin sync is supported 
 ## 4. Known limits (do not claim complete)
 
 - No full Skill Inventory / Adopt / Copy·Symlink deployment model (Stage B)
-- No GUI, CC Switch integration, MCP, Instruction, extra agents
+- No full environment-management GUI, CC Switch integration, MCP, Instruction,
+  or extra agents at this historical checkpoint. Current main later adds a
+  read-only repository asset catalog; it does not change this checkpoint's
+  deployment scope.
 - Third-party Codex hooks: scan yes, full capture/restore no
 - Project-level skill workspace incomplete
 - Real Claude Code / Codex E2E is **not** covered by CI

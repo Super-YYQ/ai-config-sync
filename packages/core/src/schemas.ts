@@ -408,6 +408,14 @@ export const PlanActionTypeSchema = z.enum([
 ]);
 export type PlanActionType = z.output<typeof PlanActionTypeSchema>;
 
+export const TargetStateSnapshotSchema = z.object({
+  path: z.string(),
+  existed: z.boolean(),
+  hash: z.string().optional(),
+  ownership: z.enum(["absent", "managed"]),
+});
+export type TargetStateSnapshot = z.output<typeof TargetStateSnapshotSchema>;
+
 export const PlanActionSchema = z.object({
   id: z.string(),
   type: PlanActionTypeSchema,
@@ -425,6 +433,8 @@ export const PlanActionSchema = z.object({
   recipeHash: z.string().optional(),
   /** Source commit the action targeted (for git sources). */
   sourceCommit: z.string().optional(),
+  /** Target filesystem state approved by this plan. Revalidated under HOME lock. */
+  targetSnapshot: TargetStateSnapshotSchema.optional(),
 });
 export type PlanAction = z.output<typeof PlanActionSchema>;
 

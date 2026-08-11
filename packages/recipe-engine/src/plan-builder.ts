@@ -1,5 +1,7 @@
 import path from "node:path";
 import {
+  claudeSkillsDir,
+  codexSkillsDir,
   hashDirectory,
   hashFile,
   isUnder,
@@ -17,6 +19,7 @@ import {
 } from "@ai-config-sync/core";
 import { getDriver, recipePathsValid } from "@ai-config-sync/drivers";
 import { getHeadCommit } from "@ai-config-sync/git-sync";
+import { getState } from "@ai-config-sync/state-manager";
 import { loadRecipeRegistry } from "./analyzer.js";
 import { computeResourceDrift } from "./drift.js";
 import type { EngineContext } from "./engine-types.js";
@@ -28,6 +31,19 @@ import {
   resolveRecipe,
   resolveSourceRoot,
 } from "./planning-helpers.js";
+
+function sameResolvedPath(left: string | undefined, right: string): boolean {
+  if (!left) return false;
+  const a = path.resolve(left);
+  const b = path.resolve(right);
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+function skillTargetPath(home: string, target: TargetTool, resourceId: string): string {
+  return target === "claude"
+    ? path.join(claudeSkillsDir(home), resourceId)
+    : path.join(codexSkillsDir(home), resourceId);
+}
 
 export async function buildPlan(ctx: EngineContext): Promise<Plan> {
   const resourcesFile = await loadResources(
@@ -58,6 +74,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
     path.join(ctx.configRepoPath, "recipes"),
   );
   const actions: PlanAction[] = [];
+  const machineState = await getState(ctx.home);
   const repoSourceDirs = new Set<string>();
   let actionSeq = 0;
 
@@ -208,6 +225,60 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
         }
       }
 
+      let targetSnapshot: PlanAction["targetSnapshot"];
+      if (
+        targetRecipe.driver === "generic-skill" ||
+        targetRecipe.driver === "repository-layout"
+      ) {
+        const targetPath = skillTargetPath(ctx.home, target, resource.id);
+        if (!(await pathExists(targetPath))) {
+          targetSnapshot = {
+            path: targetPath,
+            existed: false,
+            ownership: "absent",
+          };
+        } else {
+          let actualHash: string | undefined;
+          try {
+            actualHash = shortHash(await hashDirectory(targetPath));
+          } catch {
+            /* unreadable target is not considered owned */
+          }
+          const recorded = machineState.installed[resource.id]?.[target];
+          const owned =
+            recorded?.status === "installed" &&
+            sameResolvedPath(recorded.path, targetPath) &&
+            !!recorded.hash &&
+            !!actualHash &&
+            recorded.hash === actualHash;
+          if (!owned) {
+            const reason = recorded
+              ? "existing target no longer matches the recorded deployment"
+              : "existing target has no AI Config Sync ownership record";
+            actions.push({
+              id: `a${++actionSeq}`,
+              type: "MANUAL",
+              target,
+              resourceId: resource.id,
+              description:
+                `MANUAL collision-unmanaged: ${targetPath} (${reason}). ` +
+                "Adopt it explicitly or move it aside; no files will be replaced.",
+              risk: "high",
+              driver: targetRecipe.driver,
+              paths: [targetPath],
+              requiresConfirmation: true,
+            });
+            continue;
+          }
+          targetSnapshot = {
+            path: targetPath,
+            existed: true,
+            hash: actualHash,
+            ownership: "managed",
+          };
+        }
+      }
+
       // Skip when already installed and in sync (generic-skill / copy targets)
       if (
         targetRecipe.driver === "generic-skill" ||
@@ -230,6 +301,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
             driver: targetRecipe.driver,
             paths: drift.path ? [drift.path] : [],
             requiresConfirmation: false,
+            targetSnapshot,
           });
           continue;
         }
@@ -292,6 +364,7 @@ export async function buildPlan(ctx: EngineContext): Promise<Plan> {
           recipeRef: recipeFileRel,
           recipeHash,
           sourceCommit,
+          targetSnapshot,
         });
       }
     }

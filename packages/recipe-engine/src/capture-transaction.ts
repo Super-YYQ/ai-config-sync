@@ -31,6 +31,11 @@ import type {
   CaptureTxEntry,
 } from "./capture-types.js";
 import { vendorSkillDirectory } from "./vendor.js";
+import {
+  ASSET_CATALOG_HTML_REL,
+  ASSET_CATALOG_MARKDOWN_REL,
+  writeAssetCatalog,
+} from "./catalog.js";
 
 async function entryType(abs: string): Promise<"file" | "directory"> {
   try {
@@ -315,6 +320,8 @@ export async function commitCaptureItems(
     await trackPath("resources.yaml");
     for (const rel of stagedRecipeRels) await trackPath(rel);
     for (const rel of stagedVendorRels) await trackPath(rel);
+    await trackPath(ASSET_CATALOG_MARKDOWN_REL);
+    await trackPath(ASSET_CATALOG_HTML_REL);
 
     // Replace: vendor dirs first, then recipes, then resources
     for (const rel of stagedVendorRels) {
@@ -362,6 +369,16 @@ export async function commitCaptureItems(
       }
     }
 
+    // The catalog is a deterministic read-only projection of the live repo.
+    // Generate it inside the same transaction so a render/write failure rolls
+    // back resources, recipes, vendored sources, and both catalog views.
+    const catalogResult = await writeAssetCatalog(configRepoPath);
+    for (const rel of [ASSET_CATALOG_MARKDOWN_REL, ASSET_CATALOG_HTML_REL]) {
+      if (options.injectFailureAfter?.includes(rel)) {
+        throw new Error(`injectFailureAfter: ${rel}`);
+      }
+    }
+
     // Success — drop backup and staging
       await fs.rm(backupRoot, { recursive: true, force: true }).catch(() => {});
       await fs.rm(stagingRoot, { recursive: true, force: true }).catch(() => {});
@@ -370,6 +387,8 @@ export async function commitCaptureItems(
         "resources.yaml",
         ...stagedRecipeRels,
         ...stagedVendorRels,
+        ASSET_CATALOG_MARKDOWN_REL,
+        ASSET_CATALOG_HTML_REL,
       ];
       // Deduplicate while preserving order
       const seen = new Set<string>();
@@ -379,7 +398,12 @@ export async function commitCaptureItems(
         return true;
       });
 
-      completed = { resourcesPath, recipePaths, changedRelPaths: uniqueChanged };
+      completed = {
+        resourcesPath,
+        recipePaths,
+        catalogPaths: [catalogResult.markdownPath, catalogResult.htmlPath],
+        changedRelPaths: uniqueChanged,
+      };
     } catch (e) {
       // Precise restore: delete new paths; restore pre-existing from backup
       try {

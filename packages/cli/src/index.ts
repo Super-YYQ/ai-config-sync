@@ -32,12 +32,14 @@ import {
 import {
   applyPlan,
   buildCaptureProposals,
+  buildAssetCatalog,
   buildDriftReport,
   buildPlan,
   checkVersionPolicy,
   commitCaptureItems,
   formatDoctor,
   formatPlan,
+  writeAssetCatalog,
   runDoctor,
 } from "@ai-config-sync/recipe-engine";
 import { runSetup } from "./setup.js";
@@ -332,6 +334,77 @@ program
   });
 
 program
+  .command("inventory")
+  .description("View or generate the read-only asset catalog for a config repo")
+  .option("--home <path>", "Override home directory")
+  .option("--config-path <path>", "Config repository path (linked repo by default)")
+  .option("--write", "Write ASSETS.md and catalog/index.html")
+  .option("--json", "JSON output")
+  .action(async (opts) => {
+    const home = homeOpt({ opts: () => opts });
+    const ctx = await loadCtx(home);
+    const configRepoPath = opts.configPath
+      ? path.resolve(expandHome(opts.configPath, home))
+      : ctx.configRepoPath;
+    if (!configRepoPath) {
+      printNotLinkedHelp("inventory");
+      return;
+    }
+    if (!(await pathExists(configRepoPath))) {
+      throw new Error(`Config repository path does not exist: ${configRepoPath}`);
+    }
+
+    const written = opts.write
+      ? await writeAssetCatalog(configRepoPath)
+      : undefined;
+    const catalog = written?.catalog ?? (await buildAssetCatalog(configRepoPath));
+    if (opts.json) {
+      console.log(
+        JSON.stringify(
+          {
+            ...catalog,
+            ...(written
+              ? {
+                  written: [written.markdownPath, written.htmlPath],
+                  changed: written.changedRelPaths,
+                }
+              : {}),
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    console.log(`Repository: ${catalog.repository.name}`);
+    console.log(
+      `Assets: ${catalog.summary.total} ` +
+        `(skills=${catalog.summary.byKind.skill}, plugins=${catalog.summary.byKind.plugin}, ` +
+        `hooks=${catalog.summary.byKind.hook}, integrations=${catalog.summary.byKind.integration})`,
+    );
+    console.log(
+      `Portability: repository-copy=${catalog.summary.portable}, ` +
+        `remote-reference=${catalog.summary.referenced}, review=${catalog.summary.needsReview}`,
+    );
+    for (const asset of catalog.assets) {
+      const targets = asset.targets.map((target) => target.name).join(",") || "none";
+      console.log(`  ${asset.kind.padEnd(11)} ${asset.id} [${targets}]`);
+    }
+    if (written) {
+      console.log(`\nCatalog: ${written.markdownPath}`);
+      console.log(`HTML:    ${written.htmlPath}`);
+      console.log(
+        written.changedRelPaths.length
+          ? `Updated: ${written.changedRelPaths.join(", ")}`
+          : "Catalog already up to date.",
+      );
+    } else {
+      console.log("\nRead-only preview. Re-run with --write to generate repository views.");
+    }
+  });
+
+program
   .command("capture")
   .description("Propose managing local resources into the private config repo")
   .option("--home <path>", "Override home directory")
@@ -461,6 +534,7 @@ program
     );
     console.log(`Updated ${written.resourcesPath}`);
     for (const r of written.recipePaths) console.log(`  recipe: ${r}`);
+    for (const c of written.catalogPaths) console.log(`  catalog: ${c}`);
     for (const s of skipped) {
       console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
     }

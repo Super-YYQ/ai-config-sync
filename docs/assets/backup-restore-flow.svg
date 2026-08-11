@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="520" viewBox="0 0 1400 520" role="img" aria-labelledby="title desc">
+  <title id="title">从电脑 A 备份到电脑 B 恢复的确认流程</title>
+  <desc id="desc">电脑 A 扫描资产，规则与可选 AI 处理不确定项，用户确认后写入私有仓库；电脑 B 拉取后通过确定性 Plan、冲突处理和 Apply 完成恢复。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fafbfe"/><stop offset="1" stop-color="#f2f1ff"/></linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b5bd6"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#30305f" flood-opacity=".10"/></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c7da7"/></marker>
+    <style>
+      .font{font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.title{font-size:25px;font-weight:750;fill:#172033}.sub{font-size:13px;fill:#667085}.lane{font-size:15px;font-weight:700;fill:#fff}.step{font-size:14px;font-weight:700;fill:#20283b}.text{font-size:11px;fill:#667085}.num{font-size:12px;font-weight:750;fill:#fff}.pill{font-size:10px;font-weight:650}
+    </style>
+  </defs>
+  <rect width="1400" height="520" rx="26" fill="url(#bg)"/>
+  <g class="font">
+    <text x="46" y="52" class="title">A → Private Repo → B：最终确认的产品流程</text>
+    <text x="46" y="76" class="sub">AI 只出现在 A 机“不确定项分析”支路；确认、存储、冲突决策与恢复均由用户和确定性程序完成。</text>
+
+    <rect x="46" y="112" width="170" height="154" rx="18" fill="#202442"/>
+    <text x="68" y="143" class="lane">电脑 A · 备份</text>
+    <text x="68" y="170" font-size="11" fill="#cdd4ed">Claude Code 插件 / CLI</text>
+    <text x="68" y="193" font-size="11" fill="#cdd4ed">扫描已安装资产</text>
+    <text x="68" y="216" font-size="11" fill="#cdd4ed">用户拥有最终决定权</text>
+    <rect x="68" y="232" width="91" height="20" rx="10" fill="#8b5cf6" fill-opacity=".32"/>
+    <text x="113" y="246" text-anchor="middle" class="pill" fill="#eeeaff">CAPTURE SIDE</text>
+
+    <path d="M216 189H252" stroke="#7c7da7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="252" y="112" width="174" height="154" rx="18" fill="#fff" stroke="#e3e6ef"/>
+      <circle cx="278" cy="140" r="15" fill="url(#purple)"/><text x="278" y="145" text-anchor="middle" class="num">1</text>
+      <text x="304" y="145" class="step">Scan</text>
+      <text x="274" y="177" class="text">Skills · Plugins · Hooks</text>
+      <text x="274" y="198" class="text">来源、Target、Hash、分类</text>
+      <text x="274" y="219" class="text">只读，不修改本机环境</text>
+      <rect x="274" y="232" width="72" height="18" rx="9" fill="#eef1f6"/><text x="310" y="245" text-anchor="middle" class="pill" fill="#566074">DETERMINISTIC</text>
+    </g>
+
+    <path d="M426 189H462" stroke="#7c7da7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="462" y="112" width="202" height="154" rx="18" fill="#fff" stroke="#e3e6ef"/>
+      <circle cx="488" cy="140" r="15" fill="url(#purple)"/><text x="488" y="145" text-anchor="middle" class="num">2</text>
+      <text x="514" y="145" class="step">Review proposals</text>
+      <text x="484" y="177" class="text">READY → 可批量确认</text>
+      <text x="484" y="198" class="text">BLOCKED → 给出原因</text>
+      <text x="484" y="219" class="text">NEEDS-REVIEW → 可选 AI 分析</text>
+      <rect x="484" y="232" width="96" height="18" rx="9" fill="#fff3d6"/><text x="532" y="245" text-anchor="middle" class="pill" fill="#a35c00">HUMAN CONFIRMS</text>
+    </g>
+
+    <path d="M664 189H700" stroke="#7c7da7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="700" y="112" width="206" height="154" rx="18" fill="#fff" stroke="#e3e6ef"/>
+      <circle cx="726" cy="140" r="15" fill="url(#purple)"/><text x="726" y="145" text-anchor="middle" class="num">3</text>
+      <text x="752" y="145" class="step">Private repository</text>
+      <text x="722" y="177" class="text">关联已有 / 授权新建（目标）</text>
+      <text x="722" y="198" class="text">Capture → secret scan → commit</text>
+      <text x="722" y="219" class="text">生成 ASSETS.md + HTML → push</text>
+      <rect x="722" y="232" width="75" height="18" rx="9" fill="#e6f8ef"/><text x="759" y="245" text-anchor="middle" class="pill" fill="#087f5b">GIT SOURCE</text>
+    </g>
+
+    <path d="M906 189H942" stroke="#7c7da7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="942" y="112" width="180" height="154" rx="18" fill="#fff" stroke="#e3e6ef"/>
+      <circle cx="968" cy="140" r="15" fill="url(#purple)"/><text x="968" y="145" text-anchor="middle" class="num">4</text>
+      <text x="994" y="145" class="step">Bootstrap B</text>
+      <text x="964" y="177" class="text">Clone / Link repository</text>
+      <text x="964" y="198" class="text">双击轻量启动器（目标）</text>
+      <text x="964" y="219" class="text">检查 CLI、登录、secretRef</text>
+      <rect x="964" y="232" width="65" height="18" rx="9" fill="#eef1f6"/><text x="996" y="245" text-anchor="middle" class="pill" fill="#566074">NO AI</text>
+    </g>
+
+    <path d="M1122 189H1158" stroke="#7c7da7" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <g filter="url(#shadow)">
+      <rect x="1158" y="112" width="196" height="154" rx="18" fill="#effbf6" stroke="#cceee0"/>
+      <circle cx="1184" cy="140" r="15" fill="#087f5b"/><text x="1184" y="145" text-anchor="middle" class="num">5</text>
+      <text x="1210" y="145" class="step">Restore</text>
+      <text x="1180" y="177" class="text">pull → Plan → 冲突选择</text>
+      <text x="1180" y="198" class="text">用户确认 → Apply → Verify</text>
+      <text x="1180" y="219" class="text">失败自动 Rollback</text>
+      <rect x="1180" y="232" width="94" height="18" rx="9" fill="#dff7ed"/><text x="1227" y="245" text-anchor="middle" class="pill" fill="#087f5b">DETERMINISTIC</text>
+    </g>
+
+    <path d="M563 266V310" stroke="#c18416" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)">
+      <rect x="444" y="310" width="238" height="116" rx="18" fill="#fff9ec" stroke="#f0d59e"/>
+      <text x="466" y="340" class="step">可选 AI 分析支路</text>
+      <text x="466" y="366" class="text">只接收脱敏文档和目录结构</text>
+      <text x="466" y="387" class="text">输出候选 Recipe / 证据 / 置信度</text>
+      <text x="466" y="408" class="text">结果仍回到用户确认，不直接写仓库</text>
+    </g>
+
+    <rect x="46" y="310" width="346" height="116" rx="18" fill="#f8f9fc" stroke="#e2e6ee"/>
+    <text x="68" y="340" class="step">存储仓库的只读查看面</text>
+    <text x="68" y="366" class="text">ASSETS.md：GitHub 原生、零部署、私有仓库内直接查看</text>
+    <text x="68" y="387" class="text">catalog/index.html：自包含卡片、搜索、类型 / Target / Profile 筛选</text>
+    <text x="68" y="408" class="text">只展示已 Capture 资产，不把 scan 结果误标为已备份</text>
+
+    <rect x="730" y="310" width="624" height="116" rx="18" fill="#f8f9fc" stroke="#e2e6ee"/>
+    <text x="752" y="340" class="step">B 机恢复前置条件</text>
+    <text x="752" y="366" class="text">Claude Code / Codex 已安装并登录 · 有私有仓库访问权限 · secretRef 在本机解析</text>
+    <text x="752" y="387" class="text">远程来源未 vendored 时需要网络 · 任何冲突或高风险动作都必须由用户决定</text>
+    <text x="752" y="408" class="text">不迁移 OAuth、登录态、聊天记录或明文密钥；AI 不参与恢复。</text>
+
+    <text x="46" y="474" class="sub">状态说明：资产目录已实现；自动创建私有远端、跨平台 Bootstrap 和冲突中心属于已确认目标，不能在完成前写成现有能力。</text>
+  </g>
+</svg>

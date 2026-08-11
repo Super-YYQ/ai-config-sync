@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="generator" content="ai-config-sync asset-catalog/v1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>demo-config · AI Config Assets</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#667085; --line:#e7eaf0; --panel:#fff; --soft:#f5f7fb; --brand:#5b5bd6; --brand2:#7c3aed; --good:#087f5b; --warn:#b45309; --shadow:0 14px 36px rgba(31,42,68,.09); }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f7f8fc 0%,#f4f1ff 48%,#eef6ff 100%); font:14px/1.5 Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
+    button,input,select { font:inherit; }
+    .shell { display:grid; grid-template-columns:238px minmax(0,1fr); min-height:100vh; }
+    .sidebar { position:sticky; top:0; height:100vh; padding:26px 18px; color:#eef2ff; background:linear-gradient(180deg,#171a2f 0%,#242447 68%,#30205b 100%); }
+    .brand { display:flex; align-items:center; gap:12px; padding:0 8px 24px; }
+    .brand-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; font-size:19px; background:linear-gradient(135deg,#7c83ff,#a855f7); box-shadow:0 10px 24px rgba(124,88,255,.35); }
+    .brand strong { display:block; font-size:15px; letter-spacing:.2px; }
+    .brand span { color:#aeb7d6; font-size:11px; }
+    .nav-title { margin:15px 10px 8px; color:#8f99bc; font-size:10px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; margin:4px 0; border-radius:10px; color:#cdd4ed; }
+    .nav-item.active { color:white; background:rgba(135,124,255,.19); box-shadow:inset 0 0 0 1px rgba(167,157,255,.16); }
+    .repo-card { position:absolute; left:18px; right:18px; bottom:22px; padding:14px; border:1px solid rgba(205,212,237,.13); border-radius:13px; background:rgba(255,255,255,.07); }
+    .repo-card small { color:#aeb7d6; }
+    .repo-name { margin:4px 0 10px; overflow:hidden; color:white; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+    .repo-meta { display:flex; gap:6px; flex-wrap:wrap; }
+    .main { min-width:0; padding:28px clamp(20px,4vw,58px) 60px; }
+    .topbar { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-bottom:24px; }
+    h1 { margin:0 0 5px; font-size:28px; letter-spacing:-.7px; }
+    .subtitle { margin:0; color:var(--muted); }
+    .readonly { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border:1px solid #dadcfb; border-radius:999px; color:#4c4bb1; background:#f3f2ff; font-weight:650; white-space:nowrap; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:22px; }
+    .stat { padding:17px 18px; border:1px solid rgba(231,234,240,.9); border-radius:16px; background:rgba(255,255,255,.86); box-shadow:0 8px 28px rgba(35,45,78,.05); backdrop-filter:blur(10px); }
+    .stat-label { color:var(--muted); font-size:12px; }
+    .stat-value { display:block; margin-top:5px; font-size:25px; font-weight:760; letter-spacing:-.5px; }
+    .toolbar { display:grid; grid-template-columns:minmax(220px,1fr) auto auto; gap:10px; padding:12px; margin-bottom:14px; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.82); box-shadow:var(--shadow); }
+    .search-wrap { position:relative; }
+    .search-wrap span { position:absolute; left:12px; top:9px; color:#8b93a7; }
+    input,select { width:100%; min-height:38px; border:1px solid #dde1ea; border-radius:10px; color:var(--ink); background:white; outline:none; }
+    input { padding:8px 12px 8px 36px; }
+    select { min-width:150px; padding:7px 32px 7px 11px; }
+    input:focus,select:focus { border-color:#918ff1; box-shadow:0 0 0 3px rgba(91,91,214,.12); }
+    .chips { display:flex; gap:8px; overflow:auto; padding:3px 1px 15px; scrollbar-width:none; }
+    .filter-chip { border:1px solid #dfe3ed; border-radius:999px; padding:7px 12px; color:#566074; background:rgba(255,255,255,.84); cursor:pointer; white-space:nowrap; }
+    .filter-chip:hover { border-color:#aaa8ee; color:#4d4bb2; }
+    .filter-chip.active { border-color:#5b5bd6; color:white; background:linear-gradient(135deg,#5b5bd6,#7653d6); box-shadow:0 6px 15px rgba(91,91,214,.22); }
+    .result-row { display:flex; justify-content:space-between; align-items:center; margin:3px 2px 12px; color:var(--muted); font-size:12px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .asset { min-width:0; padding:17px; border:1px solid var(--line); border-radius:17px; background:rgba(255,255,255,.9); box-shadow:0 9px 28px rgba(35,45,78,.055); transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease; }
+    .asset:hover { transform:translateY(-2px); border-color:#cfcef8; box-shadow:0 16px 34px rgba(45,44,120,.1); }
+    .asset-head { display:flex; gap:12px; align-items:flex-start; }
+    .asset-icon { flex:0 0 auto; display:grid; place-items:center; width:40px; height:40px; border-radius:12px; color:#4d4bb2; font-size:18px; background:linear-gradient(135deg,#eeeefe,#f4eefe); }
+    .asset-title { min-width:0; flex:1; }
+    .asset-title h2 { margin:1px 0 2px; overflow:hidden; font-size:15px; text-overflow:ellipsis; white-space:nowrap; }
+    .asset-kind { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 10px; }
+    .badge { display:inline-flex; align-items:center; min-height:24px; padding:3px 8px; border:1px solid #e0e4ed; border-radius:999px; color:#586174; background:#f8f9fc; font-size:11px; }
+    .badge.target { border-color:#d9d8fb; color:#4f4eb5; background:#f4f3ff; }
+    .badge.good { border-color:#bde9d9; color:var(--good); background:#effbf6; }
+    .badge.warn { border-color:#f3d7ae; color:var(--warn); background:#fff8eb; }
+    .source { display:flex; align-items:center; gap:7px; min-width:0; color:#566074; font-size:12px; }
+    .source-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    details { margin-top:12px; padding-top:10px; border-top:1px solid #edf0f5; }
+    summary { color:#5b5bd6; cursor:pointer; font-size:12px; font-weight:650; }
+    .detail-list { display:grid; gap:7px; margin-top:10px; color:#5f687b; font-size:12px; }
+    .detail-list a { color:#5150b8; text-decoration:none; }
+    .detail-list a:hover { text-decoration:underline; }
+    .empty { grid-column:1/-1; padding:54px 24px; border:1px dashed #cfd4e1; border-radius:17px; color:var(--muted); text-align:center; background:rgba(255,255,255,.55); }
+    .footer { margin-top:28px; padding-top:18px; border-top:1px solid rgba(210,215,226,.8); color:#7b8497; font-size:12px; }
+    @media (max-width:950px) { .shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto;padding:16px 20px}.sidebar .nav-title,.sidebar .nav-item,.repo-card{display:none}.brand{padding:0}.main{padding-top:22px}.stats{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:680px) { .topbar{align-items:stretch;flex-direction:column}.grid{grid-template-columns:1fr}.toolbar{grid-template-columns:1fr}.stats{gap:9px}.stat{padding:14px}.main{padding-left:14px;padding-right:14px} }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">◇</div><div><strong>AI Config Sync</strong><span>Repository Catalog</span></div></div>
+      <div class="nav-title">Workspace</div>
+      <div class="nav-item active">▦ <span>备份资产</span></div>
+      <div class="nav-item">⌁ <span>Profiles</span></div>
+      <div class="nav-item">↺ <span>恢复说明</span></div>
+      <div class="repo-card"><small>Private config repository</small><div class="repo-name" id="repo-name"></div><div class="repo-meta"><span class="badge" id="default-profile"></span><span class="badge good">只读</span></div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div><h1>备份资产</h1><p class="subtitle">查看已经进入私有配置仓库、可供另一台电脑恢复的资产。</p></div><div class="readonly">● Repository view</div></header>
+      <section class="stats" aria-label="资产统计">
+        <div class="stat"><span class="stat-label">全部资产</span><strong class="stat-value" id="stat-total">0</strong></div>
+        <div class="stat"><span class="stat-label">仓库内副本</span><strong class="stat-value" id="stat-portable">0</strong></div>
+        <div class="stat"><span class="stat-label">远程引用</span><strong class="stat-value" id="stat-referenced">0</strong></div>
+        <div class="stat"><span class="stat-label">需要检查</span><strong class="stat-value" id="stat-review">0</strong></div>
+      </section>
+      <section class="toolbar" aria-label="筛选资产">
+        <label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="搜索名称、来源或说明…" autocomplete="off"></label>
+        <label><select id="target-filter" aria-label="按目标筛选"><option value="all">全部目标</option><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
+        <label><select id="profile-filter" aria-label="按 Profile 筛选"><option value="all">全部 Profiles</option></select></label>
+      </section>
+      <div class="chips" id="kind-filters" aria-label="按资产类型筛选"></div>
+      <div class="result-row"><span id="result-count"></span><span>数据源：resources.yaml · profiles · lock</span></div>
+      <section class="grid" id="asset-grid" aria-live="polite"></section>
+      <footer class="footer">由 ai-config-sync 确定性生成。页面不包含密钥解析值、OAuth、聊天记录或本机绝对路径；恢复操作必须在 CLI 中先查看 Plan 再确认。</footer>
+    </main>
+  </div>
+  <script id="catalog-data" type="application/json">{"schemaVersion":1,"repository":{"name":"demo-config","defaultProfile":"offline-demo","targets":{"claude":true,"codex":true}},"assets":[{"id":"planning-with-files","kind":"integration","profiles":["company","home","offline-demo"],"targets":[{"name":"claude","scope":"user","recipeRef":"recipes/planning-with-files.yaml#claude","recipePath":"recipes/planning-with-files.yaml"},{"name":"codex","scope":"user","recipeRef":"recipes/planning-with-files.yaml#codex","recipePath":"recipes/planning-with-files.yaml"}],"source":{"provider":"vendored","label":"Repository copy · sources/integrations/planning-with-files","repoPath":"sources/integrations/planning-with-files"},"versionPolicy":"vendored","lockedRevision":"0.0.0-offline","portability":"portable","notes":"Offline vendor snapshot for demos"},{"id":"demo-skill","kind":"skill","profiles":["home"],"targets":[{"name":"claude","scope":"user","recipeRef":"recipes/demo-skill.yaml#claude","recipePath":"recipes/demo-skill.yaml"},{"name":"codex","scope":"user","recipeRef":"recipes/demo-skill.yaml#codex","recipePath":"recipes/demo-skill.yaml"}],"source":{"provider":"local","label":"Local source · machine path hidden"},"versionPolicy":"latest-confirm","portability":"needs-review"}],"profiles":[{"name":"base","extends":[],"includeCount":0,"excludeCount":0,"maxRisk":"medium","isDefault":false},{"name":"company","extends":["base"],"includeCount":1,"excludeCount":1,"maxRisk":"medium","isDefault":false},{"name":"home","extends":["base"],"includeCount":2,"excludeCount":0,"maxRisk":"medium","isDefault":false},{"name":"offline-demo","extends":["base"],"includeCount":1,"excludeCount":1,"maxRisk":"medium","isDefault":true}],"summary":{"total":2,"portable":1,"referenced":0,"needsReview":1,"byKind":{"skill":1,"plugin":0,"integration":1,"hook":0,"mcp":0,"instruction":0},"byTarget":{"claude":2,"codex":2}}}</script>
+  <script>
+    (function () {
+      "use strict";
+      var catalog = JSON.parse(document.getElementById("catalog-data").textContent || "{}");
+      var state = { query: "", kind: "all", target: "all", profile: "all" };
+      var kindLabels = { all:"全部", skill:"Skills", plugin:"Plugins", integration:"Integrations", hook:"Hooks", mcp:"MCP", instruction:"Instructions" };
+      var kindIcons = { skill:"✦", plugin:"⌘", integration:"◇", hook:"↯", mcp:"⇄", instruction:"¶" };
+      var portabilityLabels = { portable:"仓库内副本", referenced:"远程引用", "needs-review":"需要检查" };
+
+      function make(tag, className, text) {
+        var element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+      }
+      function badge(text, extra) { return make("span", "badge" + (extra ? " " + extra : ""), text); }
+      function addDetail(container, label, value) {
+        if (!value) return;
+        var row = make("div", "", "");
+        row.append(make("strong", "", label + "："), document.createTextNode(value));
+        container.appendChild(row);
+      }
+      function addLink(container, label, href) {
+        if (!href) return;
+        var row = make("div", "", "");
+        row.appendChild(make("strong", "", label + "："));
+        var link = make("a", "", href);
+        link.href = href;
+        if (/^https?:/.test(href)) { link.target = "_blank"; link.rel = "noreferrer"; }
+        row.appendChild(link);
+        container.appendChild(row);
+      }
+      function createCard(asset) {
+        var card = make("article", "asset");
+        var head = make("div", "asset-head");
+        head.appendChild(make("div", "asset-icon", kindIcons[asset.kind] || "•"));
+        var title = make("div", "asset-title");
+        title.append(make("h2", "", asset.id), make("div", "asset-kind", kindLabels[asset.kind] || asset.kind));
+        head.appendChild(title);
+        card.appendChild(head);
+
+        var badges = make("div", "badges");
+        (asset.targets || []).forEach(function (target) { badges.appendChild(badge(target.name + (target.scope === "user" ? "" : " · " + target.scope), "target")); });
+        (asset.profiles || []).forEach(function (profile) { badges.appendChild(badge(profile)); });
+        badges.appendChild(badge(portabilityLabels[asset.portability], asset.portability === "needs-review" ? "warn" : "good"));
+        card.appendChild(badges);
+
+        var source = make("div", "source");
+        source.append(make("span", "", "⌁"), make("span", "source-text", asset.source.label));
+        card.appendChild(source);
+
+        var details = document.createElement("details");
+        details.appendChild(make("summary", "", "查看来源与恢复元数据"));
+        var list = make("div", "detail-list");
+        addDetail(list, "版本策略", asset.versionPolicy);
+        addDetail(list, "锁定版本", asset.lockedRevision);
+        addDetail(list, "说明", asset.notes);
+        if (asset.source.href) addLink(list, "来源", asset.source.href);
+        if (asset.source.repoPath) addLink(list, "仓库文件", "../" + asset.source.repoPath);
+        (asset.targets || []).forEach(function (target) { if (target.recipePath) addLink(list, target.name + " Recipe", "../" + target.recipePath); });
+        details.appendChild(list);
+        card.appendChild(details);
+        return card;
+      }
+      function matches(asset) {
+        if (state.kind !== "all" && asset.kind !== state.kind) return false;
+        if (state.target !== "all" && !(asset.targets || []).some(function (target) { return target.name === state.target; })) return false;
+        if (state.profile !== "all" && !(asset.profiles || []).includes(state.profile)) return false;
+        if (!state.query) return true;
+        var haystack = [asset.id, asset.kind, asset.notes || "", asset.source.label]
+          .concat(asset.profiles || [])
+          .concat((asset.targets || []).map(function (target) { return target.name; }))
+          .join(" ").toLocaleLowerCase();
+        return haystack.includes(state.query);
+      }
+      function render() {
+        var grid = document.getElementById("asset-grid");
+        var assets = (catalog.assets || []).filter(matches);
+        grid.replaceChildren();
+        if (!assets.length) {
+          var empty = make("div", "empty");
+          empty.append(make("div", "asset-icon", "⌕"), make("h2", "", "没有匹配的备份资产"), make("p", "", "调整搜索或筛选条件后再试。"));
+          grid.appendChild(empty);
+        } else {
+          assets.forEach(function (asset) { grid.appendChild(createCard(asset)); });
+        }
+        document.getElementById("result-count").textContent = "显示 " + assets.length + " / " + (catalog.assets || []).length + " 项";
+      }
+      function initFilters() {
+        var kinds = document.getElementById("kind-filters");
+        ["all","skill","plugin","integration","hook","mcp","instruction"].forEach(function (kind) {
+          if (kind !== "all" && !(catalog.summary.byKind[kind] > 0)) return;
+          var count = kind === "all" ? catalog.summary.total : catalog.summary.byKind[kind];
+          var button = make("button", "filter-chip" + (kind === "all" ? " active" : ""), kindLabels[kind] + " " + count);
+          button.type = "button";
+          button.addEventListener("click", function () {
+            state.kind = kind;
+            kinds.querySelectorAll("button").forEach(function (item) { item.classList.toggle("active", item === button); });
+            render();
+          });
+          kinds.appendChild(button);
+        });
+        var profile = document.getElementById("profile-filter");
+        (catalog.profiles || []).forEach(function (item) {
+          var option = document.createElement("option"); option.value = item.name; option.textContent = item.name; profile.appendChild(option);
+        });
+      }
+      document.getElementById("repo-name").textContent = catalog.repository.name;
+      document.getElementById("default-profile").textContent = "默认 · " + catalog.repository.defaultProfile;
+      document.getElementById("stat-total").textContent = catalog.summary.total;
+      document.getElementById("stat-portable").textContent = catalog.summary.portable;
+      document.getElementById("stat-referenced").textContent = catalog.summary.referenced;
+      document.getElementById("stat-review").textContent = catalog.summary.needsReview;
+      document.getElementById("search").addEventListener("input", function (event) { state.query = event.target.value.trim().toLocaleLowerCase(); render(); });
+      document.getElementById("target-filter").addEventListener("change", function (event) { state.target = event.target.value; render(); });
+      document.getElementById("profile-filter").addEventListener("change", function (event) { state.profile = event.target.value; render(); });
+      initFilters(); render();
+    }());
+  </script>
+</body>
+</html>
