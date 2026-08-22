@@ -18,6 +18,14 @@
 - Documented the confirmed A-machine capture → private repository → no-AI
   B-machine restore product shape, Skills Manager adoption decisions, product
   concept map, and end-to-end flow diagram.
+- Added a new-computer Bootstrap flow shared by CLI and a local-only Web page.
+  Both adapters retain the reviewed Plan and pass that exact snapshot to Apply.
+- Added `ai-config-sync ui`, the `ai-config-sync-ui` executable alias, and a
+  Windows `AI Config Sync.cmd` launcher that can be started by double-clicking.
+- The local page binds only to `127.0.0.1`, requires an in-memory session token
+  for API calls, validates Host and Origin, and shuts down after inactivity.
+- Claude SessionStart now records unmanaged findings as pending-review events,
+  matching the existing Codex Hook behavior without automatic commit or push.
 
 ## 0.5.0 — Public Beta
 

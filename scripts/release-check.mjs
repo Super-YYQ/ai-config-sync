@@ -143,6 +143,8 @@ gate("pack-inspection", () => {
   // Must ship dist, integrations, template, marketplace, README, USER_GUIDE
   const required = [
     "dist/ai-config-sync.cjs",
+    "dist/ai-config-sync-ui.cjs",
+    "AI Config Sync.cmd",
     "integrations/claude-plugin/.claude-plugin/plugin.json",
     "integrations/codex/skills/config-sync/SKILL.md",
     "examples/private-config-template/resources.yaml",

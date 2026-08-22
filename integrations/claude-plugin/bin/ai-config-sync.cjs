@@ -2944,7 +2944,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {(string | Function)} text - string to add, or a function returning a string
        * @return {Command} `this` command for chaining
        */
-      addHelpText(position, text) {
+      addHelpText(position, text2) {
         const allowedValues = ["beforeAll", "before", "after", "afterAll"];
         if (!allowedValues.includes(position)) {
           throw new Error(`Unexpected value for position to addHelpText.
@@ -2953,10 +2953,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         const helpEvent = `${position}Help`;
         this.on(helpEvent, (context) => {
           let helpStr;
-          if (typeof text === "function") {
-            helpStr = text({ error: context.error, command: context.command });
+          if (typeof text2 === "function") {
+            helpStr = text2({ error: context.error, command: context.command });
           } else {
-            helpStr = text;
+            helpStr = text2;
           }
           if (helpStr) {
             context.write(`${helpStr}
@@ -3196,8 +3196,8 @@ var init_ZodError = __esm({
       "not_finite"
     ]);
     quotelessJson = (obj) => {
-      const json = JSON.stringify(obj, null, 2);
-      return json.replace(/"([^"]+)":/g, "$1:");
+      const json2 = JSON.stringify(obj, null, 2);
+      return json2.replace(/"([^"]+)":/g, "$1:");
     };
     ZodError = class _ZodError extends Error {
       get errors() {
@@ -3460,15 +3460,15 @@ var init_parseUtil = __esm({
           message: issueData.message
         };
       }
-      let errorMessage = "";
+      let errorMessage2 = "";
       const maps = errorMaps.filter((m) => !!m).slice().reverse();
       for (const map of maps) {
-        errorMessage = map(fullIssue, { data, defaultError: errorMessage }).message;
+        errorMessage2 = map(fullIssue, { data, defaultError: errorMessage2 }).message;
       }
       return {
         ...issueData,
         path: fullPath,
-        message: errorMessage
+        message: errorMessage2
       };
     };
     EMPTY_PATH = [];
@@ -8577,14 +8577,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text2, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text;
+        return text2;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text.length <= endStep)
-        return text;
+      if (text2.length <= endStep)
+        return text2;
       const folds = [];
       const escapedFolds = {};
       let end = lineWidth - indent.length;
@@ -8601,14 +8601,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text, i, indent.length);
+        i = consumeMoreIndentedLines(text2, i, indent.length);
         if (i !== -1)
           end = i + endStep;
       }
-      for (let ch; ch = text[i += 1]; ) {
+      for (let ch; ch = text2[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text[i + 1]) {
+          switch (text2[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -8625,12 +8625,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text, i, indent.length);
+            i = consumeMoreIndentedLines(text2, i, indent.length);
           end = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text[i + 1];
+            const next = text2[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -8642,12 +8642,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text[i += 1];
+                ch = text2[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text;
+                return text2;
               folds.push(j);
               escapedFolds[j] = true;
               end = j + endStep;
@@ -8662,39 +8662,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text;
+        return text2;
       if (onFold)
         onFold();
-      let res = text.slice(0, folds[0]);
+      let res = text2.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end2 = folds[i2 + 1] || text.length;
+        const end2 = folds[i2 + 1] || text2.length;
         if (fold === 0)
           res = `
-${indent}${text.slice(0, end2)}`;
+${indent}${text2.slice(0, end2)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text[fold]}\\`;
+            res += `${text2[fold]}\\`;
           res += `
-${indent}${text.slice(fold + 1, end2)}`;
+${indent}${text2.slice(fold + 1, end2)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text, i, indent) {
+    function consumeMoreIndentedLines(text2, i, indent) {
       let end = i;
       let start = i + 1;
-      let ch = text[start];
+      let ch = text2[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text[++i];
+          ch = text2[++i];
         } else {
           do {
-            ch = text[++i];
+            ch = text2[++i];
           } while (ch && ch !== "\n");
           end = i;
           start = i + 1;
-          ch = text[start];
+          ch = text2[start];
         }
       }
       return end;
@@ -8737,27 +8737,27 @@ var require_stringifyString = __commonJS({
       return true;
     }
     function doubleQuotedString(value, ctx) {
-      const json = JSON.stringify(value);
+      const json2 = JSON.stringify(value);
       if (ctx.options.doubleQuotedAsJSON)
-        return json;
+        return json2;
       const { implicitKey } = ctx;
       const minMultiLineLength = ctx.options.doubleQuotedMinMultiLineLength;
       const indent = ctx.indent || (containsDocumentMarker(value) ? "  " : "");
       let str = "";
       let start = 0;
-      for (let i = 0, ch = json[i]; ch; ch = json[++i]) {
-        if (ch === " " && json[i + 1] === "\\" && json[i + 2] === "n") {
-          str += json.slice(start, i) + "\\ ";
+      for (let i = 0, ch = json2[i]; ch; ch = json2[++i]) {
+        if (ch === " " && json2[i + 1] === "\\" && json2[i + 2] === "n") {
+          str += json2.slice(start, i) + "\\ ";
           i += 1;
           start = i;
           ch = "\\";
         }
         if (ch === "\\")
-          switch (json[i + 1]) {
+          switch (json2[i + 1]) {
             case "u":
               {
-                str += json.slice(start, i);
-                const code = json.substr(i + 2, 4);
+                str += json2.slice(start, i);
+                const code = json2.substr(i + 2, 4);
                 switch (code) {
                   case "0000":
                     str += "\\0";
@@ -8787,23 +8787,23 @@ var require_stringifyString = __commonJS({
                     if (code.substr(0, 2) === "00")
                       str += "\\x" + code.substr(2);
                     else
-                      str += json.substr(i, 6);
+                      str += json2.substr(i, 6);
                 }
                 i += 5;
                 start = i + 1;
               }
               break;
             case "n":
-              if (implicitKey || json[i + 2] === '"' || json.length < minMultiLineLength) {
+              if (implicitKey || json2[i + 2] === '"' || json2.length < minMultiLineLength) {
                 i += 1;
               } else {
-                str += json.slice(start, i) + "\n\n";
-                while (json[i + 2] === "\\" && json[i + 3] === "n" && json[i + 4] !== '"') {
+                str += json2.slice(start, i) + "\n\n";
+                while (json2[i + 2] === "\\" && json2[i + 3] === "n" && json2[i + 4] !== '"') {
                   str += "\n";
                   i += 2;
                 }
                 str += indent;
-                if (json[i + 2] === " ")
+                if (json2[i + 2] === " ")
                   str += "\\";
                 i += 1;
                 start = i + 1;
@@ -8813,7 +8813,7 @@ var require_stringifyString = __commonJS({
               i += 1;
           }
       }
-      str = start ? str + json.slice(start) : json;
+      str = start ? str + json2.slice(start) : json2;
       return implicitKey ? str : foldFlowLines.foldFlowLines(str, indent, foldFlowLines.FOLD_QUOTED, getFoldOptions(ctx, false));
     }
     function singleQuotedString(value, ctx) {
@@ -11235,11 +11235,11 @@ var require_Document = __commonJS({
           throw new Error(`With a null YAML version, the { schema: Schema } option is required`);
       }
       // json & jsonArg are only used from toJSON()
-      toJS({ json, jsonArg, mapAsMap, maxAliasCount, onAnchor, reviver } = {}) {
+      toJS({ json: json2, jsonArg, mapAsMap, maxAliasCount, onAnchor, reviver } = {}) {
         const ctx = {
           anchors: /* @__PURE__ */ new Map(),
           doc: this,
-          keep: !json,
+          keep: !json2,
           mapAsMap: mapAsMap === true,
           mapKeyWarned: false,
           maxAliasCount: typeof maxAliasCount === "number" ? maxAliasCount : 100
@@ -15394,9 +15394,9 @@ function applyOneSet(lines, set) {
   out.splice(sectionEnd, 0, keyAssign);
   return out;
 }
-function getTomlValue(text, section, key) {
+function getTomlValue(text2, section, key) {
   const header = sectionHeader(section);
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const lines = text2.replace(/\r\n/g, "\n").split("\n");
   let inSection = false;
   for (const line of lines) {
     const trimmed = line.trim();
@@ -15438,37 +15438,37 @@ function mergeManagedMarkdown(original, managedBody, options = {}) {
   const block = `${begin}
 ${managedBody.trim()}
 ${end}`;
-  const text = original.replace(/\r\n/g, "\n");
-  const beginIdx = text.indexOf(begin);
-  const endIdx = text.indexOf(end);
+  const text2 = original.replace(/\r\n/g, "\n");
+  const beginIdx = text2.indexOf(begin);
+  const endIdx = text2.indexOf(end);
   if (beginIdx >= 0 && endIdx > beginIdx) {
-    const before = text.slice(0, beginIdx);
-    const after = text.slice(endIdx + end.length);
+    const before = text2.slice(0, beginIdx);
+    const after = text2.slice(endIdx + end.length);
     const next2 = `${before}${block}${after}`;
     const normalized = next2.endsWith("\n") ? next2 : `${next2}
 `;
     return {
       content: normalized,
-      changed: normalized !== (text.endsWith("\n") ? text : `${text}
+      changed: normalized !== (text2.endsWith("\n") ? text2 : `${text2}
 `)
     };
   }
-  const base = text.trimEnd();
+  const base = text2.trimEnd();
   const next = base.length ? `${base}
 
 ${block}
 ` : `${block}
 `;
-  return { content: next, changed: next !== text };
+  return { content: next, changed: next !== text2 };
 }
-function extractManagedMarkdown(text, options = {}) {
+function extractManagedMarkdown(text2, options = {}) {
   const begin = options.begin ?? MANAGED_BEGIN;
   const end = options.end ?? MANAGED_END;
-  const beginIdx = text.indexOf(begin);
-  const endIdx = text.indexOf(end);
+  const beginIdx = text2.indexOf(begin);
+  const endIdx = text2.indexOf(end);
   if (beginIdx < 0 || endIdx < beginIdx)
     return void 0;
-  return text.slice(beginIdx + begin.length, endIdx).trim();
+  return text2.slice(beginIdx + begin.length, endIdx).trim();
 }
 var MANAGED_BEGIN, MANAGED_END;
 var init_merge_markdown = __esm({
@@ -15485,9 +15485,9 @@ function redact(match) {
     return "***";
   return `${match.slice(0, 4)}\u2026${match.slice(-4)} (len=${match.length})`;
 }
-function scanTextForSecrets(text, path33) {
+function scanTextForSecrets(text2, path33) {
   const findings = [];
-  const lines = text.split(/\r?\n/);
+  const lines = text2.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     for (const rule of RULES) {
@@ -15508,8 +15508,8 @@ function scanTextForSecrets(text, path33) {
 function scanFilesForSecrets(files) {
   return files.flatMap((f) => scanTextForSecrets(f.content, f.path));
 }
-function sanitizeForAi(text, homeHint) {
-  let out = text;
+function sanitizeForAi(text2, homeHint) {
+  let out = text2;
   if (homeHint) {
     const escaped = homeHint.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     out = out.replace(new RegExp(escaped, "gi"), "~");
@@ -16675,7 +16675,8 @@ var {
 } = import_index.default;
 
 // packages/cli/src/index.ts
-var import_node_os5 = __toESM(require("node:os"), 1);
+var import_node_os6 = __toESM(require("node:os"), 1);
+var import_promises15 = require("node:readline/promises");
 init_dist();
 
 // packages/scanner/dist/index.js
@@ -16796,8 +16797,8 @@ async function readGitHubRemote(repoDir) {
   if (!await pathExists(gitCfg))
     return void 0;
   try {
-    const text = await import_promises4.default.readFile(gitCfg, "utf8");
-    const m = text.match(/url\s*=\s*(.+)/i);
+    const text2 = await import_promises4.default.readFile(gitCfg, "utf8");
+    const m = text2.match(/url\s*=\s*(.+)/i);
     if (!m?.[1])
       return void 0;
     const n = normalizeGitRepositoryUrl(m[1].trim());
@@ -17059,9 +17060,9 @@ async function detectSkillSource(skillDir, home) {
   const skillMd = import_node_path10.default.join(skillDir, "SKILL.md");
   if (await pathExists(skillMd)) {
     try {
-      const text = await import_promises5.default.readFile(skillMd, "utf8");
+      const text2 = await import_promises5.default.readFile(skillMd, "utf8");
       meta.hasSkillMd = true;
-      const urlMatch = text.match(/https?:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
+      const urlMatch = text2.match(/https?:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/);
       if (urlMatch) {
         return {
           candidate: urlMatch[1],
@@ -17094,8 +17095,8 @@ async function detectSkillSource(skillDir, home) {
   const gitConfig = import_node_path10.default.join(skillDir, ".git", "config");
   if (await pathExists(gitConfig)) {
     try {
-      const text = await import_promises5.default.readFile(gitConfig, "utf8");
-      const m = text.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
+      const text2 = await import_promises5.default.readFile(gitConfig, "utf8");
+      const m = text2.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
       if (m) {
         return {
           candidate: m[1].replace(/\.git$/, ""),
@@ -17217,8 +17218,8 @@ async function scanClaudePlugins(home, options) {
       try {
         const gitCfg = import_node_path10.default.join(mPath, ".git", "config");
         if (await pathExists(gitCfg)) {
-          const text = await import_promises5.default.readFile(gitCfg, "utf8");
-          const m = text.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
+          const text2 = await import_promises5.default.readFile(gitCfg, "utf8");
+          const m = text2.match(/url\s*=\s*(?:git@github\.com:|https:\/\/github\.com\/)([^\s]+)/);
           if (m)
             sourceCandidate = m[1].replace(/\.git$/, "");
         }
@@ -18367,16 +18368,16 @@ async function scanPathsForSecrets(dir, relPaths) {
         for (const f of files) {
           const rel = import_node_path14.default.relative(dir, f).replace(/\\/g, "/");
           try {
-            const text2 = await readText3(f);
-            findings.push(...scanTextForSecrets(text2, rel));
+            const text3 = await readText3(f);
+            findings.push(...scanTextForSecrets(text3, rel));
           } catch {
           }
         }
         continue;
       }
       const { readText: readText2 } = await Promise.resolve().then(() => (init_dist(), dist_exports));
-      const text = await readText2(full);
-      findings.push(...scanTextForSecrets(text, filePath));
+      const text2 = await readText2(full);
+      findings.push(...scanTextForSecrets(text2, filePath));
     } catch {
     }
   }
@@ -18637,10 +18638,10 @@ async function queryClaudePluginStatus(pluginId, pluginName, options = {}) {
       maxBuffer: 5 * 1024 * 1024,
       env
     });
-    const text = `${listOut.stdout ?? ""}`.trim();
-    if (text) {
+    const text2 = `${listOut.stdout ?? ""}`.trim();
+    if (text2) {
       try {
-        const parsed = JSON.parse(text);
+        const parsed = JSON.parse(text2);
         const entries = parseClaudePluginListJson(parsed);
         return findPluginStatus(entries, pluginId, pluginName);
       } catch {
@@ -18654,8 +18655,8 @@ async function queryClaudePluginStatus(pluginId, pluginName, options = {}) {
       maxBuffer: 5 * 1024 * 1024,
       env
     });
-    const text = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
-    const lines = text.split(/\r?\n/);
+    const text2 = `${listOut.stdout ?? ""}${listOut.stderr ?? ""}`;
+    const lines = text2.split(/\r?\n/);
     const idLower = pluginId.toLowerCase();
     for (const line of lines) {
       const lower = line.toLowerCase();
@@ -18888,8 +18889,8 @@ async function applyOperation(op, ctx, recipe) {
       const key = parts.pop();
       const section = parts.join(".") || "features";
       const dest = codexConfigPath(ctx.home);
-      let text = await pathReady(dest) ? await readText(dest) : "";
-      text = mergeTomlText(text, [
+      let text2 = await pathReady(dest) ? await readText(dest) : "";
+      text2 = mergeTomlText(text2, [
         {
           section,
           key,
@@ -18898,7 +18899,7 @@ async function applyOperation(op, ctx, recipe) {
       ]);
       if (!ctx.dryRun) {
         await ensureDir(import_node_path16.default.dirname(dest));
-        await writeText(dest, text);
+        await writeText(dest, text2);
       }
       return {
         ok: true,
@@ -20595,8 +20596,8 @@ async function vendorSkillDirectory(sourceDir, configRepoPath, resourceId, optio
       continue;
     const rel = import_node_path24.default.relative(sourceDir, full);
     try {
-      const text = await readText(full);
-      const findings = scanTextForSecrets(text, rel);
+      const text2 = await readText(full);
+      const findings = scanTextForSecrets(text2, rel);
       if (findings.length) {
         for (const f of findings) {
           blockedSecrets.push({ path: rel, rule: f.rule });
@@ -20647,6 +20648,8 @@ var import_node_path25 = __toESM(require("node:path"), 1);
 init_dist();
 var ASSET_CATALOG_MARKDOWN_REL = "ASSETS.md";
 var ASSET_CATALOG_HTML_REL = "catalog/index.html";
+var PAGES_WORKFLOW_REL = ".github/workflows/ai-config-sync-pages.yml";
+var PAGES_WORKFLOW_MARKER = "# Managed by ai-config-sync (asset catalog Pages deployment). Safe to delete or customize.";
 var ASSETS_BEGIN = "<!-- ai-config-sync:assets:start -->";
 var ASSETS_END = "<!-- ai-config-sync:assets:end -->";
 var HTML_GENERATOR_MARKER = '<meta name="generator" content="ai-config-sync asset-catalog/v1">';
@@ -20702,12 +20705,12 @@ function cleanRemote(value) {
   const cleaned = cleanText(value, 300, false);
   if (!cleaned)
     return {};
-  const http = safeHttpUrl(cleaned);
-  if (http) {
-    const parsed = new URL(http);
+  const http2 = safeHttpUrl(cleaned);
+  if (http2) {
+    const parsed = new URL(http2);
     return {
       label: `${parsed.host}${parsed.pathname}`.replace(/\.git$/i, ""),
-      href: http
+      href: http2
     };
   }
   if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?$/.test(cleaned)) {
@@ -20904,7 +20907,7 @@ function renderAssetCatalogMarkdown(catalog) {
     "> [!NOTE]",
     "> \u6B64\u76EE\u5F55\u7531 `ai-config-sync` \u6839\u636E\u4ED3\u5E93\u4E2D\u7684 `resources.yaml`\u3001Profiles\u3001Recipes \u4E0E Lock \u786E\u5B9A\u6027\u751F\u6210\u3002\u8BF7\u52FF\u624B\u5DE5\u7F16\u8F91\u6807\u8BB0\u533A\uFF1B\u5B83\u4E0D\u5305\u542B\u5BC6\u94A5\u89E3\u6790\u503C\u3001\u767B\u5F55\u6001\u3001\u804A\u5929\u8BB0\u5F55\u6216\u672C\u673A\u7EDD\u5BF9\u8DEF\u5F84\u3002",
     "",
-    "\u9700\u8981\u641C\u7D22\u548C\u7B5B\u9009\u65F6\uFF0C\u53EF\u4E0B\u8F7D\u5E76\u6253\u5F00 [`catalog/index.html`](catalog/index.html)\uFF1B\u82E5\u4ED3\u5E93\u914D\u7F6E\u4E86\u79C1\u6709\u9759\u6001\u7AD9\u70B9\uFF0C\u4E5F\u53EF\u76F4\u63A5\u6258\u7BA1\u8BE5\u81EA\u5305\u542B\u9875\u9762\u3002",
+    "\u9700\u8981\u641C\u7D22\u548C\u7B5B\u9009\u65F6\uFF0C\u53EF\u4E0B\u8F7D\u5E76\u6253\u5F00 [`catalog/index.html`](catalog/index.html)\uFF1B\u4ED3\u5E93\u5DF2\u9644\u5E26 `.github/workflows/ai-config-sync-pages.yml`\uFF0C\u5728 GitHub \u4E0A\u542F\u7528 Pages\uFF08Source \u9009 GitHub Actions\uFF09\u540E\uFF0C\u6BCF\u6B21 push \u90FD\u4F1A\u628A\u8BE5\u81EA\u5305\u542B\u9875\u9762\u81EA\u52A8\u90E8\u7F72\u4E3A\u4ED3\u5E93\u7AD9\u70B9\uFF0C\u65B9\u4FBF\u968F\u65F6\u5728\u7EBF\u67E5\u8BE2\u5907\u4EFD\u7684 Skill / Plugin \u7B49\u8D44\u4EA7\u3002\u79C1\u6709\u4ED3\u5E93\u7684 Pages \u9700\u8981\u4ED8\u8D39\u8BA1\u5212\u4E14\u4EC5\u5BF9\u6709\u6743\u9650\u8005\u53EF\u89C1\u3002",
     "",
     "## \u6982\u89C8",
     "",
@@ -21170,6 +21173,40 @@ function renderAssetCatalogHtml(catalog) {
 </html>
 `;
 }
+function renderPagesWorkflow() {
+  return `${PAGES_WORKFLOW_MARKER}
+name: Deploy asset catalog (ai-config-sync)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: catalog
+      - id: deployment
+        uses: actions/deploy-pages@v4
+`;
+}
 async function writeAssetCatalog(configRepoPath) {
   const catalog = await buildAssetCatalog(configRepoPath);
   const markdownPath = import_node_path25.default.join(configRepoPath, ASSET_CATALOG_MARKDOWN_REL);
@@ -21196,6 +21233,17 @@ async function writeAssetCatalog(configRepoPath) {
   if (existingHtml !== html) {
     await writeText(htmlPath, html);
     changedRelPaths.push(ASSET_CATALOG_HTML_REL);
+  }
+  const workflowPath = import_node_path25.default.join(configRepoPath, PAGES_WORKFLOW_REL);
+  const desiredWorkflow = renderPagesWorkflow();
+  const existingWorkflow = await pathExists(workflowPath) ? await readText(workflowPath) : void 0;
+  if (existingWorkflow !== desiredWorkflow) {
+    if (existingWorkflow !== void 0 && !existingWorkflow.startsWith(PAGES_WORKFLOW_MARKER)) {
+      return { catalog, markdownPath, htmlPath, changedRelPaths };
+    }
+    await import_promises11.default.mkdir(import_node_path25.default.dirname(workflowPath), { recursive: true });
+    await writeText(workflowPath, desiredWorkflow);
+    changedRelPaths.push(PAGES_WORKFLOW_REL);
   }
   return { catalog, markdownPath, htmlPath, changedRelPaths };
 }
@@ -21406,6 +21454,7 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         await trackPath(rel);
       await trackPath(ASSET_CATALOG_MARKDOWN_REL);
       await trackPath(ASSET_CATALOG_HTML_REL);
+      await trackPath(PAGES_WORKFLOW_REL);
       for (const rel of stagedVendorRels) {
         const from = import_node_path26.default.join(stagingRoot, rel);
         const to = import_node_path26.default.join(configRepoPath, rel);
@@ -21465,7 +21514,8 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
         ...stagedRecipeRels,
         ...stagedVendorRels,
         ASSET_CATALOG_MARKDOWN_REL,
-        ASSET_CATALOG_HTML_REL
+        ASSET_CATALOG_HTML_REL,
+        PAGES_WORKFLOW_REL
       ];
       const seen = /* @__PURE__ */ new Set();
       const uniqueChanged = changedRelPaths.filter((p) => {
@@ -21911,8 +21961,8 @@ async function runDoctor(options) {
   }
   const codexCfg = codexConfigPath(home);
   if (await pathExists(codexCfg)) {
-    const text = await readText(codexCfg);
-    const hooks = getTomlValue(text, "features", "hooks");
+    const text2 = await readText(codexCfg);
+    const hooks = getTomlValue(text2, "features", "hooks");
     if (hooks === true) {
       findings.push({
         severity: "ok",
@@ -22485,9 +22535,9 @@ async function installClaudePlugin(home, programRoot, options = {}) {
       maxBuffer: 4 * 1024 * 1024,
       env: homeScopedEnv(home)
     });
-    const text = `${listOut.stdout ?? ""}`.trim();
-    if (text) {
-      const parsed = JSON.parse(text);
+    const text2 = `${listOut.stdout ?? ""}`.trim();
+    if (text2) {
+      const parsed = JSON.parse(text2);
       const list = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed !== null && Array.isArray(parsed.plugins) ? parsed.plugins : typeof parsed === "object" && parsed !== null && Array.isArray(parsed.installed) ? parsed.installed : [];
       for (const item of list) {
         if (typeof item !== "object" || item === null) continue;
@@ -23068,6 +23118,614 @@ user-invocable: true
   };
 }
 
+// packages/cli/src/bootstrap-session.ts
+var import_node_os5 = __toESM(require("node:os"), 1);
+init_dist();
+var BootstrapSession = class {
+  home;
+  programRoot;
+  #latestPlan;
+  constructor(options = {}) {
+    this.home = expandHome(options.home ?? import_node_os5.default.homedir());
+    this.programRoot = options.programRoot;
+  }
+  async connection() {
+    const cfgPath = localConfigPath(this.home);
+    if (!await pathExists(cfgPath)) {
+      return { linked: false, home: this.home };
+    }
+    try {
+      const localConfig = await loadLocalConfig(cfgPath);
+      return {
+        linked: true,
+        home: this.home,
+        localConfig,
+        configRepoPath: localConfig.configRepository.localPath
+      };
+    } catch {
+      return { linked: false, home: this.home };
+    }
+  }
+  async connect(input) {
+    const setupOptions = {
+      home: this.home,
+      repo: input.repo?.trim() || void 0,
+      configPath: input.configPath?.trim() || void 0,
+      profile: input.profile?.trim() || "home",
+      mode: input.reconfigure ? "reconfigure" : "default",
+      claude: input.claude,
+      codex: input.codex,
+      enableCodexHook: input.enableCodexHook,
+      programRoot: this.programRoot,
+      preview: true
+    };
+    const result = await runSetup(setupOptions);
+    this.#latestPlan = void 0;
+    return result;
+  }
+  async plan(input = {}) {
+    const connection = await this.#requireConnection();
+    if (input.pull !== false && !input.offline) {
+      const safety = await inspectGitSafety(connection.configRepoPath);
+      if (safety.canPull) {
+        await pullRepo(connection.configRepoPath);
+      }
+    }
+    const plan = await buildPlan({
+      home: this.home,
+      configRepoPath: connection.configRepoPath,
+      localConfig: connection.localConfig,
+      profileName: input.profile ?? connection.localConfig.profile,
+      offline: input.offline
+    });
+    this.#latestPlan = plan;
+    return plan;
+  }
+  latestPlan() {
+    return this.#latestPlan;
+  }
+  async apply(input = {}) {
+    if (!this.#latestPlan) {
+      throw new Error("No reviewed Bootstrap Plan. Build and review a plan before apply.");
+    }
+    const connection = await this.#requireConnection();
+    const plan = this.#latestPlan;
+    const result = await applyPlan(
+      {
+        home: this.home,
+        configRepoPath: connection.configRepoPath,
+        localConfig: connection.localConfig,
+        profileName: plan.profile,
+        yes: true,
+        allowRisk: input.allowRisk ?? "medium",
+        offline: input.offline
+      },
+      plan
+    );
+    this.#latestPlan = void 0;
+    return result;
+  }
+  async doctor() {
+    const connection = await this.connection();
+    return runDoctor({
+      home: this.home,
+      localConfig: connection.localConfig,
+      configRepoPath: connection.configRepoPath
+    });
+  }
+  async #requireConnection() {
+    const connection = await this.connection();
+    if (!connection.linked || !connection.localConfig || !connection.configRepoPath) {
+      throw new Error(
+        "No private config repository is linked. Connect a repository before planning restore."
+      );
+    }
+    return {
+      localConfig: connection.localConfig,
+      configRepoPath: connection.configRepoPath
+    };
+  }
+};
+
+// packages/cli/src/bootstrap-web.ts
+var import_node_child_process4 = require("node:child_process");
+var import_node_crypto8 = __toESM(require("node:crypto"), 1);
+var import_node_http = __toESM(require("node:http"), 1);
+var LOOPBACK_HOST = "127.0.0.1";
+var MAX_BODY_BYTES = 64 * 1024;
+var BROWSER_BLOCKED_PORTS = /* @__PURE__ */ new Set([
+  1,
+  7,
+  9,
+  11,
+  13,
+  15,
+  17,
+  19,
+  20,
+  21,
+  22,
+  23,
+  25,
+  37,
+  42,
+  43,
+  53,
+  69,
+  77,
+  79,
+  87,
+  95,
+  101,
+  102,
+  103,
+  104,
+  109,
+  110,
+  111,
+  113,
+  115,
+  117,
+  119,
+  123,
+  135,
+  137,
+  139,
+  143,
+  161,
+  179,
+  389,
+  427,
+  465,
+  512,
+  513,
+  514,
+  515,
+  526,
+  530,
+  531,
+  532,
+  540,
+  548,
+  554,
+  556,
+  563,
+  587,
+  601,
+  636,
+  989,
+  990,
+  993,
+  995,
+  1719,
+  1720,
+  1723,
+  2049,
+  3659,
+  4045,
+  4190,
+  5060,
+  5061,
+  6e3,
+  6566,
+  6665,
+  6666,
+  6667,
+  6668,
+  6669,
+  6697,
+  10080
+]);
+function json(response, status, body) {
+  const payload = JSON.stringify(body);
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(payload),
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff"
+  });
+  response.end(payload);
+}
+function text(response, status, body, headers = {}) {
+  response.writeHead(status, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Content-Length": Buffer.byteLength(body),
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    ...headers
+  });
+  response.end(body);
+}
+async function readJsonBody(request) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > MAX_BODY_BYTES) {
+      throw new Error("Request body is too large");
+    }
+    chunks.push(buffer);
+  }
+  if (chunks.length === 0) return {};
+  const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Expected a JSON object");
+  }
+  return parsed;
+}
+function optionalString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function optionalBoolean(value) {
+  return typeof value === "boolean" ? value : void 0;
+}
+function riskLevel(value) {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return "medium";
+}
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function openLocalBrowser(url) {
+  const command = process.platform === "win32" ? { file: "rundll32.exe", args: ["url.dll,FileProtocolHandler", url] } : process.platform === "darwin" ? { file: "open", args: [url] } : { file: "xdg-open", args: [url] };
+  const child = (0, import_node_child_process4.spawn)(command.file, command.args, {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  child.on("error", () => {
+  });
+  child.unref();
+}
+function pageHtml(token, nonce) {
+  return String.raw`<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI Config Sync · Bootstrap</title>
+  <style nonce="__NONCE__">
+    :root { color-scheme: dark; --bg:#090d12; --panel:#111820; --line:#263342; --text:#eef5fb; --muted:#94a5b5; --cyan:#5fe0d0; --blue:#6fa8ff; --warn:#ffc56b; --bad:#ff7f8d; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font:15px/1.5 Inter,ui-sans-serif,system-ui,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at 12% 0%,#17304b 0,transparent 38%),radial-gradient(circle at 94% 14%,#123f3a 0,transparent 32%),var(--bg); }
+    main { width:min(1080px,calc(100% - 32px)); margin:0 auto; padding:42px 0 70px; }
+    header { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-bottom:28px; }
+    h1 { margin:0; font-size:clamp(28px,5vw,46px); letter-spacing:-.04em; }
+    header p { margin:8px 0 0; color:var(--muted); max-width:680px; }
+    .pill { border:1px solid var(--line); background:#0d141b; color:var(--cyan); padding:7px 11px; border-radius:999px; white-space:nowrap; }
+    .grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,.85fr); gap:18px; }
+    .card { background:color-mix(in srgb,var(--panel) 92%,transparent); border:1px solid var(--line); border-radius:18px; padding:22px; box-shadow:0 18px 60px #0006; backdrop-filter:blur(14px); }
+    .card h2 { font-size:17px; margin:0 0 16px; }
+    .status-heading { margin-top:24px !important; }
+    label { display:block; color:var(--muted); font-size:13px; margin:14px 0 6px; }
+    input,select { width:100%; background:#090f15; border:1px solid #314052; color:var(--text); border-radius:10px; padding:11px 12px; outline:none; }
+    input:focus,select:focus { border-color:var(--cyan); box-shadow:0 0 0 3px #5fe0d020; }
+    .checks { display:flex; flex-wrap:wrap; gap:10px 18px; margin:16px 0; }
+    .checks label { margin:0; display:flex; align-items:center; gap:7px; color:var(--text); }
+    .checks input { width:auto; }
+    button { border:0; border-radius:10px; padding:11px 15px; font-weight:700; cursor:pointer; background:linear-gradient(135deg,var(--cyan),var(--blue)); color:#06121a; }
+    button.secondary { background:#1a2530; color:var(--text); border:1px solid var(--line); }
+    button.danger { background:#321b23; color:#ffbac2; border:1px solid #6f3441; }
+    button:disabled { opacity:.42; cursor:not-allowed; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+    .status { min-height:58px; padding:12px 14px; background:#0a1118; border:1px solid var(--line); border-radius:12px; color:var(--muted); white-space:pre-wrap; }
+    .status.ok { color:#9ef0c5; border-color:#275e49; }
+    .status.error { color:#ffb1ba; border-color:#71333d; }
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:0 0 14px; }
+    .metric { background:#0a1118; border:1px solid var(--line); border-radius:11px; padding:11px; }
+    .metric strong { display:block; font-size:21px; }
+    .metric span { color:var(--muted); font-size:12px; }
+    .plan { max-height:460px; overflow:auto; display:grid; gap:8px; }
+    .plan-item { border:1px solid var(--line); background:#0b1219; border-radius:11px; padding:11px 12px; }
+    .plan-item .meta { color:var(--muted); font-size:12px; margin-top:3px; }
+    .risk-low { color:#8de7be; } .risk-medium { color:var(--warn); } .risk-high { color:var(--bad); }
+    details { margin-top:14px; }
+    pre { overflow:auto; max-height:310px; background:#080d12; border:1px solid var(--line); border-radius:10px; padding:12px; color:#b9c8d4; font-size:12px; }
+    footer { margin-top:18px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; }
+    @media (max-width:820px) { .grid{grid-template-columns:1fr}.summary{grid-template-columns:repeat(2,1fr)}header{display:block}.pill{display:inline-block;margin-top:14px} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>恢复你的 AI 工作环境</h1><p>连接私有配置仓库，检查恢复计划，并用一次明确确认安装 Skill、Plugin、Hook 与受管配置。</p></div>
+    <span class="pill" id="connectionPill">正在检查连接…</span>
+  </header>
+  <div class="grid">
+    <section class="card">
+      <h2>1 · 连接配置仓库</h2>
+      <label for="repo">私有 Git 仓库地址</label>
+      <input id="repo" placeholder="git@github.com:you/my-ai-config.git">
+      <label for="configPath">本机目录（可选）</label>
+      <input id="configPath" placeholder="默认：~/ai-config/my-ai-config">
+      <label for="profile">Profile</label>
+      <input id="profile" value="home">
+      <div class="checks">
+        <label><input id="claude" type="checkbox" checked> Claude</label>
+        <label><input id="codex" type="checkbox" checked> Codex</label>
+        <label><input id="codexHook" type="checkbox"> 启用 Codex SessionStart Hook</label>
+      </div>
+      <div class="actions">
+        <button id="connect">连接并检查</button>
+        <button id="doctor" class="secondary">运行 Doctor</button>
+      </div>
+      <h2 class="status-heading">状态</h2>
+      <div id="status" class="status">等待操作。</div>
+      <details><summary>诊断详情</summary><pre id="details">尚无</pre></details>
+    </section>
+    <section class="card">
+      <h2>2 · 查看并执行 Plan</h2>
+      <div class="summary">
+        <div class="metric"><strong id="total">0</strong><span>总操作</span></div>
+        <div class="metric"><strong id="low">0</strong><span>Low</span></div>
+        <div class="metric"><strong id="medium">0</strong><span>Medium</span></div>
+        <div class="metric"><strong id="high">0</strong><span>High</span></div>
+      </div>
+      <div id="plan" class="plan"><div class="status">连接仓库后生成恢复计划。</div></div>
+      <label for="allowRisk">允许的最高风险</label>
+      <select id="allowRisk"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+      <div class="actions">
+        <button id="buildPlan" class="secondary" disabled>重新生成 Plan</button>
+        <button id="apply" disabled>确认并开始恢复</button>
+      </div>
+    </section>
+  </div>
+  <footer><span>页面仅通过 127.0.0.1 访问；Plan 与 Apply 使用同一份快照。</span><button id="shutdown" class="danger">关闭本地服务</button></footer>
+</main>
+<script nonce="__NONCE__">
+  const TOKEN = "__TOKEN__";
+  const $ = (id) => document.getElementById(id);
+  let linked = false;
+  let hasPlan = false;
+
+  async function request(path, options) {
+    const init = Object.assign({ method: "GET", headers: {} }, options || {});
+    init.headers["X-AI-Config-Sync-Token"] = TOKEN;
+    if (init.body && typeof init.body !== "string") {
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(init.body);
+    }
+    const response = await fetch(path, init);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "请求失败");
+    return payload;
+  }
+
+  function busy(value, message) {
+    ["connect","doctor","buildPlan","apply"].forEach((id) => $(id).disabled = value || (id === "apply" && !hasPlan) || (id === "buildPlan" && !linked));
+    if (message) setStatus(message);
+  }
+
+  function setStatus(message, kind) {
+    $("status").textContent = message;
+    $("status").className = "status" + (kind ? " " + kind : "");
+  }
+
+  function renderPlan(plan) {
+    hasPlan = true;
+    const counts = { low:0, medium:0, high:0 };
+    plan.actions.forEach((action) => counts[action.risk]++);
+    $("total").textContent = String(plan.actions.length);
+    $("low").textContent = String(counts.low);
+    $("medium").textContent = String(counts.medium);
+    $("high").textContent = String(counts.high);
+    $("plan").replaceChildren(...plan.actions.map((action) => {
+      const item = document.createElement("div"); item.className = "plan-item";
+      const title = document.createElement("div"); title.textContent = action.type + " · " + action.description;
+      const meta = document.createElement("div"); meta.className = "meta";
+      const risk = document.createElement("span"); risk.className = "risk-" + action.risk; risk.textContent = action.risk.toUpperCase();
+      meta.append(risk, document.createTextNode(" · " + (action.target || "global") + (action.resourceId ? " · " + action.resourceId : "")));
+      item.append(title, meta); return item;
+    }));
+    if (plan.actions.length === 0) $("plan").innerHTML = '<div class="status ok">无需恢复，当前环境已符合配置。</div>';
+    $("apply").disabled = plan.actions.length === 0;
+    $("details").textContent = JSON.stringify(plan, null, 2);
+  }
+
+  async function refreshStatus() {
+    try {
+      const payload = await request("/api/status");
+      linked = payload.connection.linked;
+      $("connectionPill").textContent = linked ? "已连接 · " + payload.connection.configRepoPath : "尚未连接";
+      $("buildPlan").disabled = !linked;
+      if (payload.connection.localConfig) $("profile").value = payload.connection.localConfig.profile || "home";
+    } catch (error) { setStatus(error.message, "error"); }
+  }
+
+  $("connect").onclick = async () => {
+    busy(true, "正在连接并检查配置仓库…");
+    try {
+      const payload = await request("/api/connect", { method:"POST", body:{ repo:$("repo").value, configPath:$("configPath").value, profile:$("profile").value, claude:$("claude").checked, codex:$("codex").checked, enableCodexHook:$("codexHook").checked } });
+      $("details").textContent = JSON.stringify(payload.setup, null, 2);
+      linked = payload.connection.linked;
+      setStatus("配置仓库已连接。正在生成恢复 Plan…", "ok");
+      await refreshStatus();
+      const planned = await request("/api/plan", { method:"POST", body:{ profile:$("profile").value } });
+      renderPlan(planned.plan); setStatus("Plan 已生成，请检查后确认恢复。", "ok");
+    } catch (error) { setStatus(error.message, "error"); }
+    finally { busy(false); }
+  };
+
+  $("buildPlan").onclick = async () => {
+    busy(true, "正在刷新并构建 Plan…");
+    try { const payload = await request("/api/plan", { method:"POST", body:{ profile:$("profile").value } }); renderPlan(payload.plan); setStatus("Plan 已更新。", "ok"); }
+    catch (error) { setStatus(error.message, "error"); }
+    finally { busy(false); }
+  };
+
+  $("apply").onclick = async () => {
+    if (!confirm("将按刚刚显示的 Plan 修改本机配置。是否继续？")) return;
+    busy(true, "正在恢复，请不要关闭页面…");
+    try {
+      const payload = await request("/api/apply", { method:"POST", body:{ confirm:true, allowRisk:$("allowRisk").value } });
+      $("details").textContent = JSON.stringify(payload, null, 2);
+      hasPlan = false; $("apply").disabled = true;
+      setStatus(payload.result.failed.length ? "恢复完成，但有失败项，请查看详情。" : "恢复完成，Doctor 正在验证…", payload.result.failed.length ? "error" : "ok");
+      const checked = await request("/api/doctor", { method:"POST", body:{} });
+      $("details").textContent = JSON.stringify(checked.report, null, 2);
+      setStatus(checked.report.ok ? "恢复完成，Doctor PASS。" : "恢复完成，Doctor 发现需要处理的问题。", checked.report.ok ? "ok" : "error");
+    } catch (error) { setStatus(error.message, "error"); }
+    finally { busy(false); }
+  };
+
+  $("doctor").onclick = async () => {
+    busy(true, "正在运行 Doctor…");
+    try { const payload = await request("/api/doctor", { method:"POST", body:{} }); $("details").textContent = JSON.stringify(payload.report, null, 2); setStatus(payload.report.ok ? "Doctor PASS。" : "Doctor 发现问题，请查看详情。", payload.report.ok ? "ok" : "error"); }
+    catch (error) { setStatus(error.message, "error"); }
+    finally { busy(false); }
+  };
+
+  $("shutdown").onclick = async () => { try { await request("/api/shutdown", { method:"POST", body:{} }); document.body.innerHTML = '<main><div class="card"><h1>本地服务已关闭</h1><p>现在可以关闭此页面。</p></div></main>'; } catch {} };
+  setInterval(() => request("/api/heartbeat", { method:"POST", body:{} }).catch(() => {}), 30000);
+  refreshStatus();
+</script>
+</body>
+</html>`.replaceAll("__NONCE__", nonce).replace("__TOKEN__", token);
+}
+async function startBootstrapWeb(options = {}) {
+  const requestedPort = options.port ?? 0;
+  if (requestedPort !== 0 && BROWSER_BLOCKED_PORTS.has(requestedPort)) {
+    throw new Error(`Port ${requestedPort} is blocked by Web browsers`);
+  }
+  const session = options.session ?? new BootstrapSession();
+  const token = import_node_crypto8.default.randomBytes(24).toString("base64url");
+  const nonce = import_node_crypto8.default.randomBytes(18).toString("base64url");
+  const idleTimeoutMs = Math.max(options.idleTimeoutMs ?? 15 * 6e4, 1e4);
+  let lastActivity = Date.now();
+  let closing = false;
+  let resolveClosed;
+  const closed = new Promise((resolve) => {
+    resolveClosed = resolve;
+  });
+  const server = import_node_http.default.createServer(async (request, response) => {
+    lastActivity = Date.now();
+    const address2 = server.address();
+    const allowedHosts = /* @__PURE__ */ new Set([
+      `${LOOPBACK_HOST}:${address2?.port ?? options.port ?? 0}`,
+      `localhost:${address2?.port ?? options.port ?? 0}`
+    ]);
+    if (!request.headers.host || !allowedHosts.has(request.headers.host.toLowerCase())) {
+      return text(response, 403, "Forbidden host");
+    }
+    const url2 = new URL(request.url ?? "/", `http://${request.headers.host}`);
+    if (request.method === "GET" && url2.pathname === "/") {
+      const html = pageHtml(token, nonce);
+      response.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": Buffer.byteLength(html),
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Content-Security-Policy": `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`
+      });
+      return response.end(html);
+    }
+    if (!url2.pathname.startsWith("/api/")) return text(response, 404, "Not found");
+    const requestToken = request.headers["x-ai-config-sync-token"];
+    if (requestToken !== token) return json(response, 403, { error: "Invalid session token" });
+    const origin = request.headers.origin;
+    if (origin && origin !== `http://${request.headers.host}`) {
+      return json(response, 403, { error: "Invalid origin" });
+    }
+    try {
+      if (request.method === "GET" && url2.pathname === "/api/status") {
+        return json(response, 200, {
+          connection: await session.connection(),
+          hasReviewedPlan: Boolean(session.latestPlan())
+        });
+      }
+      if (request.method !== "POST") return json(response, 405, { error: "Method not allowed" });
+      const body = await readJsonBody(request);
+      if (url2.pathname === "/api/heartbeat") return json(response, 200, { ok: true });
+      if (url2.pathname === "/api/connect") {
+        const input = {
+          repo: optionalString(body.repo),
+          configPath: optionalString(body.configPath),
+          profile: optionalString(body.profile),
+          claude: optionalBoolean(body.claude),
+          codex: optionalBoolean(body.codex),
+          enableCodexHook: optionalBoolean(body.enableCodexHook),
+          reconfigure: optionalBoolean(body.reconfigure)
+        };
+        if (!input.repo && !input.configPath && !(await session.connection()).linked) {
+          throw new Error("\u8BF7\u8F93\u5165\u79C1\u6709\u4ED3\u5E93\u5730\u5740\u6216\u672C\u673A\u914D\u7F6E\u4ED3\u5E93\u76EE\u5F55");
+        }
+        const setup = await session.connect(input);
+        return json(response, 200, {
+          setup,
+          connection: await session.connection()
+        });
+      }
+      if (url2.pathname === "/api/plan") {
+        const plan = await session.plan({
+          profile: optionalString(body.profile),
+          offline: optionalBoolean(body.offline)
+        });
+        return json(response, 200, { plan });
+      }
+      if (url2.pathname === "/api/apply") {
+        if (body.confirm !== true) throw new Error("Apply requires explicit confirmation");
+        const result = await session.apply({
+          allowRisk: riskLevel(body.allowRisk),
+          offline: optionalBoolean(body.offline)
+        });
+        return json(response, 200, { result });
+      }
+      if (url2.pathname === "/api/doctor") {
+        return json(response, 200, { report: await session.doctor() });
+      }
+      if (url2.pathname === "/api/shutdown") {
+        json(response, 200, { ok: true });
+        setTimeout(() => void close(), 50);
+        return;
+      }
+      return json(response, 404, { error: "Unknown endpoint" });
+    } catch (error) {
+      return json(response, 400, { error: errorMessage(error) });
+    }
+  });
+  const close = async () => {
+    if (closing) return closed;
+    closing = true;
+    clearInterval(idleTimer);
+    await new Promise((resolve) => {
+      server.close(() => resolve());
+      server.closeIdleConnections?.();
+    });
+    resolveClosed();
+  };
+  const idleTimer = setInterval(() => {
+    if (Date.now() - lastActivity >= idleTimeoutMs) void close();
+  }, Math.min(3e4, Math.max(2e3, Math.floor(idleTimeoutMs / 4))));
+  idleTimer.unref();
+  const listen = async () => {
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(requestedPort, LOOPBACK_HOST, () => {
+        server.off("error", reject);
+        resolve();
+      });
+    });
+  };
+  await listen();
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const selected = server.address().port;
+    if (!BROWSER_BLOCKED_PORTS.has(selected)) break;
+    await new Promise((resolve) => server.close(() => resolve()));
+    await listen();
+  }
+  const address = server.address();
+  if (BROWSER_BLOCKED_PORTS.has(address.port)) {
+    await new Promise((resolve) => server.close(() => resolve()));
+    clearInterval(idleTimer);
+    throw new Error("Could not allocate a browser-safe local port");
+  }
+  const url = `http://${LOOPBACK_HOST}:${address.port}/`;
+  if (options.openBrowser !== false) openLocalBrowser(url);
+  return { url, port: address.port, token, close, closed };
+}
+
 // packages/cli/src/index.ts
 var import_node_path32 = __toESM(require("node:path"), 1);
 init_dist();
@@ -23078,7 +23736,17 @@ program2.name("ai-config-sync").description(
   true ? "0.5.0" : process.env.npm_package_version || "0.4.1"
 );
 function homeOpt(cmd) {
-  return expandHome(cmd.opts().home ?? import_node_os5.default.homedir());
+  return expandHome(cmd.opts().home ?? import_node_os6.default.homedir());
+}
+async function confirmInTerminal(question) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  const prompt = (0, import_promises15.createInterface)({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await prompt.question(`${question} [y/N] `)).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  } finally {
+    prompt.close();
+  }
 }
 async function loadCtx(home) {
   const cfgPath = localConfigPath(home);
@@ -23173,6 +23841,104 @@ program2.command("setup").description("Initialize, link, repair, or reconfigure"
   }
   console.log(`
 Status: ${result.status}`);
+});
+program2.command("bootstrap").description("Connect a private config repo, show one restore Plan, then apply it").option("--repo <url>", "Git remote for the private config repository").option("--config-path <path>", "Existing local private config repository").option("--profile <name>", "Profile name", "home").option("--target <name>", "Integration target: claude | codex | all", "all").option("--enable-codex-hook", "Install the ai-config-sync Codex SessionStart hook").option("--home <path>", "Override home directory").option("--yes", "Apply after displaying the Plan").option("--allow-risk <level>", "Max risk: low|medium|high", "medium").option("--offline", "Do not pull or clone remote sources").option("--json", "JSON output").action(async (opts) => {
+  const home = homeOpt({ opts: () => opts });
+  const session = new BootstrapSession({ home });
+  let setupResult;
+  if (opts.repo || opts.configPath) {
+    const target = String(opts.target ?? "all").toLowerCase();
+    if (!["claude", "codex", "all"].includes(target)) {
+      throw new Error("--target must be claude, codex, or all");
+    }
+    setupResult = await session.connect({
+      repo: opts.repo,
+      configPath: opts.configPath,
+      profile: opts.profile,
+      claude: target === "claude" || target === "all",
+      codex: target === "codex" || target === "all",
+      enableCodexHook: !!opts.enableCodexHook
+    });
+  }
+  const connection = await session.connection();
+  if (!connection.linked) {
+    throw new Error(
+      "Bootstrap needs --repo or --config-path the first time it runs."
+    );
+  }
+  const plan = await session.plan({
+    profile: opts.profile,
+    offline: !!opts.offline,
+    pull: !opts.offline
+  });
+  if (opts.json && !opts.yes) {
+    console.log(JSON.stringify({ setup: setupResult, connection, plan }, null, 2));
+    return;
+  }
+  if (setupResult && !opts.json) {
+    for (const message of setupResult.messages) console.log(message);
+    console.log(`Bootstrap setup: ${setupResult.status}
+`);
+  }
+  if (!opts.json) console.log(formatPlan(plan));
+  const actionable = plan.actions.filter((action) => action.type !== "SKIP");
+  if (actionable.length === 0) {
+    if (opts.json) {
+      console.log(JSON.stringify({ setup: setupResult, connection, plan }, null, 2));
+    } else {
+      console.log("\nBootstrap: No changes");
+    }
+    return;
+  }
+  const allowRisk = String(opts.allowRisk).toLowerCase();
+  if (!["low", "medium", "high"].includes(allowRisk)) {
+    throw new Error("--allow-risk must be low, medium, or high");
+  }
+  if (!opts.yes && !await confirmInTerminal("Apply this exact Bootstrap Plan?")) {
+    console.log(
+      "\nBootstrap cancelled. No restore actions were applied."
+    );
+    return;
+  }
+  const result = await session.apply({
+    allowRisk,
+    offline: !!opts.offline
+  });
+  const doctor = await session.doctor();
+  if (opts.json) {
+    console.log(JSON.stringify({ setup: setupResult, connection, plan, result, doctor }, null, 2));
+    return;
+  }
+  console.log(
+    `
+Bootstrap: ${result.failed.length ? "completed with failures" : "complete"}`
+  );
+  console.log(formatDoctor(doctor));
+});
+program2.command("ui").description("Open the local-only visual Bootstrap page").option("--home <path>", "Override home directory").option("--port <number>", "Local port (default: random)", "0").option("--no-open", "Do not open the browser automatically").option("--idle-minutes <number>", "Shut down after this many idle minutes", "15").action(async (opts) => {
+  const home = homeOpt({ opts: () => opts });
+  const port = Number.parseInt(String(opts.port), 10);
+  const idleMinutes = Number.parseFloat(String(opts.idleMinutes));
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error("--port must be an integer from 0 to 65535");
+  }
+  if (!Number.isFinite(idleMinutes) || idleMinutes <= 0) {
+    throw new Error("--idle-minutes must be greater than zero");
+  }
+  const handle = await startBootstrapWeb({
+    session: new BootstrapSession({ home }),
+    port,
+    openBrowser: opts.open !== false,
+    idleTimeoutMs: idleMinutes * 6e4
+  });
+  console.log("AI Config Sync local Bootstrap page:");
+  console.log(`  ${handle.url}`);
+  console.log(`  Bound to 127.0.0.1; idle shutdown: ${idleMinutes} minute(s).`);
+  console.log("Press Ctrl+C to stop.");
+  const stop = () => void handle.close();
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  await handle.closed;
 });
 program2.command("status").description("Show repository, profile, integrations, pending").option("--home <path>", "Override home directory").option("--json", "JSON output").action(async (opts) => {
   const home = homeOpt({ opts: () => opts });
@@ -23418,7 +24184,7 @@ program2.command("capture").description("Propose managing local resources into t
   const written = await commitCaptureItems(
     confirmed,
     configRepoPath,
-    import_node_os5.default.userInfo().username,
+    import_node_os6.default.userInfo().username,
     {
       home,
       afterWrite: opts.commit ? async (captureResult) => {

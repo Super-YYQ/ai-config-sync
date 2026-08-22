@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import os from "node:os";
+import { createInterface } from "node:readline/promises";
 import {
   expandHome,
   loadLocalConfig,
@@ -43,6 +44,8 @@ import {
   runDoctor,
 } from "@ai-config-sync/recipe-engine";
 import { runSetup } from "./setup.js";
+import { BootstrapSession } from "./bootstrap-session.js";
+import { startBootstrapWeb } from "./bootstrap-web.js";
 import path from "node:path";
 import { loadLock } from "@ai-config-sync/core";
 
@@ -64,6 +67,17 @@ program
 
 function homeOpt(cmd: { opts: () => { home?: string } }): string {
   return expandHome(cmd.opts().home ?? os.homedir());
+}
+
+async function confirmInTerminal(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return false;
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await prompt.question(`${question} [y/N] `)).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  } finally {
+    prompt.close();
+  }
 }
 
 async function loadCtx(home: string): Promise<{
@@ -200,6 +214,126 @@ program
       console.log("No changes");
     }
     console.log(`\nStatus: ${result.status}`);
+  });
+
+program
+  .command("bootstrap")
+  .description("Connect a private config repo, show one restore Plan, then apply it")
+  .option("--repo <url>", "Git remote for the private config repository")
+  .option("--config-path <path>", "Existing local private config repository")
+  .option("--profile <name>", "Profile name", "home")
+  .option("--target <name>", "Integration target: claude | codex | all", "all")
+  .option("--enable-codex-hook", "Install the ai-config-sync Codex SessionStart hook")
+  .option("--home <path>", "Override home directory")
+  .option("--yes", "Apply after displaying the Plan")
+  .option("--allow-risk <level>", "Max risk: low|medium|high", "medium")
+  .option("--offline", "Do not pull or clone remote sources")
+  .option("--json", "JSON output")
+  .action(async (opts) => {
+    const home = homeOpt({ opts: () => opts });
+    const session = new BootstrapSession({ home });
+    let setupResult;
+    if (opts.repo || opts.configPath) {
+      const target = String(opts.target ?? "all").toLowerCase();
+      if (!["claude", "codex", "all"].includes(target)) {
+        throw new Error("--target must be claude, codex, or all");
+      }
+      setupResult = await session.connect({
+        repo: opts.repo,
+        configPath: opts.configPath,
+        profile: opts.profile,
+        claude: target === "claude" || target === "all",
+        codex: target === "codex" || target === "all",
+        enableCodexHook: !!opts.enableCodexHook,
+      });
+    }
+
+    const connection = await session.connection();
+    if (!connection.linked) {
+      throw new Error(
+        "Bootstrap needs --repo or --config-path the first time it runs.",
+      );
+    }
+    const plan = await session.plan({
+      profile: opts.profile,
+      offline: !!opts.offline,
+      pull: !opts.offline,
+    });
+    if (opts.json && !opts.yes) {
+      console.log(JSON.stringify({ setup: setupResult, connection, plan }, null, 2));
+      return;
+    }
+
+    if (setupResult && !opts.json) {
+      for (const message of setupResult.messages) console.log(message);
+      console.log(`Bootstrap setup: ${setupResult.status}\n`);
+    }
+    if (!opts.json) console.log(formatPlan(plan));
+    const actionable = plan.actions.filter((action) => action.type !== "SKIP");
+    if (actionable.length === 0) {
+      if (opts.json) {
+        console.log(JSON.stringify({ setup: setupResult, connection, plan }, null, 2));
+      } else {
+        console.log("\nBootstrap: No changes");
+      }
+      return;
+    }
+    const allowRisk = String(opts.allowRisk).toLowerCase();
+    if (!["low", "medium", "high"].includes(allowRisk)) {
+      throw new Error("--allow-risk must be low, medium, or high");
+    }
+    if (!opts.yes && !(await confirmInTerminal("Apply this exact Bootstrap Plan?"))) {
+      console.log(
+        "\nBootstrap cancelled. No restore actions were applied.",
+      );
+      return;
+    }
+    const result = await session.apply({
+      allowRisk: allowRisk as RiskLevel,
+      offline: !!opts.offline,
+    });
+    const doctor = await session.doctor();
+    if (opts.json) {
+      console.log(JSON.stringify({ setup: setupResult, connection, plan, result, doctor }, null, 2));
+      return;
+    }
+    console.log(
+      `\nBootstrap: ${result.failed.length ? "completed with failures" : "complete"}`,
+    );
+    console.log(formatDoctor(doctor));
+  });
+
+program
+  .command("ui")
+  .description("Open the local-only visual Bootstrap page")
+  .option("--home <path>", "Override home directory")
+  .option("--port <number>", "Local port (default: random)", "0")
+  .option("--no-open", "Do not open the browser automatically")
+  .option("--idle-minutes <number>", "Shut down after this many idle minutes", "15")
+  .action(async (opts) => {
+    const home = homeOpt({ opts: () => opts });
+    const port = Number.parseInt(String(opts.port), 10);
+    const idleMinutes = Number.parseFloat(String(opts.idleMinutes));
+    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+      throw new Error("--port must be an integer from 0 to 65535");
+    }
+    if (!Number.isFinite(idleMinutes) || idleMinutes <= 0) {
+      throw new Error("--idle-minutes must be greater than zero");
+    }
+    const handle = await startBootstrapWeb({
+      session: new BootstrapSession({ home }),
+      port,
+      openBrowser: opts.open !== false,
+      idleTimeoutMs: idleMinutes * 60_000,
+    });
+    console.log("AI Config Sync local Bootstrap page:");
+    console.log(`  ${handle.url}`);
+    console.log(`  Bound to 127.0.0.1; idle shutdown: ${idleMinutes} minute(s).`);
+    console.log("Press Ctrl+C to stop.");
+    const stop = () => void handle.close();
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    await handle.closed;
   });
 
 program
