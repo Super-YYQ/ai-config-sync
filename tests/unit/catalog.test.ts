@@ -11,6 +11,7 @@ import {
 import {
   ASSET_CATALOG_HTML_REL,
   ASSET_CATALOG_MARKDOWN_REL,
+  PAGES_WORKFLOW_REL,
   buildAssetCatalog,
   renderAssetCatalogHtml,
   writeAssetCatalog,
@@ -107,6 +108,7 @@ describe("private repository asset catalog", () => {
     expect(first.changedRelPaths).toEqual([
       ASSET_CATALOG_MARKDOWN_REL,
       ASSET_CATALOG_HTML_REL,
+      PAGES_WORKFLOW_REL,
     ]);
 
     const markdown = await readText(first.markdownPath);
@@ -157,5 +159,27 @@ describe("private repository asset catalog", () => {
     const html = renderAssetCatalogHtml(catalog);
     expect(html).not.toContain("Portable skill <script>");
     expect(html).toContain('type="application/json"');
+  });
+
+  it("deploys the catalog via GitHub Pages and never clobbers a user workflow", async () => {
+    const first = await writeAssetCatalog(repo);
+    const workflowPath = path.join(repo, PAGES_WORKFLOW_REL);
+    const workflow = await readText(workflowPath);
+    // Only the self-contained catalog directory is published — never recipes,
+    // profiles, lock, or vendored sources.
+    expect(workflow).toContain("path: catalog");
+    expect(workflow).toContain("actions/deploy-pages@v4");
+    expect(workflow).toContain("pages: write");
+
+    // Deterministic content — a no-op capture reports no changes.
+    const second = await writeAssetCatalog(repo);
+    expect(second.changedRelPaths).toEqual([]);
+
+    // A user-owned workflow at the same path is left untouched.
+    await fs.rm(workflowPath, { force: true });
+    await writeText(workflowPath, "# my own pages setup\n");
+    const third = await writeAssetCatalog(repo);
+    expect(third.changedRelPaths).not.toContain(PAGES_WORKFLOW_REL);
+    expect(await readText(workflowPath)).toBe("# my own pages setup\n");
   });
 });

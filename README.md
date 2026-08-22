@@ -37,7 +37,7 @@
 
 - **电脑 A**：规则优先扫描；只有 `NEEDS-REVIEW` 可选择 AI 辅助分析，最终由用户确认。
 - **私有仓库**：Resources、Profiles、Recipes、Lock 与 vendored Sources 是声明式真源；不存明文密钥、登录态或聊天记录。
-- **仓库查看面**：`ASSETS.md` 零部署查看，HTML 提供卡片、搜索和筛选。
+- **仓库查看面**：`ASSETS.md` 零部署查看，HTML 提供卡片、搜索和筛选；Capture 会附带生成 `.github/workflows/ai-config-sync-pages.yml`，在 GitHub 仓库设置中把 Pages Source 选为 GitHub Actions 后，每次 push 自动把自包含的 `catalog/` 页面部署为可搜索的站点（仅发布 catalog，不暴露仓库其余内容）。
 - **电脑 B**：安装前先显示 Plan，冲突和高风险动作由用户决定，恢复引擎不调用 AI。
 
 完整目标、当前差距和验收标准见 [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)。

@@ -34,6 +34,7 @@ import { vendorSkillDirectory } from "./vendor.js";
 import {
   ASSET_CATALOG_HTML_REL,
   ASSET_CATALOG_MARKDOWN_REL,
+  PAGES_WORKFLOW_REL,
   writeAssetCatalog,
 } from "./catalog.js";
 
@@ -322,6 +323,7 @@ export async function commitCaptureItems(
     for (const rel of stagedVendorRels) await trackPath(rel);
     await trackPath(ASSET_CATALOG_MARKDOWN_REL);
     await trackPath(ASSET_CATALOG_HTML_REL);
+    await trackPath(PAGES_WORKFLOW_REL);
 
     // Replace: vendor dirs first, then recipes, then resources
     for (const rel of stagedVendorRels) {
@@ -389,6 +391,7 @@ export async function commitCaptureItems(
         ...stagedVendorRels,
         ASSET_CATALOG_MARKDOWN_REL,
         ASSET_CATALOG_HTML_REL,
+        PAGES_WORKFLOW_REL,
       ];
       // Deduplicate while preserving order
       const seen = new Set<string>();

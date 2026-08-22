@@ -23,6 +23,10 @@ import {
 
 export const ASSET_CATALOG_MARKDOWN_REL = "ASSETS.md";
 export const ASSET_CATALOG_HTML_REL = "catalog/index.html";
+export const PAGES_WORKFLOW_REL = ".github/workflows/ai-config-sync-pages.yml";
+
+const PAGES_WORKFLOW_MARKER =
+  "# Managed by ai-config-sync (asset catalog Pages deployment). Safe to delete or customize.";
 
 const ASSETS_BEGIN = "<!-- ai-config-sync:assets:start -->";
 const ASSETS_END = "<!-- ai-config-sync:assets:end -->";
@@ -388,7 +392,7 @@ export function renderAssetCatalogMarkdown(catalog: AssetCatalog): string {
     "> [!NOTE]",
     "> 此目录由 `ai-config-sync` 根据仓库中的 `resources.yaml`、Profiles、Recipes 与 Lock 确定性生成。请勿手工编辑标记区；它不包含密钥解析值、登录态、聊天记录或本机绝对路径。",
     "",
-    "需要搜索和筛选时，可下载并打开 [`catalog/index.html`](catalog/index.html)；若仓库配置了私有静态站点，也可直接托管该自包含页面。",
+    "需要搜索和筛选时，可下载并打开 [`catalog/index.html`](catalog/index.html)；仓库已附带 `.github/workflows/ai-config-sync-pages.yml`，在 GitHub 上启用 Pages（Source 选 GitHub Actions）后，每次 push 都会把该自包含页面自动部署为仓库站点，方便随时在线查询备份的 Skill / Plugin 等资产。私有仓库的 Pages 需要付费计划且仅对有权限者可见。",
     "",
     "## 概览",
     "",
@@ -671,6 +675,45 @@ export function renderAssetCatalogHtml(catalog: AssetCatalog): string {
 `;
 }
 
+// Only `catalog/` is published — the page is fully self-contained, so the
+// workflow never exposes recipes, profiles, lock, or vendored sources. If the
+// user already has a workflow at this path, we leave it untouched instead of
+// clobbering their customization.
+export function renderPagesWorkflow(): string {
+  return `${PAGES_WORKFLOW_MARKER}
+name: Deploy asset catalog (ai-config-sync)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: catalog
+      - id: deployment
+        uses: actions/deploy-pages@v4
+`;
+}
+
 export async function writeAssetCatalog(
   configRepoPath: string,
 ): Promise<WriteAssetCatalogResult> {
@@ -705,6 +748,22 @@ export async function writeAssetCatalog(
   if (existingHtml !== html) {
     await writeText(htmlPath, html);
     changedRelPaths.push(ASSET_CATALOG_HTML_REL);
+  }
+
+  // GitHub Pages deployment: only written when absent (or still managed by us)
+  // so a user's own Pages workflow is never overwritten.
+  const workflowPath = path.join(configRepoPath, PAGES_WORKFLOW_REL);
+  const desiredWorkflow = renderPagesWorkflow();
+  const existingWorkflow = (await pathExists(workflowPath))
+    ? await readText(workflowPath)
+    : undefined;
+  if (existingWorkflow !== desiredWorkflow) {
+    if (existingWorkflow !== undefined && !existingWorkflow.startsWith(PAGES_WORKFLOW_MARKER)) {
+      return { catalog, markdownPath, htmlPath, changedRelPaths };
+    }
+    await fs.mkdir(path.dirname(workflowPath), { recursive: true });
+    await writeText(workflowPath, desiredWorkflow);
+    changedRelPaths.push(PAGES_WORKFLOW_REL);
   }
 
   return { catalog, markdownPath, htmlPath, changedRelPaths };
