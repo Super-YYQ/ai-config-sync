@@ -333,9 +333,19 @@ export async function commitPaths(
 }
 
 export async function pushRepo(dir: string): Promise<GitResult> {
+  // Refresh remote-tracking refs first so behind/diverged detection reflects
+  // the remote's actual state instead of the last fetch/pull.
+  await runGit(dir, ["fetch", "--quiet"], { allowFail: true });
   const safety = await inspectGitSafety(dir);
   if (safety.diverged) {
-    throw new GitError("Refusing to push: branch has diverged from upstream");
+    throw new GitError(
+      "Refusing to push: branch has diverged from upstream. " +
+        "Another machine likely pushed a capture in the meantime. Fix with " +
+        "`git pull --rebase` inside the config repository: resolve resources.yaml " +
+        "by keeping the union of resource ids from both sides, take either side for " +
+        "ASSETS.md / catalog files and regenerate them via " +
+        "`ai-config-sync inventory --write`, then push again.",
+    );
   }
   if (safety.dirty) {
     throw new GitError("Refusing to push: uncommitted changes remain");

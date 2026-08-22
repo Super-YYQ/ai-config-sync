@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Multi-machine capture safety: `capture --commit` now fast-forward pulls the
+  config repository before writing anything, and `--push` aborts up front when
+  local and remote have already diverged instead of creating more diverged
+  commits.
+- `pushRepo` fetches remote refs before its safety checks, so divergence is
+  detected from fresh remote state; the refusal error now spells out the
+  `git pull --rebase` recovery steps (union-merge resources.yaml, regenerate
+  catalog views via `inventory --write`).
+- Capture proposals now surface same-id multi-machine content conflicts: when a
+  scanned skill directory hashes differently from the repository's vendored
+  copy, the item is marked NEEDS-REVIEW (`same-id-different-content`) instead
+  of being silently skipped; identical content stays silent.
 - Added a deterministic private-repository asset catalog with a GitHub-native
   managed `ASSETS.md` view and a self-contained responsive HTML page with
   search and Kind/Target/Profile filters.

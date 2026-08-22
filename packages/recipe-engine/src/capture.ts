@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   RecipeSchema,
+  hashDirectory,
   loadResources,
   loadRecipe,
   pathExists,
@@ -44,6 +45,38 @@ export {
 } from "./capture-transaction.js";
 
 /**
+ * Detect the multi-machine semantic conflict: the resource id is already
+ * backed up with a vendored copy, but this machine's local directory hashes
+ * differently. Only directory-based vendored skills can be compared this way;
+ * anything else keeps the previous silent-skip behavior.
+ */
+async function differsFromVendoredCopy(
+  recorded: Resource,
+  scanned: ScannedResource,
+  configRepoPath: string,
+): Promise<boolean> {
+  if (scanned.kind !== "skill") return false;
+  const source = recorded.source;
+  if (source?.provider !== "vendored") return false;
+  const rel = source.path;
+  if (
+    !rel ||
+    path.isAbsolute(rel) ||
+    rel.split("/").some((seg) => !seg || seg === "." || seg === "..")
+  ) {
+    return false;
+  }
+  if (!scanned.path || !path.isAbsolute(scanned.path)) return false;
+  try {
+    const localHash = await hashDirectory(scanned.path);
+    const vendoredHash = await hashDirectory(path.join(configRepoPath, rel));
+    return localHash !== vendoredHash;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Build capture proposals from scan results (does not write until confirmed).
  *
  * P0 fixes:
@@ -65,10 +98,12 @@ export async function buildCaptureProposals(
   const existing = await loadResources(
     path.join(configRepoPath, "resources.yaml"),
   );
-  const existingIds = new Set(existing.resources.map((r) => r.id));
+  const existingById = new Map(existing.resources.map((r) => [r.id, r]));
+  const existingIds = new Set(existingById.keys());
 
   // Group by logical resource id (repo + name, not repo alone)
   const groups = new Map<string, ScannedResource[]>();
+  const sameIdConflicts: { id: string; resource: Resource; scanned: ScannedResource }[] = [];
   for (const s of scanned) {
     if (s.kind === "config") continue;
     if (isNeverCapturableResource(s)) continue;
@@ -77,7 +112,16 @@ export async function buildCaptureProposals(
     if (s.classification === "managed" && !options.includeManaged) continue;
     const id = logicalId(s);
     if (isSelfManagedResourceId(id)) continue;
-    if (existingIds.has(id) && !options.includeManaged) continue;
+    if (existingIds.has(id) && !options.includeManaged) {
+      // The id is already backed up. Same content means nothing to do, but a
+      // different local copy (e.g. the same skill edited on two machines)
+      // must surface as NEEDS-REVIEW instead of being silently skipped.
+      const recorded = existingById.get(id);
+      if (recorded && (await differsFromVendoredCopy(recorded, s, configRepoPath))) {
+        sameIdConflicts.push({ id, resource: recorded, scanned: s });
+      }
+      continue;
+    }
     const key = groupKey(s);
     const list = groups.get(key) ?? [];
     list.push(s);
@@ -85,6 +129,18 @@ export async function buildCaptureProposals(
   }
 
   const items: CaptureItem[] = [];
+
+  for (const conflict of sameIdConflicts) {
+    items.push({
+      scanned: conflict.scanned,
+      scannedAll: [conflict.scanned],
+      suggestedResource: conflict.resource,
+      suggestedRecipe: undefined,
+      needsAi: false,
+      status: "needs-review",
+      blockReason: "same-id-different-content",
+    });
+  }
 
   for (const [, group] of groups) {
     const id = logicalId(group[0]!);

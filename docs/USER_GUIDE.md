@@ -38,7 +38,7 @@ ai-config-sync inventory --json           # 机器可读目录
 |------|------|------------------|
 | **READY** | 来源已解析，配方可用 | 是 |
 | **BLOCKED** | 如 Marketplace 未解析 / 系统资源 | 否 |
-| **NEEDS-REVIEW** | 需人工或 `--analyze` | 否 |
+| **NEEDS-REVIEW** | 需人工或 `--analyze`；也用于同 id 多机内容冲突 | 否 |
 | **SYSTEM-EXCLUDED** | 如 Codex `.system` | 否（扫描层已排除） |
 
 `--ai` 是 `--analyze` 的别名；**默认不调用真实 LLM**。只有配置了 `localConfig.ai` provider 时才可能走模型。
@@ -95,12 +95,28 @@ Marketplace 类资源会走 `claude plugin marketplace add / install / enable`�
 - 公司机可用更严格 profile，排除个人 skill
 - `setup --profile company` 切换；资源的 `profiles` 字段控制是否纳入
 
-## Git 冲突
+## 多机备份与 Git 冲突
 
-- 私有仓请正常用 git：一端 push，另一端 pull 后再 capture/restore
-- `capture --commit` 会做 secret-scan；冲突时先 `git pull --rebase` 再操作
-- 不要把 `.env`、密钥、OAuth 写进私有仓
-- 当前 CLI 使用 fast-forward-only 拉取，不会自动改写分叉历史；资产级“保留本机 / 使用远端 / 两者保留”仍是目标能力
+多台电脑可以先后备份到同一个私有仓：每台只 Capture 自己未纳管的资产，
+仓库最终是所有机器的并集；恢复过的资产在本机是 managed 状态，不会重复提案。
+撞车时的行为：
+
+- `capture --commit` 写入前会自动 `git pull --ff-only`（工作区干净且配置了
+  远端时），大多数"另一台机器刚 push 过"的情况会静默追上
+- push 前会先 fetch 刷新远端状态；本地与远端已分叉时拒绝推送并给出修复
+  指引。带 `--push` 的 capture 在已分叉时会在写入任何东西**之前**中止，
+  不会制造更多分叉提交
+- 手动解决：`git pull --rebase` → `resources.yaml` 按 id 取两侧并集 →
+  `ASSETS.md` / `catalog/index.html` 任选一侧后用
+  `ai-config-sync inventory --write` 重新生成 → 再 push
+- 同一个资源 id 在两台机器上改出不同内容时，Capture 会把它标为
+  **NEEDS-REVIEW**（`same-id-different-content`，比较本机目录与仓库内
+  vendored 副本的内容哈希），`--yes` 不会自动写入；想两份都保留就改成
+  不同的资源 id。远程引用类资源（GitHub、Marketplace）没有本地副本可比，
+  仍维持静默跳过
+- `capture --commit` 会做 secret-scan；不要把 `.env`、密钥、OAuth 写进私有仓
+- 拉取始终是 fast-forward-only，不会自动改写分叉历史；资产级
+  "保留本机 / 使用远端 / 两者保留"三选一界面仍是目标能力
 
 ## Hook Trust
 

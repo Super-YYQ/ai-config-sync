@@ -642,6 +642,46 @@ program
       }
       return;
     }
+    // Sync with the private repo before writing anything, so multi-machine
+    // captures build on the latest resources.yaml instead of a stale clone.
+    // On divergence we refuse to continue when --push was requested (the push
+    // would be refused anyway) and only warn for local-only --commit.
+    if (opts.commit) {
+      const guidance =
+        "This machine's config repository has diverged from the remote " +
+        "(another machine pushed captures in the meantime). Run " +
+        "`git pull --rebase` inside the config repository — merge resources.yaml " +
+        "by keeping the union of resource ids, then regenerate views with " +
+        "`ai-config-sync inventory --write` — and re-run capture.";
+      const before = await inspectGitSafety(configRepoPath);
+      if (before.diverged) {
+        if (opts.push) {
+          console.error(guidance);
+          return;
+        }
+        console.log(`WARNING: ${guidance}`);
+      } else if (before.canPull) {
+        try {
+          await pullRepo(configRepoPath);
+          console.log("Pulled latest config repository before capture.");
+        } catch (e) {
+          // A failed ff-only pull updates remote-tracking refs; re-inspect to
+          // tell real divergence apart from network/offline hiccups.
+          const after = await inspectGitSafety(configRepoPath);
+          if (after.diverged) {
+            if (opts.push) {
+              console.error(guidance);
+              return;
+            }
+            console.log(`WARNING: ${guidance}`);
+          } else {
+            console.log(`Pull skipped: ${(e as Error).message}`);
+          }
+        }
+      } else if (before.messages.length) {
+        for (const m of before.messages) console.log(`Git: ${m}`);
+      }
+    }
     let committed = false;
     let pushed = false;
     const written = await commitCaptureItems(

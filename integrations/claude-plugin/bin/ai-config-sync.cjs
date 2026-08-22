@@ -18342,9 +18342,10 @@ async function commitPaths(dir, message, relPaths, options = {}) {
   }
 }
 async function pushRepo(dir) {
+  await runGit(dir, ["fetch", "--quiet"], { allowFail: true });
   const safety = await inspectGitSafety(dir);
   if (safety.diverged) {
-    throw new GitError("Refusing to push: branch has diverged from upstream");
+    throw new GitError("Refusing to push: branch has diverged from upstream. Another machine likely pushed a capture in the meantime. Fix with `git pull --rebase` inside the config repository: resolve resources.yaml by keeping the union of resource ids from both sides, take either side for ASSETS.md / catalog files and regenerate them via `ai-config-sync inventory --write`, then push again.");
   }
   if (safety.dirty) {
     throw new GitError("Refusing to push: uncommitted changes remain");
@@ -21553,10 +21554,32 @@ async function commitCaptureItems(items, configRepoPath, confirmedBy = "user", o
 }
 
 // packages/recipe-engine/dist/capture.js
+async function differsFromVendoredCopy(recorded, scanned, configRepoPath) {
+  if (scanned.kind !== "skill")
+    return false;
+  const source = recorded.source;
+  if (source?.provider !== "vendored")
+    return false;
+  const rel = source.path;
+  if (!rel || import_node_path27.default.isAbsolute(rel) || rel.split("/").some((seg) => !seg || seg === "." || seg === "..")) {
+    return false;
+  }
+  if (!scanned.path || !import_node_path27.default.isAbsolute(scanned.path))
+    return false;
+  try {
+    const localHash = await hashDirectory(scanned.path);
+    const vendoredHash = await hashDirectory(import_node_path27.default.join(configRepoPath, rel));
+    return localHash !== vendoredHash;
+  } catch {
+    return false;
+  }
+}
 async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
   const existing = await loadResources(import_node_path27.default.join(configRepoPath, "resources.yaml"));
-  const existingIds = new Set(existing.resources.map((r) => r.id));
+  const existingById = new Map(existing.resources.map((r) => [r.id, r]));
+  const existingIds = new Set(existingById.keys());
   const groups = /* @__PURE__ */ new Map();
+  const sameIdConflicts = [];
   for (const s of scanned) {
     if (s.kind === "config")
       continue;
@@ -21571,14 +21594,30 @@ async function buildCaptureProposals(scanned, configRepoPath, options = {}) {
     const id = logicalId(s);
     if (isSelfManagedResourceId(id))
       continue;
-    if (existingIds.has(id) && !options.includeManaged)
+    if (existingIds.has(id) && !options.includeManaged) {
+      const recorded = existingById.get(id);
+      if (recorded && await differsFromVendoredCopy(recorded, s, configRepoPath)) {
+        sameIdConflicts.push({ id, resource: recorded, scanned: s });
+      }
       continue;
+    }
     const key = groupKey(s);
     const list = groups.get(key) ?? [];
     list.push(s);
     groups.set(key, list);
   }
   const items = [];
+  for (const conflict of sameIdConflicts) {
+    items.push({
+      scanned: conflict.scanned,
+      scannedAll: [conflict.scanned],
+      suggestedResource: conflict.resource,
+      suggestedRecipe: void 0,
+      needsAi: false,
+      status: "needs-review",
+      blockReason: "same-id-different-content"
+    });
+  }
   for (const [, group] of groups) {
     const id = logicalId(group[0]);
     const primary = group.find((g) => g.kind === "skill") ?? group.find((g) => g.kind === "plugin") ?? group[0];
@@ -24178,6 +24217,35 @@ program2.command("capture").description("Propose managing local resources into t
       console.log(`  skipped: ${s.suggestedResource.id} (needs review)`);
     }
     return;
+  }
+  if (opts.commit) {
+    const guidance = "This machine's config repository has diverged from the remote (another machine pushed captures in the meantime). Run `git pull --rebase` inside the config repository \u2014 merge resources.yaml by keeping the union of resource ids, then regenerate views with `ai-config-sync inventory --write` \u2014 and re-run capture.";
+    const before = await inspectGitSafety(configRepoPath);
+    if (before.diverged) {
+      if (opts.push) {
+        console.error(guidance);
+        return;
+      }
+      console.log(`WARNING: ${guidance}`);
+    } else if (before.canPull) {
+      try {
+        await pullRepo(configRepoPath);
+        console.log("Pulled latest config repository before capture.");
+      } catch (e) {
+        const after = await inspectGitSafety(configRepoPath);
+        if (after.diverged) {
+          if (opts.push) {
+            console.error(guidance);
+            return;
+          }
+          console.log(`WARNING: ${guidance}`);
+        } else {
+          console.log(`Pull skipped: ${e.message}`);
+        }
+      }
+    } else if (before.messages.length) {
+      for (const m of before.messages) console.log(`Git: ${m}`);
+    }
   }
   let committed = false;
   let pushed = false;

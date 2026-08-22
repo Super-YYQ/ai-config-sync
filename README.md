@@ -27,6 +27,7 @@ Git 仓库。换电脑后，通过 CLI 或本地 Web 页面连接该仓库、检
 - [环境要求](#环境要求)
 - [快速开始](#快速开始)
 - [完整双机流程](#完整双机流程)
+- [多机备份与冲突处理](#多机备份与冲突处理)
 - [Skill 与 Plugin 如何处理](#skill-与-plugin-如何处理)
 - [私有配置仓库](#私有配置仓库)
 - [私有仓库资产目录](#私有仓库资产目录)
@@ -244,6 +245,31 @@ ai-config-sync plan
 ai-config-sync restore --yes --allow-risk medium
 ai-config-sync doctor
 ```
+
+## 多机备份与冲突处理
+
+多台电脑可以先后向同一个私有配置仓备份。每台机器只 Capture 自己未纳管
+的资产，仓库最终是所有机器的**并集**；恢复过的资产在本机是 managed 状态，
+不会重复提案。冲突在两个层面分别处理：
+
+**Git 层（先后推送撞车）**
+
+- `capture --commit` 在写入前会自动 `git pull --ff-only`（工作区干净且配置了
+  远端时），大多数"另一台机器刚 push 过"的情况会静默追上。
+- push 前会先 fetch 刷新远端状态；本地与远端已经分叉时拒绝推送，并给出
+  完整修复指引：`git pull --rebase` 后解决冲突再推送。带 `--push` 的
+  capture 在已分叉时会在写入任何东西**之前**中止，避免产生更多分叉提交。
+- rebase 时的文件冲突解法：`resources.yaml` 按 id 取两侧并集；
+  `ASSETS.md` 和 `catalog/index.html` 任选一侧，然后用
+  `ai-config-sync inventory --write` 重新生成即可。
+
+**资产层（同一个 id、两台机器改出不同内容）**
+
+- Capture 提案阶段会比较本机目录与仓库内 vendored 副本的内容哈希：不一致
+  时该项被标为 `NEEDS-REVIEW`（`reason=same-id-different-content`），
+  `--yes` 不会自动写入，由你决定保留哪一份（改用不同的资源 id 可两份都留）。
+  内容一致则保持安静，不会产生噪音。
+- 远程引用类资源（GitHub、Marketplace）没有本地副本可比，仍维持静默跳过。
 
 ## Skill 与 Plugin 如何处理
 
